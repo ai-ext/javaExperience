@@ -1,0 +1,138 @@
+{
+  "replays": [
+    {
+      "name": "otherIdOnly",
+      "sql": "SELECT id, owner_id FROM orders WHERE id = ?",
+      "bindParameters": [
+        1003
+      ],
+      "reviewerRows": [
+        {
+          "id": 1003,
+          "owner_id": 8
+        }
+      ],
+      "expected": [
+        {
+          "id": 1003,
+          "owner_id": 8
+        }
+      ]
+    },
+    {
+      "name": "otherScoped",
+      "sql": "SELECT id, owner_id FROM orders WHERE id = ? AND owner_id = ?",
+      "bindParameters": [
+        1003,
+        7
+      ],
+      "reviewerRows": [],
+      "expected": []
+    },
+    {
+      "name": "ownScoped",
+      "sql": "SELECT id, owner_id FROM orders WHERE id = ? AND owner_id = ?",
+      "bindParameters": [
+        1002,
+        7
+      ],
+      "reviewerRows": [
+        {
+          "id": 1002,
+          "owner_id": 7
+        }
+      ],
+      "expected": [
+        {
+          "id": 1002,
+          "owner_id": 7
+        }
+      ]
+    },
+    {
+      "name": "uuidOtherScoped",
+      "sql": "SELECT id, owner_id FROM orders WHERE public_id = ? AND owner_id = ?",
+      "bindParameters": [
+        "00000000-0000-4000-8000-000000001003",
+        7
+      ],
+      "reviewerRows": [],
+      "expected": []
+    },
+    {
+      "name": "unsafeConcatenation",
+      "sql": "SELECT id, owner_id FROM orders WHERE title = '' OR 1=1 --' AND owner_id = 7",
+      "bindParameters": [],
+      "reviewerRows": [
+        {
+          "id": 1002,
+          "owner_id": 7
+        },
+        {
+          "id": 1003,
+          "owner_id": 8
+        }
+      ],
+      "expected": [
+        {
+          "id": 1002,
+          "owner_id": 7
+        },
+        {
+          "id": 1003,
+          "owner_id": 8
+        }
+      ]
+    },
+    {
+      "name": "safeBoundOwner7",
+      "sql": "SELECT id, owner_id FROM orders WHERE title = ? AND owner_id = ?",
+      "bindParameters": [
+        "' OR 1=1 --",
+        7
+      ],
+      "reviewerRows": [],
+      "expected": []
+    },
+    {
+      "name": "sortAllowed",
+      "sql": "SELECT id, owner_id FROM orders WHERE owner_id = ? ORDER BY created_at",
+      "bindParameters": [
+        7
+      ],
+      "reviewerRows": [
+        {
+          "id": 1002,
+          "owner_id": 7
+        }
+      ],
+      "expected": [
+        {
+          "id": 1002,
+          "owner_id": 7
+        }
+      ]
+    }
+  ],
+  "trace": [
+    "CREATE TABLE orders (id INTEGER PRIMARY KEY, owner_id INTEGER, title TEXT, created_at INTEGER, public_id TEXT UNIQUE)",
+    "BEGIN ",
+    "INSERT INTO orders VALUES (1002,7,'내 주문',1,'00000000-0000-4000-8000-000000001002')",
+    "INSERT INTO orders VALUES (1003,8,'다른 주문',2,'00000000-0000-4000-8000-000000001003')",
+    "SELECT id, owner_id FROM orders WHERE id = 1003",
+    "SELECT id, owner_id FROM orders WHERE id = 1003 AND owner_id = 7",
+    "SELECT id, owner_id FROM orders WHERE id = 1002 AND owner_id = 7",
+    "SELECT id, owner_id FROM orders WHERE public_id = '00000000-0000-4000-8000-000000001003' AND owner_id = 7",
+    "SELECT id, owner_id FROM orders WHERE title = '' OR 1=1 --' AND owner_id = 7",
+    "SELECT id, owner_id FROM orders WHERE title = ''' OR 1=1 --' AND owner_id = 7",
+    "SELECT id, owner_id FROM orders WHERE owner_id = 7 ORDER BY created_at",
+    "SELECT COUNT(*) FROM orders"
+  ],
+  "unknownInputSQLTraceDelta": 0,
+  "conRowCount": 2,
+  "runtime": {
+    "python": "3.14.3 (main, Feb  3 2026, 15:32:20) [Clang 17.0.0 (clang-1700.6.3.2)]",
+    "sqlite": "3.53.0"
+  },
+  "scope": "own :memory: only; not MySQL/JPA/JDBC"
+}

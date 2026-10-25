@@ -1,0 +1,35 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+const root=process.cwd(), site=path.join(root,'tools/site');
+const {Marked}=await import(path.join(site,'node_modules/marked/lib/marked.esm.js'));
+const {JSDOM}=await import(path.join(site,'node_modules/jsdom/lib/api.js'));
+const data=await import(path.join(site,'r04-lesson-data.mjs'));
+const {renderR04Learning}=await import(path.join(site,'r04-learning.mjs'));
+const {initR04Learning}=await import(path.join(site,'r04-learning.js'));
+const {rasterDimensions}=await import(path.join(site,'raster-size.mjs'));
+const {R03_ASSETS}=await import(path.join(site,'r03-lesson-data.mjs'));
+const {D06_ASSETS}=await import(path.join(site,'d06-lesson-data.mjs'));
+const read=p=>fs.readFileSync(path.join(root,p),'utf8'),sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+const checks=[];
+const build=read('tools/site/build.mjs');
+const literal=eval(build.match(/const R03_LITERAL_DEL_RAW = (new Set\([^;]+\));/)[1]);
+const body=build.match(/      del\(token\) \{([\s\S]*?)\n      \},/)[1];
+const escapeHtml=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const render=(input,isR03)=>{const abs=path.join(root,isR03?'docs/knowledge/R03-schema-types-constraints.md':'docs/knowledge/OTHER.md');const handler=new Function('token','abs','path','ROOT','R03_LITERAL_DEL_RAW','escapeHtml',body);return new Marked({renderer:{del(token){return handler(token,abs,path,root,literal,escapeHtml);}}}).parse(input);};
+const sample='-128~127, unsigned 0~255\n\n-2⁶³~2⁶³-1 / unsigned 0~2⁶⁴-1\n\n~~취소선~~\n\n`-128~127, unsigned 0~255`\n\n```sql\n-128~127, unsigned 0~255\n```\n';
+const r03=render(sample,true), normal=render(sample,false), defaultHtml=new Marked().parse(sample);
+assert.equal(normal,defaultHtml);assert.match(r03,/-128~127, unsigned 0~255/);assert.match(r03,/-2⁶³~2⁶³-1 \/ unsigned 0~2⁶⁴-1/);assert.match(r03,/<del>취소선<\/del>/);assert.match(r03,/<code>-128~127, unsigned 0~255<\/code>/);assert.match(r03,/<pre><code class="language-sql">-128~127, unsigned 0~255\n<\/code><\/pre>/);assert.equal(render('~~127, unsigned 0~~',true),new Marked().parse('~~127, unsigned 0~~'));checks.push({id:'r03-renderer-boundaries',pass:true,r03,otherDocument:normal});
+const manifest=JSON.parse(read('docs/design/concept-cycle-2026-10-22/repairs/priority/correction-manifest.json'));
+const test=read('tools/site/test-r03-generated.mjs');const pairs=JSON.parse('['+test.match(/const approvedTextCorrections=\[([\s\S]*?)\n\];/)[1].trim().replaceAll("'",'"').replace(/,\s*$/,'')+']');assert.deepEqual(pairs,manifest.r03ApprovedHTMLBaselineCorrections.approvedNormalizedTextChanges.map(x=>[x.before,x.after]));
+assert.equal(sha(fs.readFileSync(manifest.r03ApprovedHTMLBaselineCorrections.sourcePath)),manifest.r03ApprovedHTMLBaselineCorrections.sourceSHA256);assert.equal(sha(fs.readFileSync(manifest.r03ApprovedHTMLBaselineCorrections.historicalHtmlBaselinePath)),manifest.r03ApprovedHTMLBaselineCorrections.historicalHtmlBaselineSHA256);checks.push({id:'r03-manifest-baseline-corrections',pass:true,pairs});
+for(const item of manifest.imageCorrections){const raw=fs.readFileSync(item.rawSource),jpeg=fs.readFileSync(item.targetJPEG),active=item.documentId==='R03'?R03_ASSETS[item.assetKey]:D06_ASSETS[item.assetKey];assert.equal(path.basename(item.targetJPEG),active.file);assert.equal(sha(raw),item.rawSourceSHA256);assert.equal(sha(jpeg),item.conversion.targetSHA256);assert.deepEqual(rasterDimensions(raw),{width:1672,height:941,format:'png'});assert.deepEqual(rasterDimensions(jpeg),{width:1672,height:941,format:'jpeg'});assert.equal(raw.length,item.rawSourceBytes);assert.equal(jpeg.length,item.conversion.targetBytes);assert.equal(sha(fs.readFileSync(item.promptPath)),item.promptSHA256);assert.equal(sha(fs.readFileSync(item.candidatePath)),item.candidateSHA256);const reproduced=path.join(root,'docs/design/concept-cycle-2026-10-22/repairs/priority/sol-logs',item.documentId+'-quality92-reproduced.jpg');execFileSync('/usr/bin/sips',['-s','format','jpeg','-s','formatOptions','92',item.rawSource,'--out',reproduced]);assert.equal(sha(fs.readFileSync(reproduced)),sha(jpeg));checks.push({id:item.finding+'-provenance',pass:true,target:item.targetJPEG,sha256:sha(jpeg),quality92ReproductionByteEqual:true});}
+const baseCode=execFileSync('git',['show','4b0493af:tools/site/r04-lesson-data.mjs'],{encoding:'utf8'});const baseData=await import('data:text/javascript;base64,'+Buffer.from(baseCode).toString('base64'));assert.deepEqual(data.R04_LESSONS.map(l=>l.stages),baseData.R04_LESSONS.map(l=>l.stages));assert.deepEqual(data.R04_RUNS,baseData.R04_RUNS);checks.push({id:'r04-fragments-highlights-runtime-preserved',pass:true});
+const dom=new JSDOM(renderR04Learning(),{url:'https://example.test/'}),win=dom.window,doc=win.document,$=s=>doc.querySelector(s),tick=()=>new Promise(r=>setTimeout(r,0));let complete;Object.defineProperty(win.navigator,'clipboard',{value:{writeText:()=>new Promise((resolve,reject)=>{complete={resolve,reject};})}});initR04Learning(doc,win);const choose=id=>{let t=$('[data-r04-topic]');t.value=id;t.dispatchEvent(new win.Event('change'));};
+choose('dml');assert.equal($('[data-r04-full-manual]').open,false);assert.equal($('[data-r04-full-manual]').hidden,false);assert.equal($('[data-r04-full-code]').textContent,data.R04_FULL_DML_TRANSACTION);
+for(const sel of ['[data-r04-copy]','[data-r04-copy-full]'])for(const outcome of ['resolve','reject']){choose('dml');$(sel).click();assert.equal($('[data-r04-copy-status]').textContent,'');choose('select');complete[outcome](new Error('denied'));await tick();assert.equal($('[data-r04-copy-status]').textContent,'');assert.equal($('[data-r04-full-manual]').hidden,true);assert.equal($('[data-r04-full-manual]').open,false);assert.equal($('[data-r04-copy-full]').hidden,true);}
+choose('dml');$('[data-r04-copy]').click();complete.reject(new Error('denied'));await tick();assert.match($('[data-r04-copy-status]').textContent,/선택했습니다/);assert.doesNotMatch($('[data-r04-copy-status]').textContent,/복사했습니다/);
+win.close();checks.push({id:'r04-additional-behavior',pass:true,cases:['manual collapsed on DML entry','full text payload','regular/full deferred success and rejection after navigation','DML outside hidden','regular failure truthful fallback']});
+console.log(JSON.stringify({checkedAtUTC:new Date().toISOString(),checks},null,2));

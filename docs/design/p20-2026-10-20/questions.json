@@ -1,0 +1,319 @@
+{
+  "source": "docs/knowledge/P20-jpa-entity-mapping.md",
+  "sourceSHA256": "6cd8b34253f33255e8c7ec5608f07c382d3fe020b049182bfa0bc536dabdd125",
+  "questions": [
+    {
+      "id": "compile",
+      "question": "원문 전체 코드는 왜 DTO에서 컴파일되지 않을까?",
+      "source": "원문 §3.3 OrderLine/OrderResponse · 원문6파일 javac 실패 + 별도교정실행",
+      "note": "LineStatus는 package-private이고 호출하는 web은 다른 패키지입니다. 공개 메서드라도 그 반환 타입의 Enum.name()을 호출할 수 있는 것은 아닙니다. 한 식 교정은 추가 fixture에만 적용했습니다. 현재 enum에는 toString override가 없습니다. 추가 격리 실험은 Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final입니다. 원문 6파일은 DTO 접근 오류로 컴파일 실패했고 원문 5파일과 별도 DTO 교정본으로 실행했습니다. MySQL·Java 25·HTTP·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "compile-original",
+          "title": "원문6파일은 접근 오류",
+          "image": "P20-compile-v2.png",
+          "checks": [],
+          "sqlPhases": []
+        },
+        {
+          "id": "compile-corrected",
+          "title": "추가 DTO 한 식만 교정",
+          "image": "P20-compile-v2.png",
+          "checks": [
+            "dto-status-and-no-order-backref"
+          ],
+          "sqlPhases": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p20-2026-10-20/source-proof/original-compile.txt",
+        "docs/design/p20-2026-10-20/source-proof/execution.json",
+        "docs/design/p20-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "ownership",
+      "question": "addLine과 removeLine은 객체의 어느 쪽을 바꿀까?",
+      "source": "원문 §2.4 / §3.3 / §3.4 · 원문domain 순수Java 실행",
+      "note": "이 세 장면은 DB 실행 전 순수 Java입니다. addLine은 lines 추가와 line.attach(this)를 함께 수행하고, removeLine은 컬렉션 제거와 detach를 함께 수행합니다. 출력은 원문에서 제시한 두 줄과 일치했습니다. 추가 격리 실험은 Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final입니다. 원문 6파일은 DTO 접근 오류로 컴파일 실패했고 원문 5파일과 별도 DTO 교정본으로 실행했습니다. MySQL·Java 25·HTTP·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "ownership-add",
+          "title": "컬렉션과 owner 참조를 함께 추가",
+          "image": "P20-ownership-v2.png",
+          "checks": [
+            "pure-add-both-sides"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "ownership-remove",
+          "title": "같은 자식을 제거하고 detach",
+          "image": "P20-ownership-v2.png",
+          "checks": [
+            "pure-remove-both-sides"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "ownership-quantity",
+          "title": "quantity=0은 생성자에서 거부",
+          "image": "P20-ownership-v2.png",
+          "checks": [
+            "quantity-zero-reject"
+          ],
+          "sqlPhases": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p20-2026-10-20/source-proof/original-compile.txt",
+        "docs/design/p20-2026-10-20/source-proof/execution.json",
+        "docs/design/p20-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "inverse",
+      "question": "부모 컬렉션에만 넣으면 FK가 채워질까?",
+      "source": "추가 의도적실패fixture · 원문 OrderLine.order mapping 그대로",
+      "note": "원문 getLines는 List.copyOf를 반환하므로 이 실패는 추가 probe가 reflection으로 내부 컬렉션만 수정한 실험입니다. 학습자 코드에 실제로 이 오류가 있다는 뜻이 아닙니다. mappedBy=\"order\"는 Java 필드명이며 order_id 열명이 아닙니다. 추가 격리 실험은 Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final입니다. 원문 6파일은 DTO 접근 오류로 컴파일 실패했고 원문 5파일과 별도 DTO 교정본으로 실행했습니다. MySQL·Java 25·HTTP·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "inverse-memory",
+          "title": "inverse 컬렉션만 수정한 상태",
+          "image": "P20-inverse-v2.png",
+          "checks": [
+            "inverse-only-owner-null"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "inverse-reject",
+          "title": "owner null은 persist 중 거부",
+          "image": "P20-inverse-v2.png",
+          "checks": [
+            "inverse-only-null-owner-reject",
+            "inverse-only-rollback-no-parent-row"
+          ],
+          "sqlPhases": [
+            "inverseOnlySql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p20-2026-10-20/source-proof/original-compile.txt",
+        "docs/design/p20-2026-10-20/source-proof/execution.json",
+        "docs/design/p20-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "identity",
+      "question": "persist 뒤 INSERT와 commit은 같은 순간일까?",
+      "source": "추가 EntityManager transaction · 원문Order/OrderLine IDENTITY·cascade",
+      "note": "같은 commit 분기의 kim/coffee/4.50/quantity2를 따라갑니다. observer는 독립 JDBC 연결에서 H2 READ_COMMITTED(2)·autocommit으로 조회합니다. 원시 ORM SQL은 바인딩값을 기록하지 않았고 observer 쿼리는 별도입니다. 명시 flush의 추가 SQL 0개는 이 단순 조건의 관측입니다. 추가 격리 실험은 Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final입니다. 원문 6파일은 DTO 접근 오류로 컴파일 실패했고 원문 5파일과 별도 DTO 교정본으로 실행했습니다. MySQL·Java 25·HTTP·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "identity-new",
+          "title": "persist 전에는 두 ID가 null",
+          "image": "P20-identity-v2.png",
+          "checks": [
+            "new-ids-null-unmanaged"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "identity-persist",
+          "title": "이 fixture는 persist 중 두 INSERT",
+          "image": "P20-identity-v2.png",
+          "checks": [
+            "identity-persist-ids",
+            "cascade-line-managed",
+            "identity-insert-before-explicit-flush",
+            "owner-fk-is-order-id",
+            "persist-not-visible-outside"
+          ],
+          "sqlPhases": [
+            "persistSql"
+          ]
+        },
+        {
+          "id": "identity-flush",
+          "title": "추가 flush 뒤에도 외부는 0",
+          "image": "P20-identity-v2.png",
+          "checks": [
+            "flush-not-commit"
+          ],
+          "sqlPhases": [
+            "explicitFlushSql"
+          ]
+        },
+        {
+          "id": "identity-commit",
+          "title": "commit 뒤 별도 연결에서 같은 행",
+          "image": "P20-identity-v2.png",
+          "checks": [
+            "commit-visible-outside"
+          ],
+          "sqlPhases": [
+            "commitSql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p20-2026-10-20/source-proof/original-compile.txt",
+        "docs/design/p20-2026-10-20/source-proof/execution.json",
+        "docs/design/p20-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "rollback",
+      "question": "INSERT가 실행됐어도 rollback하면 행이 남을까?",
+      "source": "추가 별도rollback분기 · ordererName=rolled / order id2",
+      "note": "앞선 id1 commit 다음의 별도 transaction에서 id2를 저장하고 rollback했습니다. 같은 주문의 commit 뒤에 rollback하는 연속 단계가 아닙니다. rollback이 이미 할당된 ID를 되돌린다는 주장도 아닙니다. 추가 격리 실험은 Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final입니다. 원문 6파일은 DTO 접근 오류로 컴파일 실패했고 원문 5파일과 별도 DTO 교정본으로 실행했습니다. MySQL·Java 25·HTTP·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "rollback-insert",
+          "title": "별도 분기는 id2로 INSERT 후 flush",
+          "image": "P20-rollback-v2.png",
+          "checks": [
+            "rollback-branch-inserted-inside"
+          ],
+          "sqlPhases": [
+            "rollbackBranchSql"
+          ]
+        },
+        {
+          "id": "rollback-done",
+          "title": "rollback 뒤 id2 행은 외부에 없음",
+          "image": "P20-rollback-v2.png",
+          "checks": [
+            "rollback-outside-no-row"
+          ],
+          "sqlPhases": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p20-2026-10-20/source-proof/original-compile.txt",
+        "docs/design/p20-2026-10-20/source-proof/execution.json",
+        "docs/design/p20-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "orphan",
+      "question": "managed 자식을 removeLine하면 언제 DB에서 없어질까?",
+      "source": "원문orphanRemoval=true · 추가managed삭제transaction",
+      "note": "앞서 commit한 id1을 새 EntityManager로 조회해 managed 자식을 제거했습니다. new/detached/already removed의 orphanRemoval 제외 조건은 JPA 3.2 근거이며 이 실험에서는 그 세 조건을 실행하지 않았습니다. JPA 상태 전파와 DB ON DELETE CASCADE는 별개입니다. 추가 격리 실험은 Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final입니다. 원문 6파일은 DTO 접근 오류로 컴파일 실패했고 원문 5파일과 별도 DTO 교정본으로 실행했습니다. MySQL·Java 25·HTTP·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "orphan-memory",
+          "title": "메모리 참조부터 제거",
+          "image": "P20-orphan-v2.png",
+          "checks": [
+            "managed-remove-memory-before-flush"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "orphan-flush",
+          "title": "flush가 자식 DELETE 실행",
+          "image": "P20-orphan-v2.png",
+          "checks": [
+            "orphan-flush-delete-inside"
+          ],
+          "sqlPhases": [
+            "orphanFlushSql"
+          ]
+        },
+        {
+          "id": "orphan-commit",
+          "title": "commit 뒤 child0·parent1",
+          "image": "P20-orphan-v2.png",
+          "checks": [
+            "orphan-commit-child-gone-parent-kept"
+          ],
+          "sqlPhases": [
+            "orphanCommitSql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p20-2026-10-20/source-proof/original-compile.txt",
+        "docs/design/p20-2026-10-20/source-proof/execution.json",
+        "docs/design/p20-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "mapping",
+      "question": "애노테이션이 실제 열과 감사 값에 어떻게 나타났을까?",
+      "source": "원문Column/Enumerated/BaseEntity · 추가JDBC metadata와commit행",
+      "note": "H2 metadata 실측이며 MySQL DDL을 확인한 것이 아닙니다. 명시한 EnumType.STRING의 실제 PENDING과 JPA 3.2 기본 추론의 예외를 구분합니다. 현재 AuditorAware는 로그인 사용자가 아닌 원문의 상수 local-user입니다. 동적 감사 시각의 정확한 원값은 execution.json에 있습니다. 추가 격리 실험은 Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final입니다. 원문 6파일은 DTO 접근 오류로 컴파일 실패했고 원문 5파일과 별도 DTO 교정본으로 실행했습니다. MySQL·Java 25·HTTP·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "mapping-columns",
+          "title": "price와 FK의 실제 metadata",
+          "image": "P20-mapping-v2.png",
+          "checks": [
+            "ddl-order-id-not-null",
+            "ddl-price-precision-scale",
+            "ddl-fk-not-db-delete-cascade"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "mapping-enum",
+          "title": "현재 status는 PENDING 문자열",
+          "image": "P20-mapping-v2.png",
+          "checks": [
+            "enum-stored-string"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "mapping-audit",
+          "title": "감사 사용자와 시각이 채워짐",
+          "image": "P20-mapping-v2.png",
+          "checks": [
+            "audit-users-local-user",
+            "audit-dates-non-null"
+          ],
+          "sqlPhases": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p20-2026-10-20/source-proof/original-compile.txt",
+        "docs/design/p20-2026-10-20/source-proof/execution.json",
+        "docs/design/p20-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "dto",
+      "question": "DTO에는 무엇이 남고 EntityManager가 닫힌 뒤에도 쓸 수 있을까?",
+      "source": "원문OrderResponse + 추가한식교정 · 직접JsonMapper직렬화",
+      "note": "OrderResponse의 추가 한 식 교정이 필요한 조건입니다. 열린 transaction에서 DTO로 복사한 뒤 EntityManager 종료 후 같은 JSON을 확인했습니다. 실제 Controller 호출·HTTP 응답은 실행하지 않았습니다. JSON 프로퍼티 순서는 필드 계약이 아닙니다. 추가 격리 실험은 Boot 4.1.1 non-web / JDK 21 / H2 2.4.240 / Hibernate 7.4.5.Final입니다. 원문 6파일은 DTO 접근 오류로 컴파일 실패했고 원문 5파일과 별도 DTO 교정본으로 실행했습니다. MySQL·Java 25·HTTP·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "dto-copy",
+          "title": "필요 필드만 복사한 실제 JSON",
+          "image": "P20-dto-v3.png",
+          "checks": [
+            "dto-status-and-no-order-backref"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "dto-after-close",
+          "title": "종료 뒤 같은 DTO JSON",
+          "image": "P20-dto-v3.png",
+          "checks": [
+            "detached-dto-serializes"
+          ],
+          "sqlPhases": []
+        }
+      ],
+      "evidence": [
+        "docs/design/p20-2026-10-20/source-proof/original-compile.txt",
+        "docs/design/p20-2026-10-20/source-proof/execution.json",
+        "docs/design/p20-2026-10-20/browser-all-states.json"
+      ]
+    }
+  ]
+}

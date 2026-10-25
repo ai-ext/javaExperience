@@ -1,29 +1,1481 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>V04. 테스트 DB 전략 — H2 vs Testcontainers, 데이터 준비, @Transactional의 함정</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
+
+
 <link rel="stylesheet" href="../../tools/site/knowledge-page-visual.css?v=798d01268b0d">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer></script>
+
+
+<link rel="stylesheet" href="../../tools/site/knowledge-reader.css?v=691dfb866a25">
+
 
 
 
 
 <link rel="stylesheet" href="../../tools/site/knowledge-navigation.css?v=22b8d51fa76c">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=a74da8acda65">
-<link rel="stylesheet" href="../../tools/site/course-content.css?v=35f34c292222">
+<link rel="stylesheet" href="../../tools/site/course-content.css?v=3f40f9d78025">
 <link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
 <link rel="stylesheet" href="../../tools/site/course-navigation.css?v=55c2d6d2b117">
 <link rel="stylesheet" href="../../tools/site/course-data-blocks.css?v=bc0b02a82ffb">
 <link rel="stylesheet" href="../../tools/site/course-semantics.css?v=f4e45f454a8c">
+
+<link rel="stylesheet" href="../../tools/site/p09-learning.css?v=7f7a13e75c77"><link rel="stylesheet" href="../../tools/site/v04-learning.css?v=a17a641448bb"><link rel="stylesheet" href="../../tools/site/knowledge-dark.css?v=8b650d38cd27">
 </head>
-<body>
+<body data-concept-surface="dark">
 <header class="topbar site-topbar"><a class="home-brand" href="../../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../../index.html">홈</a><a href="../../course/spring/README.html">과정 v2 · 일정</a><a href="../../course/map.html">과정 지도</a><a href="../../scenario/README.html">서비스 만들기</a><a href="../../practice/MISSIONS.html">실전 미션</a><a href="README.html" aria-current="page">개념 학습</a></nav></header>
 <main class="knowledge-main">
 
-<h1 id="v04-테스트-db-전략--h2-vs-testcontainers-데이터-준비-transactional의-함정"><a class="anchor" href="#v04-테스트-db-전략--h2-vs-testcontainers-데이터-준비-transactional의-함정" aria-hidden="true">#</a>V04. 테스트 DB 전략 — H2 vs Testcontainers, 데이터 준비, @Transactional의 함정</h1><nav class="kc-detail-navigation" aria-label="개념 학습으로 돌아가기"><a href="README.html?from=detail" data-kc-catalog-return>← 개념 목록·검색 결과</a><a data-kc-task-return hidden></a></nav><section class="knowledge-page-map" aria-label="문서 읽기 지도"><div class="knowledge-page-map-head"><div><p class="knowledge-page-map-kicker">Verification &amp; tests <span>· V04</span></p><h2>이 문서에서 볼 내용</h2><p>계층별 테스트와 검증</p></div><span class="knowledge-page-map-count">8개 주제</span></div><nav class="knowledge-page-steps" aria-label="문서의 실제 절로 이동"><a class="knowledge-page-step" href="#1-한-줄로-말하면"><span class="knowledge-page-step-no">01</span><span>1. 한 줄로 말하면</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#2-당장-알아야-할-것"><span class="knowledge-page-step-no">02</span><span>2. 당장 알아야 할 것</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#3-따라-하기"><span class="knowledge-page-step-no">03</span><span>3. 따라 하기</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#4-치트시트"><span class="knowledge-page-step-no">04</span><span>4. 치트시트</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#5-자주-나는-에러와-해결"><span class="knowledge-page-step-no">05</span><span>5. 자주 나는 에러와 해결</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#6-한-단계-더"><span class="knowledge-page-step-no">06</span><span>6. 한 단계 더</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#7-자가점검-qa-면접-대비"><span class="knowledge-page-step-no">07</span><span>7. 자가점검 Q&amp;A (면접 대비)</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#8-참고문헌"><span class="knowledge-page-step-no">08</span><span>8. 참고문헌</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a></nav></section>
+<div class="kr-reader" data-knowledge-reader data-kr-metadata="{&quot;title&quot;:&quot;V04. 테스트 DB 전략 — H2 vs Testcontainers, 데이터 준비, @Transactional의 함정&quot;,&quot;hasScene&quot;:true,&quot;headings&quot;:[{&quot;id&quot;:&quot;1-한-줄로-말하면&quot;,&quot;label&quot;:&quot;1. 한 줄로 말하면&quot;},{&quot;id&quot;:&quot;2-당장-알아야-할-것&quot;,&quot;label&quot;:&quot;2. 당장 알아야 할 것&quot;},{&quot;id&quot;:&quot;3-따라-하기&quot;,&quot;label&quot;:&quot;3. 따라 하기&quot;},{&quot;id&quot;:&quot;4-치트시트&quot;,&quot;label&quot;:&quot;4. 치트시트&quot;},{&quot;id&quot;:&quot;5-자주-나는-에러와-해결&quot;,&quot;label&quot;:&quot;5. 자주 나는 에러와 해결&quot;},{&quot;id&quot;:&quot;6-한-단계-더&quot;,&quot;label&quot;:&quot;6. 한 단계 더&quot;},{&quot;id&quot;:&quot;7-자가점검-qa-면접-대비&quot;,&quot;label&quot;:&quot;7. 자가점검 Q&amp;A (면접 대비)&quot;},{&quot;id&quot;:&quot;8-참고문헌&quot;,&quot;label&quot;:&quot;8. 참고문헌&quot;}]}">
+  <header class="kr-toolbar"><div class="kr-toolbar-title"><p>개념 학습</p><h1>V04. 테스트 DB 전략</h1></div><div class="kr-controls" role="group" aria-label="개념 읽는 방식"><button type="button" data-kr-mode="scene" aria-pressed="false" aria-controls="kr-scene">장면으로 보기</button><button type="button" data-kr-mode="read" aria-pressed="true" aria-controls="kr-reading">설명 차근차근 읽기</button></div><nav class="kc-detail-navigation" aria-label="개념 학습으로 돌아가기"><a href="README.html?from=detail" data-kc-catalog-return>← 개념 목록·검색 결과</a><a data-kc-task-return hidden></a></nav></header>
+  <div class="kr-layout"><aside class="kr-toc" aria-label="이 문서의 목차"><strong>이 문서에서 볼 내용</strong><nav><a href="#1-한-줄로-말하면" data-kr-toc-link>1. 한 줄로 말하면</a><a href="#2-당장-알아야-할-것" data-kr-toc-link>2. 당장 알아야 할 것</a><a href="#3-따라-하기" data-kr-toc-link>3. 따라 하기</a><a href="#4-치트시트" data-kr-toc-link>4. 치트시트</a><a href="#5-자주-나는-에러와-해결" data-kr-toc-link>5. 자주 나는 에러와 해결</a><a href="#6-한-단계-더" data-kr-toc-link>6. 한 단계 더</a><a href="#7-자가점검-qa-면접-대비" data-kr-toc-link>7. 자가점검 Q&amp;A (면접 대비)</a><a href="#8-참고문헌" data-kr-toc-link>8. 참고문헌</a></nav></aside><div class="kr-content"><section id="kr-scene" data-kr-scene><section class="p09-learning v04-learning" data-v04-learning aria-labelledby="v04-learning-heading">
+    <header class="v04-intro"><p>테스트 DB · mock·실제 엔진·test transaction</p><h2 id="v04-learning-heading" data-v04-question>DB 없는 Service unit은 무엇을 확인했을까?</h2></header>
+    <p class="v04-scope">원문 full Testcontainers class는 compile-only입니다. 외부 원본 unit2와 추가 native MySQL·H2/JPA·Boot TCP/동기 MockMvc 실행을 구분합니다. 원문 OrderHttpTest·학습자 상품 API·MySQL HTTP·Java25는 미실행이며 전체 버전·조건은 추가 근거로 확인합니다.</p>
+    <label class="p09-topic-label" for="v04-topic">살펴볼 질문<select id="v04-topic" data-v04-topic><option value="unit">DB 없는 Service unit은 무엇을 확인했을까?</option><option value="replace">DataJpaTest는 항상 H2로 바꿀까?</option><option value="fixtures">원문 assert body와 Sql fixture는 어디서 실행했을까?</option><option value="dialect">H2 MODE=MySQL이면 같은 문자열 결과일까?</option><option value="lazy">테스트 transaction이 lazy 실패를 숨겼을까?</option><option value="flush">persist 통과만으로 DB CHECK도 검증했을까?</option><option value="events">flagForCommit과 end는 같은 시점일까?</option><option value="requiresnew">안쪽 REQUIRES_NEW도 테스트 rollback이 지울까?</option><option value="http">추가 실제 TCP와 동기 MockMvc는 같은 transaction일까?</option><option value="containers">원문 Testcontainers class는 어디까지 검증됐을까?</option></select></label>
+    <section class="p09-scene" aria-label="테스트 DB 경계 보충 학습 장면">
+      <header class="p09-question"><p data-v04-source>외부 study 원본 ProductServiceUnitTest2 · 직접 new Service/mock Repository</p></header>
+      <p class="v04-source-note" data-v04-source-note>원본 unit2는 실제 JUnit PASSED입니다. SQL·Spring proxy·DB 엔진·HTTP 상태를 검증한 테스트가 아닙니다.</p>
+      <div class="p09-stages" data-v04-stages role="group" aria-label="장면 선택"></div>
+      <div class="p09-mobile-nav" role="group" aria-label="모바일 장면 이동"><button type="button" data-v04-mobile-prev aria-label="이전 학습 장면">이전</button><label class="p09-stage-label" for="v04-stage-select">장면<select id="v04-stage-select" data-v04-stage-select></select></label><button type="button" data-v04-mobile-next aria-label="다음 학습 장면">다음</button></div>
+      <h3 data-v04-title>id7·키보드·9700과 없는id404</h3><p class="p09-lead" data-v04-lead>원본 unit은 mock Product id7을 키보드·가격9700으로 매핑했습니다. 별도 조회id404는 ProductNotFoundException이며 여기서404는 HTTP 상태 코드가 아닙니다.</p>
+      <div class="p09-workspace"><figure class="p09-figure"><div class="p09-image-frame v04-image-frame"><div class="p09-image-window"><img data-v04-image src="../design/v04-2026-10-20/images/V04-unit-v2.jpg" width="1672" height="941" alt="unit · 원문 compile-only·원본 unit과 추가 native/H2/Boot TCP·MockMvc 관측 범위 구분"><span class="p09-focus" data-v04-focus aria-hidden="true" hidden></span></div></div><figcaption><span data-v04-figure-label>전체 관계 그림</span><button type="button" data-v04-zoom aria-pressed="false">강조 구간 확대</button><a data-v04-image-link href="../design/v04-2026-10-20/images/V04-unit-v2.jpg" target="_blank" rel="noopener">원본 그림 보기 ↗</a></figcaption></figure>
+      <div class="p09-observation"><section class="p09-value-sheet"><h3>지금의 테스트 경계·DB 관찰값</h3><dl data-v04-state></dl></section><section class="p09-code-sheet"><div><h3>함께 읽을 코드</h3><button type="button" data-v04-copy>코드 복사</button></div><pre><code data-v04-code></code></pre><p>원문과 추가 실험의 코드 발췌입니다. 강조는 설명하는 위치이며 실시간 실행 줄이 아닙니다.</p><p data-v04-copy-status role="status"></p></section></div></div>
+      <p class="p09-note" data-v04-note>응답에서 assertion한 id·name·price와 page/items/totalPages만 표시합니다. mock page의 totalElements는 표시하지 않습니다.</p>
+      <details class="v04-output" data-v04-output hidden><summary>추가 실행 검증 로그 보기</summary><p>최종 frozen 관측의 실제 JSON/PASS 발췌입니다. 원본 unit2는 JUnit PASSED로 구분하며 없는 PASS를 만들지 않습니다. native9·Java28의 고유 ASSERT37개, JUnit22/11classes, facts32는 겹치는 단위이며 독립59실험이 아닙니다. JUnit22에는 관찰기 회귀1개가 포함됩니다. 이전 가변 참조 오류 checkpoint는 쓰지 않습니다.</p><pre><code data-v04-stdout></code></pre><div class="v04-runs" data-v04-runs></div></details>
+      <footer class="p09-controls"><button type="button" data-v04-prev disabled>← 이전</button><span data-v04-position role="status"></span><button type="button" data-v04-next>다음 →</button></footer>
+    </section>
+    <p class="p09-original-link"><a href="#v04-original">원문 전체 · 긴 코드·선택 기준·자가점검 보기 ↓</a></p>
+  </section><details class="v04-supplement"><summary>원문·추가 실험 전체 코드와 실제 검증 근거</summary>
+ <p><strong>이번 최종 범위 정정:</strong> native 9개·Java 28개·JUnit 22개·facts 32개를 확인했습니다. 이 수는 서로 겹치는 검증 단위이며 독립 실험 수가 아닙니다. 실제 JDK 21.0.6 추가 환경과 외부 unit 2개 사례를 포함하고, 원문 Testcontainers class는 compile-only입니다. Java 25 원문 환경·Docker·Testcontainers·ServiceConnection runtime은 실행하지 않았습니다. 아래 source.json의 runtimeScope는 이전 준비 시점의 메모이며 native adapter 실행과 최종 replay 이전의 기록입니다. source.json의 원문 status는 역사 자료로 보존합니다.</p>
+ <details><summary>이번 최종 실행 범위 정정 JSON</summary><pre><code>{
+  &quot;title&quot;: &quot;V04 최종 실행 범위 정정&quot;,
+  &quot;asOf&quot;: &quot;2026-10-24&quot;,
+  &quot;basis&quot;: {
+    &quot;execution&quot;: &quot;docs/design/v04-2026-10-20/source-proof/execution.json&quot;,
+    &quot;sourceProof&quot;: &quot;docs/design/v04-2026-10-20/source-proof/source.json&quot;,
+    &quot;sourceDocumentSha256&quot;: &quot;1fe115e967ba5602aeb8547c93e8a29eed1838549893a8598f90e1b905773cda&quot;
+  },
+  &quot;finalCounts&quot;: {
+    &quot;native&quot;: 9,
+    &quot;java&quot;: 28,
+    &quot;junit&quot;: 22,
+    &quot;facts&quot;: 32,
+    &quot;meaning&quot;: &quot;Java facts 32개는 native 9개 및 Java 28개 검사와 겹치는 관측 단위이며 독립 실험 수가 아니다. JUnit 22개에는 관찰기 회귀가 포함된다.&quot;
+  },
+  &quot;executed&quot;: [
+    &quot;Java 21 추가 환경의 native probe와 Java 검사&quot;,
+    &quot;JUnit 22개 사례 모두 통과·skip 없음&quot;,
+    &quot;외부 study 원본 ServiceUnitTest 2개 사례&quot;,
+    &quot;기존 원문 ProductRepositoryTest 전체 클래스는 compile-only&quot;,
+    &quot;추가 native adapter, H2/JPA toy, private MySQL 및 TCP·동기 MockMvc 범위는 execution.json에 기록된 범위&quot;
+  ],
+  &quot;notExecuted&quot;: [
+    &quot;Java 25 원문 환경&quot;,
+    &quot;원문 ProductRepositoryTest의 runtime 실행&quot;,
+    &quot;Docker·Testcontainers·ServiceConnection runtime&quot;,
+    &quot;원문 전체 애플리케이션 실행&quot;
+  ],
+  &quot;historicalPreparation&quot;: {
+    &quot;file&quot;: &quot;docs/design/v04-2026-10-20/source-proof/source.json&quot;,
+    &quot;runtimeScope&quot;: &quot;preparing; source completeTCJava compile-only, partialdomainpatterns not executable as provided; fresh native adapter proposed&quot;,
+    &quot;interpretation&quot;: &quot;이 runtimeScope는 native adapter 실행과 최종 replay 이전의 준비 시점 메모다. source.json의 원문 status와 함께 역사 자료로 보존하며 현재 최종 실행 범위로 사용하지 않는다.&quot;
+  },
+  &quot;limits&quot;: [
+    &quot;native·Java·JUnit·facts 수치는 서로 중첩되는 검증 단위다.&quot;,
+    &quot;원문 Testcontainers·Docker·ServiceConnection과 Java 25는 실행하지 않았다.&quot;,
+    &quot;기존 execution.json 및 raw 결과의 값을 수정하거나 이 범위를 추가 실험으로 만들지 않았다.&quot;
+  ]
+}</code></pre></details>
+ <p>원문264줄/9fence는 보존했습니다. 원문 complete ProductRepositoryTest는 그대로 컴파일만 했고, Docker 소켓의 연결 거부로 Testcontainers·Docker·ServiceConnection은 실행하지 않았습니다. 원문 Java 4부분 패턴은 도메인/설정이 생략된 예제입니다. 원문 Kotlin/bash와 외부 starter 명령을 전부 실행한 것이 아닙니다.</p>
+ <p>외부 study의 Product관련6Java·ServiceUnitTest2케이스·schema/seed는 SHA 사본입니다. 원본unit은 mock Repository와 직접 new한 service를 검사하므로 SQL·Spring proxy·DB 검증이 아닙니다. 원문 RepositoryTest의 assert body2개는 별도 native adapter에서 검증했습니다. 정렬 없는 Page의 관측id는 추가 관찰기가 membership만 정렬 표시했으며 SQL ORDER BY 계약이 아닙니다.</p>
+ <p>JDK21·Boot4.1.1·Spring7.0.9·DataJPA4.1.1·Hibernate7.4.5.Final·H22.4.240·MySQL8.4.11·Connector/J9.7.0·TC2.0.5·Tomcat11.0.24를 사용했습니다. dependencies.json의132개 artifact는 testRuntimeClasspath·annotationProcessor·compileClasspath 합집합입니다. Java25·원문 실제상품/주문API·MySQL HTTP·TC/Docker/SC 동작·모든콜레이션/잠금/격리수준/성능은 미검증입니다.</p>
+ <p>매번 0700 run 아래 새 datadir(실측0750)·0700 socket 디렉터리·자체PID·새127.0.0.1port·mysqlxOFF를 확인한 뒤 외부 schema/seed 사본만 적재했습니다. Java는 두 private schema의 SELECT/INSERT/UPDATE/DELETE만 허용한 임시계정과 TLS REQUIRED를 사용했고 암호는 기록하지 않았습니다. 기존 DB·3306·서비스·학습자코드는 사용/수정하지 않았습니다. 자기 MySQL은 정상 종료(exit0)했고 추가 HTTP socket도 worker종료 뒤 닫힘을 확인했습니다.</p>
+ <p>Boot4.1.1 기본 replace=NON_TEST는 자동 구성 DataSource에서 인식한 test database를 예외로 둡니다. static URL과 DynamicPropertySource URL의 실제 H2/MySQL 차이를 관찰했습니다. explicitNONE이 모든 컨테이너 연결 유지의 보편적인 필수조건이라는 원문 일반화를 보충합니다. @ServiceConnection 예외는 공식 문헌 근거이며 이번 컨테이너 실행 결과가 아닙니다. 네가지 replacement case는 ddl-auto=none으로 엔진 확인 전에 DDL을 실행하지 않았습니다.</p>
+ <p>native adapter는80상품/active79·첫page10/total79/pages8을 확인했습니다. 전체 seed 모든 값의 전후 동등성을 검사한 것이 아닙니다. 원문SQL의 category9001→product9001은 Spring @Sql에서 실행했고, INFERRED rollback뒤둘다0/ISOLATED는outerrollback뒤둘다1을 관찰했습니다. product→category 각1행삭제와최종9001두테이블0을 확인했습니다. context cache는 cleanup이 아닙니다.</p>
+ <p>추가 case_probe.word의 cafe/CAFE/café는 MySQL utf8mb4_0900_ai_ci와 H2 MODE=MySQL·DATABASE_TO_LOWER=TRUE의 기본 문자열 조건을 비교했습니다. 각1/1 대0/0, UNIQUE1062/1행 대H2모드2행이었습니다. 모든 H2설정/SQL/함수/락/엔진 또는 성능으로 일반화하지 않습니다.</p>
+ <p>LearnOrder/DeferredProbe/IdentityProbe/RowListener는 추가 H2/JPA toy이며 실제 주문 도메인·원문Product 저장API가 아닙니다. 바깥 테스트TX의 lazy2문장과 없는경우의1문장+예외, assignedpersist0/flush1과IDENTITYpersist1의CHECK23513을 구분했습니다. 이 counter는 Hibernate 준비문장이고 별도 JDBC observer SQL을 세지 않습니다. flush/commit은 다르며 rollback이 Java 객체 값을 되돌렸다고 주장하지 않습니다.</p>
+ <p>RowListener는 외부 메일/결제를 보내지 않고 독립 connection으로 commit된행을 읽습니다. flagForCommit은 종료가 아니며 end에서 commit한뒤call1/행1을 관찰했습니다. REQUIRES_NEW는 추가 TransactionTemplate 실험으로 inner73/outer74의 최종행1/0을 확인했습니다. inner73의추가DELETE는실행했지만그영향행수/이후0은별도관측값으로기록하지않았습니다.</p>
+ <p>실제 TCP1회와 동기 MockMvc1회는 추가 Boot/JDBC/H2 앱의 POST /v04/probe입니다. 실제connector의loopback/port를 확인했습니다. TCP는다른worker/TestManagedTX=false/ApplicationTX=true라테스트marker100을0으로읽고별도commit한201행이테스트rollback뒤에도남았습니다. syncMockMvc는같은thread/TestManagedTX=true로marker110을1로읽으며211쓰기와함께rollback됐습니다. status201과id201을구분하고asyncMVC·원문 OrderHttpTest·실제상품API로확대하지않습니다.</p>
+ <p>native9/Java28의고유ASSERT37개와JUnit22케이스/11클래스·facts32는겹치는검증단위입니다.59개독립실험으로세지않으며JUnit22에는관찰기회귀1개가포함됩니다. 관찰기의가변list참조가과거값을덮는오류는수정전실패/수정후deep snapshot회귀로교정했고최종freeze/새replay/독립temp실행이모두일치했습니다. 원문TCclass는runtime에서실행하지않았음을별도로검사했습니다.</p>
+ <p>아래 raw HTTP 자료의 port/PID/threadID는 해당 run의 임시자원식별자이며 API계약이 아닙니다. frozen은 실제비교한same/differentthread·DB행·bind일치값을기록합니다. wire캡처·픽셀전수·학습자이해도는 검증하지 않았습니다. 컨테이너 수명·재사용·기동시간은 공식문헌 설명/미측정 범위로 남깁니다.</p>
+ <details><summary>원문 SHA·외부 사본·실행 범위</summary><pre><code>{
+  &quot;source&quot;: &quot;docs/knowledge/V04-test-db-strategy.md&quot;,
+  &quot;sha256&quot;: &quot;1fe115e967ba5602aeb8547c93e8a29eed1838549893a8598f90e1b905773cda&quot;,
+  &quot;lines&quot;: 264,
+  &quot;originalBlocks&quot;: [
+    {
+      &quot;block&quot;: 1,
+      &quot;language&quot;: &quot;kotlin&quot;,
+      &quot;file&quot;: &quot;block-01.kts&quot;,
+      &quot;sha256&quot;: &quot;772ef0c32c9bb70f99e5da418596597a7152ace078bb8f7f95a645d161483d97&quot;
+    },
+    {
+      &quot;block&quot;: 2,
+      &quot;language&quot;: &quot;bash&quot;,
+      &quot;file&quot;: &quot;block-02.sh&quot;,
+      &quot;sha256&quot;: &quot;020beee64b403830d3e3fbd28987cfb48d41eeae4dd23bf414495aef993da9d9&quot;
+    },
+    {
+      &quot;block&quot;: 3,
+      &quot;language&quot;: &quot;java&quot;,
+      &quot;file&quot;: &quot;block-03.java&quot;,
+      &quot;sha256&quot;: &quot;8ea331b2f1871355f36c82ca60cc48609ed42452231a06e429fd7a2f248c3160&quot;
+    },
+    {
+      &quot;block&quot;: 4,
+      &quot;language&quot;: &quot;bash&quot;,
+      &quot;file&quot;: &quot;block-04.sh&quot;,
+      &quot;sha256&quot;: &quot;6e2fc8356d3765a690a982189522a561fe7ba477bffadcdc85516d264f2aa2f0&quot;
+    },
+    {
+      &quot;block&quot;: 5,
+      &quot;language&quot;: &quot;sql&quot;,
+      &quot;file&quot;: &quot;block-05.sql&quot;,
+      &quot;sha256&quot;: &quot;b8a7347ec134e6aee2da387ff7f71454218e31aed1d13ffcac98ecbc2da6592c&quot;
+    },
+    {
+      &quot;block&quot;: 6,
+      &quot;language&quot;: &quot;java&quot;,
+      &quot;file&quot;: &quot;block-06.java&quot;,
+      &quot;sha256&quot;: &quot;3d8ab9cb0b2262bf386168aaf88848a68cc344bb19edd10cd4d6280b62dac0a6&quot;
+    },
+    {
+      &quot;block&quot;: 7,
+      &quot;language&quot;: &quot;java&quot;,
+      &quot;file&quot;: &quot;block-07.java&quot;,
+      &quot;sha256&quot;: &quot;5cf753b468f85a8996517b35141e6b6994b7c5e20497a1b2082ba132eb87f919&quot;
+    },
+    {
+      &quot;block&quot;: 8,
+      &quot;language&quot;: &quot;java&quot;,
+      &quot;file&quot;: &quot;block-08.java&quot;,
+      &quot;sha256&quot;: &quot;2fb85afe510899228bc36e0f6227dda683095bfb9dcabce29f9f3e4f6b58b2b2&quot;
+    },
+    {
+      &quot;block&quot;: 9,
+      &quot;language&quot;: &quot;java&quot;,
+      &quot;file&quot;: &quot;block-09.java&quot;,
+      &quot;sha256&quot;: &quot;89b6b8c8927a34a0708efdffb5c2ae05f5b34afddca480bce413a1c2665a92b2&quot;
+    }
+  ],
+  &quot;status&quot;: &quot;original completeTCJava compile-only; external original unit2 passes; extra native adapter/sourceassertbody2 +SQLfixture +replacement/enginediff/H2toy/actualTCP+syncMockMvc; observer-corrected full native9/Java28/JUnit22/facts32 frozen replay passed; TC/Docker/ServiceConnection runtime unexecuted&quot;,
+  &quot;externalStudyData&quot;: [
+    {
+      &quot;source&quot;: &quot;/Users/ds/research/java-spring/practice/starter/src/main/java/com/example/practice/product/Product.java&quot;,
+      &quot;copy&quot;: &quot;external/java/com/example/practice/product/Product.java&quot;,
+      &quot;sha256&quot;: &quot;e7acc9a0738e46fc9fad375f8eb4322fbf3916c5d6f8c639e6a04707660a8eda&quot;,
+      &quot;scope&quot;: &quot;external study original support, not learner repo&quot;
+    },
+    {
+      &quot;source&quot;: &quot;/Users/ds/research/java-spring/practice/starter/src/main/java/com/example/practice/product/ProductRepository.java&quot;,
+      &quot;copy&quot;: &quot;external/java/com/example/practice/product/ProductRepository.java&quot;,
+      &quot;sha256&quot;: &quot;de72917102291af62fc95eb8841ed32688315598ad8da2d8f136577214efb175&quot;,
+      &quot;scope&quot;: &quot;external study original support, not learner repo&quot;
+    },
+    {
+      &quot;source&quot;: &quot;/Users/ds/research/java-spring/practice/starter/src/main/java/com/example/practice/product/ProductService.java&quot;,
+      &quot;copy&quot;: &quot;external/java/com/example/practice/product/ProductService.java&quot;,
+      &quot;sha256&quot;: &quot;c3491813c23b9ceda1f8783995330f90e944686686c31bad3690dc4ec6b224f3&quot;,
+      &quot;scope&quot;: &quot;external study original support, not learner repo&quot;
+    },
+    {
+      &quot;source&quot;: &quot;/Users/ds/research/java-spring/practice/starter/src/main/java/com/example/practice/product/ProductResponse.java&quot;,
+      &quot;copy&quot;: &quot;external/java/com/example/practice/product/ProductResponse.java&quot;,
+      &quot;sha256&quot;: &quot;273646599b516adf952f2b4fc0d7bca790188912f8163a0be9a789e761b55ba6&quot;,
+      &quot;scope&quot;: &quot;external study original support, not learner repo&quot;
+    },
+    {
+      &quot;source&quot;: &quot;/Users/ds/research/java-spring/practice/starter/src/main/java/com/example/practice/product/ProductPageResponse.java&quot;,
+      &quot;copy&quot;: &quot;external/java/com/example/practice/product/ProductPageResponse.java&quot;,
+      &quot;sha256&quot;: &quot;4e8ca20fbdb0b6b3d89c0e7fa6743af1a6338dc1d92768773cfda5dbcd5dd0a5&quot;,
+      &quot;scope&quot;: &quot;external study original support, not learner repo&quot;
+    },
+    {
+      &quot;source&quot;: &quot;/Users/ds/research/java-spring/practice/starter/src/main/java/com/example/practice/product/ProductNotFoundException.java&quot;,
+      &quot;copy&quot;: &quot;external/java/com/example/practice/product/ProductNotFoundException.java&quot;,
+      &quot;sha256&quot;: &quot;5a891e613712ff2fb951632db87d086b2a30af438cbe4ab927d4db4794b33055&quot;,
+      &quot;scope&quot;: &quot;external study original support, not learner repo&quot;
+    },
+    {
+      &quot;source&quot;: &quot;/Users/ds/research/java-spring/practice/starter/src/test/java/com/example/practice/product/ProductServiceUnitTest.java&quot;,
+      &quot;copy&quot;: &quot;external-test/java/com/example/practice/product/ProductServiceUnitTest.java&quot;,
+      &quot;sha256&quot;: &quot;1465e1d9a87daf33174570f46ac4128634839d396a000c32347e91168730f9bc&quot;,
+      &quot;scope&quot;: &quot;external study original unit test2; no DB&quot;
+    },
+    {
+      &quot;source&quot;: &quot;/Users/ds/research/java-spring/practice/schema/schema.sql&quot;,
+      &quot;copy&quot;: &quot;original/external-study-schema.sql&quot;,
+      &quot;sha256&quot;: &quot;9d3b0ee42b1206168776ea776804266227fe8c0da845c6e227a1a7184ce8029a&quot;,
+      &quot;scope&quot;: &quot;copy only; load after fresh MySQL guard; never existing DB&quot;
+    },
+    {
+      &quot;source&quot;: &quot;/Users/ds/research/java-spring/practice/schema/seed.sql&quot;,
+      &quot;copy&quot;: &quot;original/external-study-seed.sql&quot;,
+      &quot;sha256&quot;: &quot;351eff76376265f524c2da9d78d019176f4379fc0095f2e326f213d4aec71a56&quot;,
+      &quot;scope&quot;: &quot;copy only; load after fresh MySQL guard; never existing DB&quot;
+    }
+  ],
+  &quot;runtimeScope&quot;: &quot;preparing; source completeTCJava compile-only, partialdomainpatterns not executable as provided; fresh native adapter proposed&quot;,
+  &quot;compileFixtureAttempt&quot;: &quot;added Gradle annotationProcessor config did not inherit implementation BOM; added same Boot4.1.1 platform to annotationProcessor; no original code changed&quot;
+}</code></pre></details><details><summary>private MySQL·전용 CRUD/TLS·JUnit/HTTP 종료·frozen 재현</summary><pre><code>&quot;&quot;&quot;V04 source/추가 TestContext 실험을 새 private MySQL에서만 실행한다.&quot;&quot;&quot;
+from pathlib import Path
+import argparse,datetime,decimal,hashlib,json,os,re,secrets,socket as net,subprocess,tempfile,time,xml.etree.ElementTree as ET
+import pymysql
+OUT=Path(__file__).resolve().parent;ROOT=OUT.parents[3]
+p=argparse.ArgumentParser();p.add_argument(&#39;--mysql-base&#39;,required=True);p.add_argument(&#39;--runtime-root&#39;,required=True);p.add_argument(&#39;--freeze&#39;,action=&#39;store_true&#39;);a=p.parse_args()
+BASE=Path(a.mysql_base).resolve();runtime=Path(a.runtime_root).resolve();runtime.mkdir(parents=True,exist_ok=True)
+meta=json.loads((OUT/&#39;source.json&#39;).read_text());source=ROOT/meta[&#39;source&#39;];assert hashlib.sha256(source.read_bytes()).hexdigest()==meta[&#39;sha256&#39;]
+blocks=re.findall(r&#39;^[ \t]*```(\w+)[ \t]*\n(.*?)^[ \t]*```[ \t]*$&#39;,source.read_text(),re.M|re.S);assert len(blocks)==9
+for (lang,body),e in zip(blocks,meta[&#39;originalBlocks&#39;],strict=True):assert lang==e[&#39;language&#39;]and body.encode()==(OUT/&#39;original&#39;/e[&#39;file&#39;]).read_bytes()and hashlib.sha256(body.encode()).hexdigest()==e[&#39;sha256&#39;]
+assert (OUT/&#39;original/block-03.java&#39;).read_bytes()==(OUT/&#39;original-test/java/com/example/practice/product/ProductRepositoryTest.java&#39;).read_bytes()
+assert (OUT/&#39;original/block-05.sql&#39;).read_bytes()==(OUT/&#39;test-resources/sql/product-fixture.sql&#39;).read_bytes()
+for e in meta[&#39;externalStudyData&#39;]:assert hashlib.sha256((OUT/e[&#39;copy&#39;]).read_bytes()).hexdigest()==e[&#39;sha256&#39;]and hashlib.sha256(Path(e[&#39;source&#39;]).read_bytes()).hexdigest()==e[&#39;sha256&#39;]
+run=Path(tempfile.mkdtemp(prefix=&#39;run-&#39;,dir=runtime));os.chmod(run,0o700);short=Path(tempfile.mkdtemp(prefix=&#39;v04-mysql-&#39;,dir=&#39;/tmp&#39;));os.chmod(short,0o700)
+data=run/&#39;data&#39;;sock=short/&#39;mysql.sock&#39;;log=run/&#39;server.log&#39;;pid=run/&#39;mysqld.pid&#39;
+with net.socket()as s:s.bind((&#39;127.0.0.1&#39;,0));port=s.getsockname()[1]
+common=[str(BASE/&#39;bin/mysqld&#39;),&#39;--no-defaults&#39;,f&#39;--basedir={BASE}&#39;,f&#39;--datadir={data}&#39;]
+r=subprocess.run(common+[&#39;--initialize-insecure&#39;],capture_output=True,text=True);(run/&#39;initialize.log&#39;).write_text(r.stdout+r.stderr);assert r.returncode==0,r.stderr
+args=common+[f&#39;--socket={sock}&#39;,f&#39;--pid-file={pid}&#39;,f&#39;--log-error={log}&#39;,f&#39;--port={port}&#39;,&#39;--bind-address=127.0.0.1&#39;,&#39;--mysqlx=OFF&#39;,&#39;--innodb-buffer-pool-size=64M&#39;,&#39;--mysql-native-password=OFF&#39;,&#39;--default-time-zone=+00:00&#39;]
+server=subprocess.Popen(args,stdout=(run/&#39;stdout.log&#39;).open(&#39;w&#39;),stderr=subprocess.STDOUT)
+root_password=secrets.token_urlsafe(32);jdbc_password=secrets.token_urlsafe(32);writer=None
+result={&#39;runtime&#39;:{},&#39;source&#39;:{},&#39;java&#39;:{},&#39;junit&#39;:[],&#39;checks&#39;:[]};trace=[]
+def clean(v):
+ if isinstance(v,dict):return {k:clean(x)for k,x in v.items()}
+ if isinstance(v,(tuple,list)):return [clean(x)for x in v]
+ if isinstance(v,decimal.Decimal):return str(v)
+ if isinstance(v,datetime.datetime):return v.isoformat(sep=&#39; &#39;)
+ return v
+
+def connect(password):return pymysql.connect(unix_socket=str(sock),user=&#39;root&#39;,password=password,charset=&#39;utf8mb4&#39;,autocommit=True,cursorclass=pymysql.cursors.DictCursor)
+def sql(q):
+ with writer.cursor()as c:n=c.execute(q);r={&#39;sql&#39;:q,&#39;rows&#39;:clean(c.fetchall())if c.description else None,&#39;affectedRows&#39;:None if c.description else n}
+ trace.append(r);return r
+
+def rows(q):return sql(q)[&#39;rows&#39;]
+def check(name,value):assert value,name;result[&#39;checks&#39;].append(name);print(&#39;PASS &#39;+name,flush=True)
+try:
+ deadline=time.monotonic()+30
+ while time.monotonic()&lt;deadline:
+  if server.poll()is not None:raise RuntimeError(log.read_text())
+  if sock.exists():
+   try:writer=connect(&#39;&#39;);break
+   except pymysql.MySQLError:pass
+  time.sleep(.1)
+ assert writer,&#39;private instance timeout&#39;
+ guard=rows(&#39;SELECT @@datadir AS datadir,@@socket AS socket,@@port AS port,@@bind_address AS bindAddress,@@skip_networking AS skipNetworking&#39;)
+ assert Path(guard[0][&#39;datadir&#39;]).resolve()==data.resolve()and Path(guard[0][&#39;socket&#39;]).resolve()==sock.resolve()and guard[0][&#39;port&#39;]==port and guard[0][&#39;bindAddress&#39;]==&#39;127.0.0.1&#39;and guard[0][&#39;skipNetworking&#39;]==0 and int(pid.read_text())==server.pid
+ x=rows(&quot;SELECT PLUGIN_NAME,PLUGIN_STATUS FROM information_schema.plugins WHERE PLUGIN_NAME=&#39;mysqlx&#39;&quot;);assert x==[]or x[0][&#39;PLUGIN_STATUS&#39;]==&#39;DISABLED&#39;
+ (run/&#39;isolation.json&#39;).write_text(json.dumps({&#39;pid&#39;:server.pid,&#39;arguments&#39;:args,&#39;guard&#39;:guard,&#39;mysqlx&#39;:x,&#39;socketMode&#39;:oct(short.stat().st_mode&amp;0o777),&#39;passwords&#39;:&#39;fresh eachrun not recorded; new JDBC CRUD on two private schemas only&#39;},indent=2)+&#39;\n&#39;);trace.clear()
+ with writer.cursor()as c:c.execute(&quot;ALTER USER &#39;root&#39;@&#39;localhost&#39; IDENTIFIED BY %s&quot;,(root_password,))
+ client=[str(BASE/&#39;bin/mysql&#39;),&#39;--no-defaults&#39;,&#39;--no-login-paths&#39;,&#39;--protocol=SOCKET&#39;,f&#39;--socket={sock}&#39;,&#39;-uroot&#39;,&#39;--default-character-set=utf8mb4&#39;];client_env=os.environ.copy();client_env[&#39;MYSQL_PWD&#39;]=root_password
+ for name in [&#39;external-study-schema.sql&#39;,&#39;external-study-seed.sql&#39;]:
+  r=subprocess.run(client,input=(OUT/&#39;original&#39;/name).read_text(),env=client_env,capture_output=True,text=True);(run/(name+&#39;.log&#39;)).write_text(r.stdout+r.stderr);assert r.returncode==0,r.stderr
+ sql(&#39;CREATE DATABASE v04_extra CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci&#39;);sql(&#39;CREATE TABLE v04_extra.case_probe(id INT PRIMARY KEY,word VARCHAR(30) NOT NULL UNIQUE)&#39;)
+ result[&#39;runtime&#39;]=rows(&#39;SELECT VERSION()AS mysql,@@version_compile_machine AS machine,@@version_compile_os AS os,@@sql_mode AS sqlMode,@@autocommit AS autocommit,@@transaction_isolation AS isolation,@@time_zone AS timeZone&#39;)[0];check(&#39;private-native-mysql8.4.11&#39;,result[&#39;runtime&#39;][&#39;mysql&#39;]==&#39;8.4.11&#39;)
+ before=rows(&#39;SELECT COUNT(*)AS total,SUM(deleted_at IS NULL)AS active FROM ds_practice.product&#39;)[0];check(&#39;source-seed-products80-active79&#39;,before=={&#39;total&#39;:80,&#39;active&#39;:&#39;79&#39;});result[&#39;source&#39;][&#39;before&#39;]=before
+ with writer.cursor()as c:
+  c.execute(&quot;CREATE USER &#39;v04_probe&#39;@&#39;127.0.0.1&#39; IDENTIFIED BY %s&quot;,(jdbc_password,))
+  for schema in [&#39;ds_practice&#39;,&#39;v04_extra&#39;]:c.execute(f&quot;GRANT SELECT,INSERT,UPDATE,DELETE ON {schema}.* TO &#39;v04_probe&#39;@&#39;127.0.0.1&#39;&quot;)
+ env=os.environ.copy();env.update(JAVA_HOME=&#39;/Users/ds/Library/Java/JavaVirtualMachines/corretto-21.0.6/Contents/Home&#39;,V04_DB_URL=f&#39;jdbc:mysql://127.0.0.1:{port}/ds_practice?characterEncoding=UTF-8&amp;sslMode=REQUIRED&amp;useServerPrepStmts=true&#39;,V04_DB_PASSWORD=jdbc_password,V04_EXPECTED_DATADIR=str(data),V04_EXPECTED_PORT=str(port),V04_JAVA_OUTPUT=str(run/&#39;java.json&#39;),V04_RUNTIME_DIR=str(run))
+ r=subprocess.run([str(ROOT/&#39;gradlew&#39;),&#39;-p&#39;,str(OUT/&#39;runtime&#39;),&#39;--no-daemon&#39;,&#39;--console=plain&#39;,&#39;cleanTest&#39;,&#39;test&#39;,&#39;recordDependencies&#39;],cwd=ROOT,env=env,capture_output=True,text=True);(OUT/&#39;java-run.log&#39;).write_text(r.stdout+r.stderr);assert r.returncode==0,&#39;Java suite failed; see source-proof/java-run.log&#39;
+ listener=json.loads((run/&#39;http-listener.json&#39;).read_text());assert listener[&#39;address&#39;]==&#39;127.0.0.1&#39;
+ with net.socket()as probe:probe.settimeout(2);http_closed=probe.connect_ex((&#39;127.0.0.1&#39;,listener[&#39;port&#39;]))!=0
+ (run/&#39;http-stop-check.json&#39;).write_text(json.dumps({&#39;listener&#39;:listener,&#39;tcpClosedAfterWorkerExit&#39;:http_closed},indent=2)+&#39;\n&#39;);check(&#39;private-http-server-stopped&#39;,http_closed)
+ result[&#39;java&#39;]=json.loads((run/&#39;java.json&#39;).read_text());passes=re.findall(r&#39;(?m)^\s*PASS ([^\r\n]+)$&#39;,r.stdout);check(&#39;java-explicit-checks-match-stdout&#39;,sorted(passes)==result[&#39;java&#39;][&#39;checks&#39;]and len(passes)==len(set(passes)))
+ for file in sorted((OUT/&#39;runtime/build/test-results/test&#39;).glob(&#39;TEST-*.xml&#39;)):
+  xml=ET.parse(file).getroot()
+  for case in xml.findall(&#39;testcase&#39;):
+   result[&#39;junit&#39;].append({&#39;class&#39;:case.attrib[&#39;classname&#39;],&#39;method&#39;:case.attrib[&#39;name&#39;],&#39;passed&#39;:case.find(&#39;failure&#39;)is None and case.find(&#39;error&#39;)is None,&#39;skipped&#39;:case.find(&#39;skipped&#39;)is not None})
+  (run/file.name).write_bytes(file.read_bytes())
+ expected_ids=set();expected_records=set()
+ for file in (OUT/&#39;probe/java&#39;).rglob(&#39;*.java&#39;):
+  text=file.read_text();expected_ids.update(re.findall(r&#39;Proof\.check\(&quot;([^&quot;]+)&quot;&#39;,text));expected_records.update(re.findall(r&#39;Proof\.record\(&quot;([^&quot;]+)&quot;&#39;,text))
+ check(&#39;java-check-and-fact-ids-cover-declared-probes&#39;,set(result[&#39;java&#39;][&#39;checks&#39;])==expected_ids and set(result[&#39;java&#39;][&#39;facts&#39;])==expected_ids|expected_records)
+ expected_classes={&#39;com.example.practice.product.DefaultStaticReplaceTest&#39;:1,&#39;com.example.practice.product.DefaultDynamicReplaceTest&#39;:1,&#39;com.example.practice.product.ExplicitNoneReplaceTest&#39;:1,&#39;com.example.practice.product.ExplicitAnyReplaceTest&#39;:1,&#39;com.example.practice.product.NativeAdapterTest&#39;:2,&#39;com.example.practice.product.SqlFixtureTest&#39;:2,&#39;com.example.practice.product.ProductServiceUnitTest&#39;:2,&#39;v04.extra.EngineDifferentialTest&#39;:1,&#39;v04.toy.ToyTransactionTest&#39;:8,&#39;v04.http.HttpBoundaryTest&#39;:2,&#39;v04.support.ObservationSnapshotTest&#39;:1}
+ actual_classes={name:sum(c[&#39;class&#39;]==name for c in result[&#39;junit&#39;])for name in {c[&#39;class&#39;]for c in result[&#39;junit&#39;]}};check(&#39;junit-exact22-cases-in11-expected-classes&#39;,actual_classes==expected_classes)
+ result[&#39;junit&#39;].sort(key=lambda c:(c[&#39;class&#39;],c[&#39;method&#39;]));check(&#39;junit-all-discovered-cases-pass-no-skips&#39;,bool(result[&#39;junit&#39;])and all(c[&#39;passed&#39;]and not c[&#39;skipped&#39;]for c in result[&#39;junit&#39;]));check(&#39;source-tc-class-not-run&#39;,all(c[&#39;class&#39;]!=&#39;com.example.practice.product.ProductRepositoryTest&#39;for c in result[&#39;junit&#39;]))
+ after=rows(&#39;SELECT COUNT(*)AS total,SUM(deleted_at IS NULL)AS active FROM ds_practice.product&#39;)[0];fixture=rows(&#39;SELECT(SELECT COUNT(*)FROM ds_practice.product WHERE id=9001)AS product,(SELECT COUNT(*)FROM ds_practice.category WHERE id=9001)AS category&#39;)[0];result[&#39;source&#39;].update(after=after,fixtureAfter=fixture);check(&#39;source-seed-row-counts-preserved-fixture-cleaned&#39;,after==before and fixture=={&#39;product&#39;:0,&#39;category&#39;:0})
+ result[&#39;trace&#39;]=trace;(OUT/&#39;execution.json&#39;).write_text(json.dumps(result,ensure_ascii=False,indent=2)+&#39;\n&#39;);frozen=OUT/&#39;checkpoints/expected-current-execution.json&#39;
+ if a.freeze:frozen.parent.mkdir(exist_ok=True);frozen.write_bytes((OUT/&#39;execution.json&#39;).read_bytes())
+ else:assert json.loads(frozen.read_text())==result,&#39;frozen differs; investigate before updating&#39;
+ print(json.dumps({&#39;nativeChecks&#39;:len(result[&#39;checks&#39;]),&#39;javaChecks&#39;:len(result[&#39;java&#39;][&#39;checks&#39;]),&#39;junitCases&#39;:len(result[&#39;junit&#39;]),&#39;observations&#39;:len(result[&#39;java&#39;][&#39;facts&#39;]),&#39;privateRuntime&#39;:str(run),&#39;frozenMatch&#39;:not a.freeze},indent=2))
+finally:
+ if writer:
+  writer.close();env=os.environ.copy();env[&#39;MYSQL_PWD&#39;]=root_password
+  r=subprocess.run([str(BASE/&#39;bin/mysqladmin&#39;),&#39;--no-defaults&#39;,&#39;--no-login-paths&#39;,&#39;--protocol=SOCKET&#39;,f&#39;--socket={sock}&#39;,&#39;-uroot&#39;,&#39;shutdown&#39;],env=env,capture_output=True,text=True,timeout=15);(run/&#39;shutdown.log&#39;).write_text(r.stdout+r.stderr)
+ try:server.wait(timeout=15)
+ except subprocess.TimeoutExpired:server.terminate();server.wait(timeout=10)
+ (OUT/&#39;runtime-last.json&#39;).write_text(json.dumps({&#39;run&#39;:str(run),&#39;pid&#39;:server.pid,&#39;serverExit&#39;:server.returncode,&#39;serverStopped&#39;:server.poll()is not None},indent=2)+&#39;\n&#39;)
+</code></pre></details><details><summary>원문 TC Java 그대로 · 컴파일만</summary><pre><code>package com.example.practice.product;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.mysql.MySQLContainer;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@Testcontainers
+@DataJpaTest(properties = {&quot;spring.sql.init.mode=always&quot;,
+        &quot;spring.sql.init.schema-locations=file:../schema/schema.sql,file:../schema/seed.sql&quot;})
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class ProductRepositoryTest {
+    @Container @ServiceConnection
+    static final MySQLContainer mysql = new MySQLContainer(&quot;mysql:8.4&quot;)
+            .withDatabaseName(&quot;ds_practice&quot;).withUsername(&quot;practice&quot;).withPassword(&quot;practice&quot;);
+    @Autowired ProductRepository productRepository;
+
+    @Test
+    void excludesSoftDeletedProduct() {
+        assertThat(productRepository.findByIdAndDeletedAtIsNull(1L)).isPresent();
+        assertThat(productRepository.findByIdAndDeletedAtIsNull(80L)).isEmpty();
+    }
+
+    @Test
+    void countsActiveProductsWithMysql() {
+        Page&lt;Product&gt; page = productRepository.findAllByDeletedAtIsNull(PageRequest.of(0, 10));
+        assertThat(page.getContent()).hasSize(10);
+        assertThat(page.getTotalElements()).isEqualTo(79);
+        assertThat(page.getTotalPages()).isEqualTo(8);
+    }
+}
+</code></pre></details><details><summary>외부 study 원본 서비스 unit2케이스</summary><pre><code>package com.example.practice.product;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.*;
+
+class ProductServiceUnitTest {
+    private final ProductRepository repository = mock(ProductRepository.class);
+    private final ProductService service = new ProductService(repository);
+
+    @Test
+    void mapsResponseAndThrowsForMissingProduct() {
+        Product found = product(7L, &quot;키보드&quot;);
+        given(repository.findByIdAndDeletedAtIsNull(7L)).willReturn(Optional.of(found));
+        given(repository.findByIdAndDeletedAtIsNull(404L)).willReturn(Optional.empty());
+
+        ProductResponse response = service.getById(7L);
+        assertThat(response.id()).isEqualTo(7L);
+        assertThat(response.name()).isEqualTo(&quot;키보드&quot;);
+        assertThat(response.price()).isEqualByComparingTo(&quot;9700&quot;);
+        assertThatThrownBy(() -&gt; service.getById(404L))
+                .isInstanceOf(ProductNotFoundException.class).hasMessage(&quot;Product 404 was not found&quot;);
+    }
+
+    @Test
+    void mapsPageAndDelegatesPageable() {
+        var request = PageRequest.of(2, 2);
+        // 상품 mock을 먼저 만든다. willReturn(...) 인자 안에서 product()를 부르면 그 안의 given()이
+        // 바깥 stubbing이 끝나기 전에 실행돼 UnfinishedStubbingException이 난다(검증 중 실제로 겪음).
+        var first = product(21L, &quot;첫 상품&quot;);
+        var second = product(22L, &quot;둘째 상품&quot;);
+        given(repository.findAllByDeletedAtIsNull(request))
+                .willReturn(new PageImpl&lt;&gt;(List.of(first, second), request, 5));
+
+        ProductPageResponse response = service.getPage(2, 2);
+        assertThat(response.items()).extracting(ProductResponse::id).containsExactly(21L, 22L);
+        assertThat(response.page()).isEqualTo(2);
+        assertThat(response.totalPages()).isEqualTo(3);
+        verify(repository).findAllByDeletedAtIsNull(request);
+    }
+
+    private static Product product(Long id, String name) {
+        Product p = mock(Product.class);
+        given(p.getId()).willReturn(id);
+        given(p.getName()).willReturn(name);
+        given(p.getPrice()).willReturn(new BigDecimal(&quot;9700&quot;));
+        return p;
+    }
+}
+</code></pre></details><details><summary>추가 관찰기 · 기록시점 deep snapshot</summary><pre><code>package v04.support;
+
+import java.io.File;
+import java.sql.*;
+import java.util.*;
+import javax.sql.DataSource;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import tools.jackson.databind.json.JsonMapper;
+
+/** 새 격리 실험의 관찰 저장기. URL·암호·임시port/datadir를 결과에 기록하지 않는다. */
+public final class Proof {
+    private static final SortedMap&lt;String,Map&lt;String,Object&gt;&gt; facts=new TreeMap&lt;&gt;();
+    private static final SortedSet&lt;String&gt; checks=new TreeSet&lt;&gt;();
+    private Proof(){}
+    public static Map&lt;String,Object&gt; map(Object... pairs){Map&lt;String,Object&gt; m=new LinkedHashMap&lt;&gt;();for(int i=0;i&lt;pairs.length;i+=2)m.put((String)pairs[i],pairs[i+1]);return m;}
+    public static synchronized void check(String id,boolean pass,Map&lt;String,Object&gt; value){if(!pass)throw new AssertionError(id+&quot; &quot;+value);checks.add(id);record(id,value);System.out.println(&quot;PASS &quot;+id);}
+    public static synchronized void record(String id,Map&lt;String,Object&gt; value){
+        Map&lt;String,Object&gt; detached=JsonMapper.builder().build().convertValue(value,Map.class);
+        if(facts.putIfAbsent(id,detached)!=null)throw new AssertionError(&quot;duplicate observation &quot;+id);
+        String path=System.getenv(&quot;V04_JAVA_OUTPUT&quot;);if(path==null)throw new IllegalStateException(&quot;V04 private runner environment required&quot;);
+        JsonMapper.builder().build().writeValue(new File(path),map(&quot;checks&quot;,new ArrayList&lt;&gt;(checks),&quot;facts&quot;,facts));
+    }
+    public static String url(){String value=System.getenv(&quot;V04_DB_URL&quot;);if(value==null||!value.matches(&quot;jdbc:mysql://127\\.0\\.0\\.1:[0-9]+/ds_practice\\?.*&quot;))throw new IllegalStateException(&quot;fresh private loopback URL required&quot;);return value;}
+    public static String password(){return Objects.requireNonNull(System.getenv(&quot;V04_DB_PASSWORD&quot;));}
+    public static DriverManagerDataSource mysql(){DriverManagerDataSource ds=new DriverManagerDataSource(url(),&quot;v04_probe&quot;,password());guard(ds);return ds;}
+    public static void guard(DataSource ds){
+        try(Connection c=ds.getConnection();Statement s=c.createStatement();ResultSet rs=s.executeQuery(&quot;SELECT @@datadir,@@port,@@bind_address&quot;)){
+            rs.next();if(!new File(rs.getString(1)).getCanonicalFile().equals(new File(System.getenv(&quot;V04_EXPECTED_DATADIR&quot;)).getCanonicalFile())||rs.getInt(2)!=Integer.parseInt(System.getenv(&quot;V04_EXPECTED_PORT&quot;))||!rs.getString(3).equals(&quot;127.0.0.1&quot;))throw new AssertionError(&quot;private datadir/port/bind guard&quot;);
+        }catch(Exception e){throw new IllegalStateException(&quot;fresh MySQL guard failed&quot;,e);}
+    }
+    public static Map&lt;String,Object&gt; engine(DataSource ds){
+        try(Connection c=ds.getConnection()){
+            DatabaseMetaData m=c.getMetaData();return map(&quot;engine&quot;,m.getDatabaseProductName(),&quot;version&quot;,m.getDatabaseProductVersion(),&quot;dataSourceClass&quot;,ds.getClass().getName());
+        }catch(SQLException e){throw new IllegalStateException(e);}
+    }
+    public static Map&lt;String,Object&gt; sqlError(Throwable t){
+        for(Throwable p=t;p!=null;p=p.getCause())if(p instanceof SQLException e)return map(&quot;type&quot;,e.getClass().getName(),&quot;code&quot;,e.getErrorCode(),&quot;state&quot;,e.getSQLState());
+        return map(&quot;type&quot;,t.getClass().getName());
+    }
+}
+</code></pre></details><details><summary>추가 native adapter · 원문 assert body2개</summary><pre><code>package com.example.practice.product;
+
+import javax.sql.DataSource;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.ContextConfiguration;
+import com.example.practice.ProofJpaApp;
+import v04.support.Proof;
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** 추가 native 연결 adapter다. 원문 assert body만 그대로 복사했고 TC 원문 class 실행이 아니다. */
+@DataJpaTest(properties={&quot;spring.jpa.hibernate.ddl-auto=validate&quot;,&quot;spring.sql.init.mode=never&quot;,&quot;spring.jpa.show-sql=false&quot;,&quot;logging.level.root=ERROR&quot;,&quot;spring.datasource.hikari.maximum-pool-size=2&quot;,&quot;spring.datasource.hikari.minimum-idle=0&quot;})
+@ContextConfiguration(classes=ProofJpaApp.class)
+@AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.NONE)
+class NativeAdapterTest extends NativeProperties {
+ @Autowired ProductRepository productRepository;
+ @Autowired DataSource ds;
+ @Test void excludesSoftDeletedProduct(){
+        assertThat(productRepository.findByIdAndDeletedAtIsNull(1L)).isPresent();
+        assertThat(productRepository.findByIdAndDeletedAtIsNull(80L)).isEmpty();
+  Proof.guard(ds);Proof.record(&quot;adapter-source-finder-assert-body&quot;,Proof.map(&quot;product1Present&quot;,productRepository.findByIdAndDeletedAtIsNull(1L).isPresent(),&quot;product80Present&quot;,productRepository.findByIdAndDeletedAtIsNull(80L).isPresent(),&quot;engine&quot;,Proof.engine(ds)));
+ }
+ @Test void countsActiveProductsWithMysql(){
+        Page&lt;Product&gt; page = productRepository.findAllByDeletedAtIsNull(PageRequest.of(0, 10));
+        assertThat(page.getContent()).hasSize(10);
+        assertThat(page.getTotalElements()).isEqualTo(79);
+        assertThat(page.getTotalPages()).isEqualTo(8);
+  Proof.guard(ds);Proof.record(&quot;adapter-source-page-assert-body&quot;,Proof.map(&quot;content&quot;,page.getContent().size(),&quot;total&quot;,page.getTotalElements(),&quot;pages&quot;,page.getTotalPages(),&quot;idsUnordered&quot;,page.getContent().stream().map(Product::getId).sorted().toList()));
+ }
+}
+</code></pre></details><details><summary>추가 replace4조합</summary><pre><code>package com.example.practice.product;
+
+import javax.sql.DataSource;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
+import com.example.practice.ProofJpaApp;
+import v04.support.Proof;
+
+// 모든 교체 사례는 ddl-auto=none으로 실제 연결을 확인하기 전 DDL을 실행하지 않는다.
+@DataJpaTest(properties={&quot;spring.jpa.hibernate.ddl-auto=none&quot;,&quot;spring.sql.init.mode=never&quot;,&quot;spring.jpa.show-sql=false&quot;,&quot;logging.level.root=ERROR&quot;,&quot;spring.datasource.hikari.maximum-pool-size=2&quot;,&quot;spring.datasource.hikari.minimum-idle=0&quot;})
+@ContextConfiguration(classes=ProofJpaApp.class)
+@TestPropertySource(properties={&quot;spring.datasource.url=${V04_DB_URL}&quot;,&quot;spring.datasource.username=v04_probe&quot;,&quot;spring.datasource.password=${V04_DB_PASSWORD}&quot;})
+class DefaultStaticReplaceTest {
+ @Autowired DataSource ds;
+ @Test void staticUrlDefaultNonTestUsesH2()throws Exception{
+  Object value=AutoConfigureTestDatabase.class.getDeclaredMethod(&quot;replace&quot;).getDefaultValue();Map&lt;String,Object&gt; facts=Proof.engine(ds);facts.put(&quot;annotationDefault&quot;,value.toString());
+  Proof.check(&quot;replace-default-static-is-h2&quot;,value.toString().equals(&quot;NON_TEST&quot;)&amp;&amp;facts.get(&quot;engine&quot;).equals(&quot;H2&quot;),facts);
+ }
+}
+@DataJpaTest(properties={&quot;spring.jpa.hibernate.ddl-auto=none&quot;,&quot;spring.sql.init.mode=never&quot;,&quot;spring.jpa.show-sql=false&quot;,&quot;logging.level.root=ERROR&quot;,&quot;spring.datasource.hikari.maximum-pool-size=2&quot;,&quot;spring.datasource.hikari.minimum-idle=0&quot;})
+@ContextConfiguration(classes=ProofJpaApp.class)
+class DefaultDynamicReplaceTest extends NativeProperties {
+ @Autowired DataSource ds;
+ @Test void dynamicUrlDefaultNonTestKeepsMySQL(){Proof.guard(ds);Map&lt;String,Object&gt; facts=Proof.engine(ds);facts.put(&quot;origin&quot;,&quot;DynamicPropertySource URL, not Testcontainers&quot;);Proof.check(&quot;replace-default-dynamic-keeps-mysql&quot;,facts.get(&quot;engine&quot;).equals(&quot;MySQL&quot;),facts);}
+}
+@DataJpaTest(properties={&quot;spring.jpa.hibernate.ddl-auto=none&quot;,&quot;spring.sql.init.mode=never&quot;,&quot;spring.jpa.show-sql=false&quot;,&quot;logging.level.root=ERROR&quot;,&quot;spring.datasource.hikari.maximum-pool-size=2&quot;,&quot;spring.datasource.hikari.minimum-idle=0&quot;})
+@ContextConfiguration(classes=ProofJpaApp.class)
+@AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.NONE)
+@TestPropertySource(properties={&quot;spring.datasource.url=${V04_DB_URL}&quot;,&quot;spring.datasource.username=v04_probe&quot;,&quot;spring.datasource.password=${V04_DB_PASSWORD}&quot;})
+class ExplicitNoneReplaceTest {
+ @Autowired DataSource ds;
+ @Test void explicitNoneKeepsStaticMySQL(){Proof.guard(ds);Map&lt;String,Object&gt; facts=Proof.engine(ds);facts.put(&quot;replace&quot;,&quot;NONE&quot;);Proof.check(&quot;replace-none-static-keeps-mysql&quot;,facts.get(&quot;engine&quot;).equals(&quot;MySQL&quot;),facts);}
+}
+@DataJpaTest(properties={&quot;spring.jpa.hibernate.ddl-auto=none&quot;,&quot;spring.sql.init.mode=never&quot;,&quot;spring.jpa.show-sql=false&quot;,&quot;logging.level.root=ERROR&quot;,&quot;spring.datasource.hikari.maximum-pool-size=2&quot;,&quot;spring.datasource.hikari.minimum-idle=0&quot;})
+@ContextConfiguration(classes=ProofJpaApp.class)
+@AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.ANY)
+class ExplicitAnyReplaceTest extends NativeProperties {
+ @Autowired DataSource ds;
+ @Test void explicitAnyReplacesDynamicWithH2(){Map&lt;String,Object&gt; facts=Proof.engine(ds);facts.put(&quot;replace&quot;,&quot;ANY&quot;);Proof.check(&quot;replace-any-dynamic-is-h2&quot;,facts.get(&quot;engine&quot;).equals(&quot;H2&quot;),facts);}
+}
+</code></pre></details><details><summary>추가 @Sql INFERRED·ISOLATED·정리</summary><pre><code>package com.example.practice.product;
+
+import javax.sql.DataSource;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.jdbc.Sql;
+import org.springframework.test.context.jdbc.SqlConfig;
+import org.springframework.test.context.transaction.TestTransaction;
+import com.example.practice.ProofJpaApp;
+import v04.support.Proof;
+import static org.assertj.core.api.Assertions.assertThat;
+
+@DataJpaTest(properties={&quot;spring.jpa.hibernate.ddl-auto=validate&quot;,&quot;spring.sql.init.mode=never&quot;,&quot;spring.jpa.show-sql=false&quot;,&quot;logging.level.root=ERROR&quot;,&quot;spring.datasource.hikari.maximum-pool-size=2&quot;,&quot;spring.datasource.hikari.minimum-idle=0&quot;})
+@ContextConfiguration(classes=ProofJpaApp.class)
+@AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.NONE)
+class SqlFixtureTest extends NativeProperties {
+ @Autowired ProductRepository productRepository;
+ @Autowired DataSource ds;
+ @Test @Sql(&quot;/sql/product-fixture.sql&quot;)
+ void inferredJoinsTestRollback(){
+  assertThat(productRepository.findByIdAndDeletedAtIsNull(9001L)).isPresent();
+  boolean active=TestTransaction.isActive();TestTransaction.end();
+  JdbcTemplate jdbc=new JdbcTemplate(ds);int product=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM product WHERE id=9001&quot;,Integer.class),category=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM category WHERE id=9001&quot;,Integer.class);
+  Proof.check(&quot;sql-inferred-fixture-rolled-back&quot;,active&amp;&amp;product==0&amp;&amp;category==0,Proof.map(&quot;activeBeforeEnd&quot;,active,&quot;productAfterRollback&quot;,product,&quot;categoryAfterRollback&quot;,category));
+ }
+ @Test @Sql(scripts=&quot;/sql/product-fixture.sql&quot;,config=@SqlConfig(transactionMode=SqlConfig.TransactionMode.ISOLATED))
+ void isolatedCommitNeedsCleanup(){
+  assertThat(productRepository.findByIdAndDeletedAtIsNull(9001L)).isPresent();TestTransaction.end();JdbcTemplate jdbc=new JdbcTemplate(ds);
+  int product=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM product WHERE id=9001&quot;,Integer.class),category=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM category WHERE id=9001&quot;,Integer.class);
+  Proof.check(&quot;sql-isolated-fixture-survives-test-rollback&quot;,product==1&amp;&amp;category==1,Proof.map(&quot;productAfterTestRollback&quot;,product,&quot;categoryAfterTestRollback&quot;,category));
+  int deletedProduct=jdbc.update(&quot;DELETE FROM product WHERE id=9001&quot;),deletedCategory=jdbc.update(&quot;DELETE FROM category WHERE id=9001&quot;);
+  Proof.check(&quot;sql-isolated-explicit-child-first-cleanup&quot;,deletedProduct==1&amp;&amp;deletedCategory==1&amp;&amp;jdbc.queryForObject(&quot;SELECT COUNT(*)FROM product WHERE id=9001&quot;,Integer.class)==0,Proof.map(&quot;deletedProduct&quot;,deletedProduct,&quot;deletedCategory&quot;,deletedCategory,&quot;productAfterCleanup&quot;,jdbc.queryForObject(&quot;SELECT COUNT(*)FROM product WHERE id=9001&quot;,Integer.class)));
+ }
+}
+</code></pre></details><details><summary>원문 fixture SQL2문장</summary><pre><code>INSERT INTO category (id, name, depth, sort_order, created_at, updated_at)
+VALUES (9001, &#39;테스트 분류&#39;, 1, 1, &#39;2026-09-01 00:00:00&#39;, &#39;2026-09-01 00:00:00&#39;);
+INSERT INTO product (id, category_id, name, product_type, price, stock, sale_status, created_at, updated_at)
+VALUES (9001, 9001, &#39;테스트 상품&#39;, &#39;GOODS&#39;, 12000, 3, &#39;ON_SALE&#39;, &#39;2026-09-01 00:00:00&#39;, &#39;2026-09-01 00:00:00&#39;);
+</code></pre></details><details><summary>추가 두 엔진 문자열·UNIQUE 대조</summary><pre><code>package v04.extra;
+
+import javax.sql.DataSource;
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import v04.support.Proof;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+/** 같은 문자열 입력을 두 엔진의 명시한 기본 collation 조건에서 비교한다. */
+class EngineDifferentialTest {
+ @Test void mysqlModeDoesNotCopyMysqlCollation(){
+  DataSource mysql=Proof.mysql();DriverManagerDataSource h2=new DriverManagerDataSource(&quot;jdbc:h2:mem:v04_engine;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1&quot;,&quot;sa&quot;,&quot;&quot;);
+  JdbcTemplate m=new JdbcTemplate(mysql),h=new JdbcTemplate(h2);
+  h.execute(&quot;CREATE SCHEMA v04_extra&quot;);h.execute(&quot;CREATE TABLE v04_extra.case_probe(id INT PRIMARY KEY,word VARCHAR(30) NOT NULL UNIQUE)&quot;);
+  m.update(&quot;DELETE FROM v04_extra.case_probe&quot;);
+  for(JdbcTemplate jdbc:new JdbcTemplate[]{m,h})jdbc.update(&quot;INSERT INTO v04_extra.case_probe VALUES(1,&#39;cafe&#39;)&quot;);
+  String caseSql=&quot;SELECT CASE WHEN word=&#39;CAFE&#39; THEN 1 ELSE 0 END FROM v04_extra.case_probe WHERE id=1&quot;,accentSql=&quot;SELECT CASE WHEN word=&#39;café&#39; THEN 1 ELSE 0 END FROM v04_extra.case_probe WHERE id=1&quot;;
+  int mysqlCase=m.queryForObject(caseSql,Integer.class),h2Case=h.queryForObject(caseSql,Integer.class),mysqlAccent=m.queryForObject(accentSql,Integer.class),h2Accent=h.queryForObject(accentSql,Integer.class);
+  String collation=m.queryForObject(&quot;SELECT COLLATION_NAME FROM information_schema.columns WHERE table_schema=&#39;v04_extra&#39;AND table_name=&#39;case_probe&#39;AND column_name=&#39;word&#39;&quot;,String.class);
+  Proof.check(&quot;engine-same-comparison-mysql-ai-ci-vs-h2-mode&quot;,mysqlCase==1&amp;&amp;mysqlAccent==1&amp;&amp;h2Case==0&amp;&amp;h2Accent==0,Proof.map(&quot;mysqlCase&quot;,mysqlCase,&quot;mysqlAccent&quot;,mysqlAccent,&quot;h2ModeCase&quot;,h2Case,&quot;h2ModeAccent&quot;,h2Accent,&quot;mysqlColumnCollation&quot;,collation,&quot;h2Settings&quot;,&quot;MODE=MySQL;DATABASE_TO_LOWER=TRUE; no IGNORECASE/collation override&quot;,&quot;caseSql&quot;,caseSql,&quot;accentSql&quot;,accentSql));
+  DataIntegrityViolationException duplicate=assertThrows(DataIntegrityViolationException.class,()-&gt;m.update(&quot;INSERT INTO v04_extra.case_probe VALUES(2,&#39;café&#39;)&quot;));h.update(&quot;INSERT INTO v04_extra.case_probe VALUES(2,&#39;café&#39;)&quot;);
+  int mysqlRows=m.queryForObject(&quot;SELECT COUNT(*)FROM v04_extra.case_probe&quot;,Integer.class),h2Rows=h.queryForObject(&quot;SELECT COUNT(*)FROM v04_extra.case_probe&quot;,Integer.class);Map&lt;String,Object&gt; error=Proof.sqlError(duplicate);
+  Proof.check(&quot;engine-unique-accent-native1062-vs-h2-two&quot;,error.get(&quot;code&quot;).equals(1062)&amp;&amp;mysqlRows==1&amp;&amp;h2Rows==2,Proof.map(&quot;mysqlError&quot;,error,&quot;mysqlRows&quot;,mysqlRows,&quot;h2ModeRows&quot;,h2Rows,&quot;mysqlEngine&quot;,Proof.engine(mysql),&quot;h2Engine&quot;,Proof.engine(h2)));
+  int cleaned=m.update(&quot;DELETE FROM v04_extra.case_probe&quot;);Proof.check(&quot;engine-private-probe-cleaned&quot;,cleaned==1,Proof.map(&quot;mysqlDeletedRows&quot;,cleaned));
+ }
+}
+</code></pre></details><details><summary>추가 H2/JPA 모델·service·RowListener 구성</summary><pre><code>package v04.toy;
+
+import javax.sql.DataSource;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import org.springframework.context.annotation.*;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.orm.jpa.*;
+import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
+import org.springframework.transaction.annotation.*;
+import org.springframework.transaction.event.*;
+import java.util.*;
+import java.sql.*;
+import v04.support.Proof;
+
+@Configuration @EnableTransactionManagement(proxyTargetClass=true)
+public class ToyConfig {
+ @Bean DataSource dataSource(){return new DriverManagerDataSource(&quot;jdbc:h2:mem:v04_tx;DB_CLOSE_DELAY=-1&quot;,&quot;sa&quot;,&quot;&quot;);}
+ @Bean LocalContainerEntityManagerFactoryBean entityManagerFactory(DataSource ds){
+  var bean=new LocalContainerEntityManagerFactoryBean();bean.setDataSource(ds);bean.setPackagesToScan(&quot;v04.toy&quot;);bean.setJpaVendorAdapter(new HibernateJpaVendorAdapter());
+  bean.setJpaPropertyMap(Map.of(&quot;hibernate.hbm2ddl.auto&quot;,&quot;create-drop&quot;,&quot;hibernate.generate_statistics&quot;,&quot;true&quot;,&quot;hibernate.cache.use_second_level_cache&quot;,&quot;false&quot;,&quot;hibernate.cache.use_query_cache&quot;,&quot;false&quot;));return bean;
+ }
+ @Bean JpaTransactionManager transactionManager(EntityManagerFactory emf){return new JpaTransactionManager(emf);}
+ @Bean ToyService toyService(EntityManagerFactory emf){return new ToyService(SharedEntityManagerCreator.createSharedEntityManager(emf));}
+ @Bean RowListener rowListener(DataSource ds){return new RowListener(ds);}
+ public static class ToyService {
+  private final EntityManager em;
+  ToyService(EntityManager em){this.em=em;}
+  @Transactional(readOnly=true) public LearnOrder getEntity(long id){return em.find(LearnOrder.class,id);}
+ }
+ public record Created(int id){}
+ public static class RowListener {
+  final DataSource ds;final List&lt;Map&lt;String,Object&gt;&gt; calls=new ArrayList&lt;&gt;();
+  RowListener(DataSource ds){this.ds=ds;}
+  @TransactionalEventListener(phase=TransactionPhase.AFTER_COMMIT)
+  public void afterCommit(Created event)throws SQLException{
+   // Spring 바인딩 연결과 별도 connection에서 실제 commit된 행을 관찰한다.
+   try(Connection c=ds.getConnection();PreparedStatement p=c.prepareStatement(&quot;SELECT COUNT(*)FROM event_probe WHERE id=?&quot;)){
+    p.setInt(1,event.id());try(ResultSet r=p.executeQuery()){r.next();calls.add(Proof.map(&quot;id&quot;,event.id(),&quot;independentConnectionRows&quot;,r.getInt(1)));}
+   }
+  }
+}
+}
+</code></pre></details><details><summary>추가 테스트TX·lazy·flush·commit·REQUIRES_NEW 검사</summary><pre><code>package v04.toy;
+
+import javax.sql.DataSource;
+import jakarta.persistence.*;
+import org.hibernate.Hibernate;
+import org.hibernate.LazyInitializationException;
+import org.hibernate.SessionFactory;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
+import org.springframework.test.context.transaction.TestTransaction;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.*;
+import org.springframework.transaction.support.TransactionTemplate;
+import v04.support.Proof;
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringJUnitConfig(ToyConfig.class) @Transactional @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class ToyTransactionTest {
+ @Autowired DataSource ds;
+ @Autowired EntityManagerFactory emf;
+ @Autowired PlatformTransactionManager tm;
+ @Autowired ToyConfig.ToyService service;
+ @Autowired ToyConfig.RowListener listener;
+ @Autowired ApplicationEventPublisher publisher;
+ @PersistenceContext EntityManager em;
+ JdbcTemplate jdbc;SessionFactory sf;
+ @BeforeAll void seedOutsideTestTransaction(){
+  jdbc=new JdbcTemplate(ds);sf=emf.unwrap(SessionFactory.class);jdbc.execute(&quot;CREATE TABLE event_probe(id INT PRIMARY KEY)&quot;);
+  boolean testTx=TestTransaction.isActive();new TransactionTemplate(tm).executeWithoutResult(s-&gt;{LearnOrder order=new LearnOrder(1);order.add(101);em.persist(order);});
+  Proof.check(&quot;toy-beforeall-seed-is-not-test-managed-tx&quot;,!testTx,Proof.map(&quot;beforeAllTestTransactionActive&quot;,testTx,&quot;committedSeedOrder&quot;,1,&quot;committedSeedLine&quot;,101));
+ }
+ @BeforeEach void resetObserver(){listener.calls.clear();sf.getStatistics().clear();}
+ @Test void outerTestTransactionKeepsLazyOpen(){
+  LearnOrder order=service.getEntity(1);boolean before=Hibernate.isInitialized(order.getLines());int n=order.getLines().size();long statements=sf.getStatistics().getPrepareStatementCount();
+  Proof.check(&quot;toy-outer-test-tx-hides-lazy-boundary&quot;,TestTransaction.isActive()&amp;&amp;!before&amp;&amp;n==1&amp;&amp;statements==2,Proof.map(&quot;testTransactionActive&quot;,TestTransaction.isActive(),&quot;initializedBeforeSize&quot;,before,&quot;lines&quot;,n,&quot;hibernatePreparedStatements&quot;,statements,&quot;scope&quot;,&quot;additional H2 model/service, no DTO/HTTP&quot;));
+ }
+ @Test @Transactional(propagation=Propagation.NOT_SUPPORTED)
+ void serviceAloneClosesLazyContext(){
+  LearnOrder order=service.getEntity(1);boolean before=Hibernate.isInitialized(order.getLines());assertThrows(LazyInitializationException.class,()-&gt;order.getLines().size());
+  Proof.check(&quot;toy-no-outer-test-tx-lazy-exception&quot;,!TestTransaction.isActive()&amp;&amp;!before&amp;&amp;sf.getStatistics().getPrepareStatementCount()==1,Proof.map(&quot;testTransactionActive&quot;,TestTransaction.isActive(),&quot;initializedBeforeSize&quot;,before,&quot;error&quot;,&quot;LazyInitializationException&quot;,&quot;hibernatePreparedStatements&quot;,sf.getStatistics().getPrepareStatementCount()));
+ }
+ @Test void noFlushRollbackNeverChecksDeferredConstraint(){
+  em.persist(new DeferredProbe(81,-1));long statements=sf.getStatistics().getPrepareStatementCount();TestTransaction.end();int rows=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM deferred_probe WHERE id=81&quot;,Integer.class);
+  Proof.check(&quot;toy-no-flush-rollback-has-zero-insert-statements&quot;,statements==0&amp;&amp;rows==0,Proof.map(&quot;negativeAmount&quot;,-1,&quot;hibernatePreparedBeforeRollback&quot;,statements,&quot;rowsAfterRollback&quot;,rows,&quot;scope&quot;,&quot;passing persist call alone did not test DB CHECK&quot;));
+ }
+ @Test void explicitFlushExposesAssignedIdConstraint(){
+  em.persist(new DeferredProbe(82,-1));long before=sf.getStatistics().getPrepareStatementCount();PersistenceException error=assertThrows(PersistenceException.class,()-&gt;em.flush());long after=sf.getStatistics().getPrepareStatementCount();var details=Proof.sqlError(error);TestTransaction.end();
+  Proof.check(&quot;toy-assigned-id-check-fails-at-flush&quot;,before==0&amp;&amp;after==1&amp;&amp;details.get(&quot;code&quot;).equals(23513),Proof.map(&quot;beforeFlushHibernatePrepared&quot;,before,&quot;afterFlushHibernatePrepared&quot;,after,&quot;error&quot;,details,&quot;rowsAfterRollback&quot;,jdbc.queryForObject(&quot;SELECT COUNT(*)FROM deferred_probe WHERE id=82&quot;,Integer.class)));
+ }
+ @Test void identityNeedsInsertDuringPersist(){
+  PersistenceException error=assertThrows(PersistenceException.class,()-&gt;em.persist(new IdentityProbe(-1)));long statements=sf.getStatistics().getPrepareStatementCount();var details=Proof.sqlError(error);TestTransaction.end();
+  Proof.check(&quot;toy-identity-check-fails-during-persist&quot;,statements==1&amp;&amp;details.get(&quot;code&quot;).equals(23513),Proof.map(&quot;hibernatePreparedAtPersist&quot;,statements,&quot;error&quot;,details,&quot;rowsAfterRollback&quot;,jdbc.queryForObject(&quot;SELECT COUNT(*)FROM identity_probe&quot;,Integer.class)));
+ }
+ @Test void rollbackDoesNotInvokeAfterCommit(){
+  jdbc.update(&quot;INSERT INTO event_probe VALUES(71)&quot;);publisher.publishEvent(new ToyConfig.Created(71));int before=listener.calls.size();TestTransaction.end();int rows=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM event_probe WHERE id=71&quot;,Integer.class);
+  Proof.check(&quot;toy-default-test-rollback-no-aftercommit&quot;,before==0&amp;&amp;listener.calls.isEmpty()&amp;&amp;rows==0,Proof.map(&quot;callsBeforeEnd&quot;,before,&quot;callsAfterRollback&quot;,listener.calls.size(),&quot;rowsAfterRollback&quot;,rows));
+ }
+ @Test void flagForCommitWaitsForEndAndListenerObservesCommit(){
+  jdbc.update(&quot;INSERT INTO event_probe VALUES(72)&quot;);publisher.publishEvent(new ToyConfig.Created(72));TestTransaction.flagForCommit();int flaggedCalls=listener.calls.size();boolean active=TestTransaction.isActive();TestTransaction.end();int rows=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM event_probe WHERE id=72&quot;,Integer.class);
+  Proof.check(&quot;toy-flagforcommit-alone-does-not-fire-listener&quot;,active&amp;&amp;flaggedCalls==0,Proof.map(&quot;activeAfterFlagBeforeEnd&quot;,active,&quot;callsAfterFlagBeforeEnd&quot;,flaggedCalls));
+  Proof.check(&quot;toy-end-commit-fires-once-and-observes-committed-row&quot;,listener.calls.size()==1&amp;&amp;rows==1&amp;&amp;listener.calls.get(0).get(&quot;independentConnectionRows&quot;).equals(1),Proof.map(&quot;calls&quot;,listener.calls,&quot;rowsAfterEnd&quot;,rows));
+  int cleaned=jdbc.update(&quot;DELETE FROM event_probe WHERE id=72&quot;);Proof.check(&quot;toy-committed-test-row-explicit-cleanup&quot;,cleaned==1,Proof.map(&quot;deletedRows&quot;,cleaned,&quot;remainingRows&quot;,jdbc.queryForObject(&quot;SELECT COUNT(*)FROM event_probe WHERE id=72&quot;,Integer.class)));
+ }
+ @Test void requiresNewEscapesOuterTestRollback(){
+  jdbc.update(&quot;INSERT INTO event_probe VALUES(74)&quot;);var inner=new TransactionTemplate(tm);inner.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);inner.executeWithoutResult(s-&gt;jdbc.update(&quot;INSERT INTO event_probe VALUES(73)&quot;));TestTransaction.end();
+  int outerRows=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM event_probe WHERE id=74&quot;,Integer.class),innerRows=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM event_probe WHERE id=73&quot;,Integer.class);
+  Proof.check(&quot;toy-requiresnew-commit-survives-test-rollback&quot;,outerRows==0&amp;&amp;innerRows==1,Proof.map(&quot;outer74AfterRollback&quot;,outerRows,&quot;inner73AfterOuterRollback&quot;,innerRows));jdbc.update(&quot;DELETE FROM event_probe WHERE id=73&quot;);
+ }
+}
+</code></pre></details><details><summary>추가 Boot/JDBC/H2 HTTP 앱</summary><pre><code>package v04.http;
+
+import javax.sql.DataSource;
+import java.net.InetAddress;
+import java.util.Map;
+import org.springframework.beans.factory.InitializingBean;
+import org.springframework.boot.SpringBootConfiguration;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration;
+import org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration;
+import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
+import org.springframework.context.annotation.Bean;
+import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.*;
+import org.springframework.test.context.transaction.TestTransaction;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.*;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.bind.annotation.*;
+import v04.support.Proof;
+
+/** 원문에 없는 JDBC/H2 전용 HTTP toy app. 실제 상품/주문 API 구현이 아니다. */
+@SpringBootConfiguration
+@EnableAutoConfiguration(exclude={HibernateJpaAutoConfiguration.class,DataJpaRepositoriesAutoConfiguration.class})
+@EnableTransactionManagement(proxyTargetClass=true)
+public class HttpApp {
+ @Bean TomcatServletWebServerFactory servletWebServerFactory()throws Exception{var f=new TomcatServletWebServerFactory(0);f.setAddress(InetAddress.getByName(&quot;127.0.0.1&quot;));return f;}
+ @Bean DataSource dataSource(){return new DriverManagerDataSource(&quot;jdbc:h2:mem:v04_http;DB_CLOSE_DELAY=-1&quot;,&quot;sa&quot;,&quot;&quot;);}
+ @Bean JdbcTemplate jdbcTemplate(DataSource ds){return new JdbcTemplate(ds);}
+ @Bean PlatformTransactionManager transactionManager(DataSource ds){return new DataSourceTransactionManager(ds);}
+ @Bean InitializingBean privateSchema(JdbcTemplate jdbc){return()-&gt;jdbc.execute(&quot;CREATE TABLE http_probe(id INT PRIMARY KEY)&quot;);}
+ @Bean ProbeService probeService(JdbcTemplate jdbc){return new ProbeService(jdbc);}
+ public static class ProbeService {
+  final JdbcTemplate jdbc;
+  ProbeService(JdbcTemplate jdbc){this.jdbc=jdbc;}
+  @Transactional public Map&lt;String,Object&gt; write(int id,int marker){
+   int seen=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM http_probe WHERE id=?&quot;,Integer.class,marker);jdbc.update(&quot;INSERT INTO http_probe VALUES(?)&quot;,id);
+   return Proof.map(&quot;id&quot;,id,&quot;markerSeen&quot;,seen,&quot;applicationTxActive&quot;,TransactionSynchronizationManager.isActualTransactionActive(),&quot;testManagedTxActive&quot;,TestTransaction.isActive(),&quot;threadId&quot;,Thread.currentThread().threadId());
+  }
+ }
+ @RestController public static class ProbeController {
+  final ProbeService service;
+  ProbeController(ProbeService service){this.service=service;}
+  @PostMapping(&quot;/v04/probe&quot;) public ResponseEntity&lt;Map&lt;String,Object&gt;&gt; create(@RequestParam(&quot;id&quot;)int id,@RequestParam(&quot;marker&quot;)int marker){return ResponseEntity.status(201).body(service.write(id,marker));}
+ }
+}
+</code></pre></details><details><summary>추가 실제TCP·동기MockMvc 비교</summary><pre><code>package v04.http;
+
+import java.io.File;
+import java.net.URI;
+import java.net.http.*;
+import java.nio.file.Path;
+import java.util.Map;
+import org.apache.coyote.AbstractProtocol;
+import org.junit.jupiter.api.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.tomcat.TomcatWebServer;
+import org.springframework.boot.web.server.servlet.context.ServletWebServerApplicationContext;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.transaction.TestTransaction;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
+import v04.support.Proof;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest(classes=HttpApp.class,webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={&quot;server.address=127.0.0.1&quot;,&quot;spring.sql.init.mode=never&quot;,&quot;logging.level.root=ERROR&quot;})
+@AutoConfigureMockMvc @Transactional @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
+class HttpBoundaryTest {
+ @LocalServerPort int port;
+ @Autowired ServletWebServerApplicationContext context;
+ @Autowired JdbcTemplate jdbc;
+ @Autowired MockMvc mvc;
+ final JsonMapper mapper=JsonMapper.builder().build();
+ File raw(String name){return Path.of(System.getenv(&quot;V04_RUNTIME_DIR&quot;),name).toFile();}
+ @BeforeAll void captureOnlyOwnListener(){
+  TomcatWebServer server=(TomcatWebServer)context.getWebServer();AbstractProtocol&lt;?&gt; protocol=(AbstractProtocol&lt;?&gt;)server.getTomcat().getConnector().getProtocolHandler();
+  Proof.check(&quot;http-private-loopback-bound&quot;,protocol.getAddress().isLoopbackAddress()&amp;&amp;protocol.getLocalPort()==port,Proof.map(&quot;address&quot;,protocol.getAddress().getHostAddress(),&quot;portMatchesActualConnector&quot;,protocol.getLocalPort()==port,&quot;scope&quot;,&quot;additional Boot4.1.1/Tomcat11/JDBC H2 app, source OrderHttpTest not executed&quot;));
+  mapper.writeValue(raw(&quot;http-listener.json&quot;),Proof.map(&quot;port&quot;,port,&quot;address&quot;,protocol.getAddress().getHostAddress(),&quot;pid&quot;,ProcessHandle.current().pid()));
+ }
+ @Test void actualTcpServerCommitEscapesTestRollback()throws Exception{
+  jdbc.update(&quot;INSERT INTO http_probe VALUES(100)&quot;);long testThread=Thread.currentThread().threadId();Map&lt;String,Object&gt; body;int responseStatus;String text;String url=&quot;http://127.0.0.1:&quot;+port+&quot;/v04/probe?id=201&amp;marker=100&quot;;
+  try(HttpClient client=HttpClient.newHttpClient()){
+   HttpResponse&lt;String&gt; response=client.send(HttpRequest.newBuilder(URI.create(url)).POST(HttpRequest.BodyPublishers.noBody()).build(),HttpResponse.BodyHandlers.ofString());responseStatus=response.statusCode();text=response.body();body=mapper.readValue(text,Map.class);
+  }
+  mapper.writeValue(raw(&quot;actual-http-response.json&quot;),Proof.map(&quot;url&quot;,url,&quot;status&quot;,responseStatus,&quot;bodyExact&quot;,text,&quot;testThreadId&quot;,testThread));
+  boolean different=((Number)body.get(&quot;threadId&quot;)).longValue()!=testThread;
+  Proof.check(&quot;http-tcp-uses-other-thread-and-transaction&quot;,responseStatus==201&amp;&amp;TestTransaction.isActive()&amp;&amp;different&amp;&amp;body.get(&quot;markerSeen&quot;).equals(0)&amp;&amp;body.get(&quot;applicationTxActive&quot;).equals(true)&amp;&amp;body.get(&quot;testManagedTxActive&quot;).equals(false),Proof.map(&quot;status&quot;,responseStatus,&quot;serverThreadDifferent&quot;,different,&quot;uncommittedTestMarkerSeenByServer&quot;,body.get(&quot;markerSeen&quot;),&quot;serverApplicationTxActive&quot;,body.get(&quot;applicationTxActive&quot;),&quot;serverTestManagedTxActive&quot;,body.get(&quot;testManagedTxActive&quot;),&quot;testThreadTestTransactionActive&quot;,TestTransaction.isActive()));
+  TestTransaction.end();int marker=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM http_probe WHERE id=100&quot;,Integer.class),server=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM http_probe WHERE id=201&quot;,Integer.class);
+  Proof.check(&quot;http-server-commit-survives-test-rollback&quot;,marker==0&amp;&amp;server==1,Proof.map(&quot;testMarker100AfterRollback&quot;,marker,&quot;server201AfterRollback&quot;,server));int deleted=jdbc.update(&quot;DELETE FROM http_probe WHERE id=201&quot;);Proof.check(&quot;http-committed-row-explicit-cleanup&quot;,deleted==1,Proof.map(&quot;deletedServerRows&quot;,deleted));
+ }
+ @Test void synchronousMockMvcSharesTestTransaction()throws Exception{
+  jdbc.update(&quot;INSERT INTO http_probe VALUES(110)&quot;);long testThread=Thread.currentThread().threadId();String text=mvc.perform(post(&quot;/v04/probe&quot;).param(&quot;id&quot;,&quot;211&quot;).param(&quot;marker&quot;,&quot;110&quot;)).andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();Map&lt;String,Object&gt; body=mapper.readValue(text,Map.class);
+  mapper.writeValue(raw(&quot;mockmvc-response.json&quot;),Proof.map(&quot;status&quot;,201,&quot;bodyExact&quot;,text,&quot;testThreadId&quot;,testThread));boolean same=((Number)body.get(&quot;threadId&quot;)).longValue()==testThread;
+  Proof.check(&quot;http-sync-mockmvc-joins-test-thread-tx&quot;,same&amp;&amp;body.get(&quot;markerSeen&quot;).equals(1)&amp;&amp;body.get(&quot;applicationTxActive&quot;).equals(true)&amp;&amp;body.get(&quot;testManagedTxActive&quot;).equals(true),Proof.map(&quot;sameThread&quot;,same,&quot;markerSeen&quot;,body.get(&quot;markerSeen&quot;),&quot;applicationTxActive&quot;,body.get(&quot;applicationTxActive&quot;),&quot;testManagedTxActive&quot;,body.get(&quot;testManagedTxActive&quot;),&quot;scope&quot;,&quot;synchronous dispatcher only, async MVC not tested&quot;));
+  TestTransaction.end();int marker=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM http_probe WHERE id=110&quot;,Integer.class),write=jdbc.queryForObject(&quot;SELECT COUNT(*)FROM http_probe WHERE id=211&quot;,Integer.class);
+  Proof.check(&quot;http-sync-mockmvc-write-rolled-back-with-test&quot;,marker==0&amp;&amp;write==0,Proof.map(&quot;marker110AfterRollback&quot;,marker,&quot;mockmvc211AfterRollback&quot;,write));
+ }
+}
+</code></pre></details><details><summary>실행 결과 · native9/Java28·JUnit22/facts32</summary><pre><code>{
+  &quot;runtime&quot;: {
+    &quot;mysql&quot;: &quot;8.4.11&quot;,
+    &quot;machine&quot;: &quot;arm64&quot;,
+    &quot;os&quot;: &quot;macos15&quot;,
+    &quot;sqlMode&quot;: &quot;ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION&quot;,
+    &quot;autocommit&quot;: 1,
+    &quot;isolation&quot;: &quot;REPEATABLE-READ&quot;,
+    &quot;timeZone&quot;: &quot;+00:00&quot;
+  },
+  &quot;source&quot;: {
+    &quot;before&quot;: {
+      &quot;total&quot;: 80,
+      &quot;active&quot;: &quot;79&quot;
+    },
+    &quot;after&quot;: {
+      &quot;total&quot;: 80,
+      &quot;active&quot;: &quot;79&quot;
+    },
+    &quot;fixtureAfter&quot;: {
+      &quot;product&quot;: 0,
+      &quot;category&quot;: 0
+    }
+  },
+  &quot;java&quot;: {
+    &quot;checks&quot;: [
+      &quot;engine-private-probe-cleaned&quot;,
+      &quot;engine-same-comparison-mysql-ai-ci-vs-h2-mode&quot;,
+      &quot;engine-unique-accent-native1062-vs-h2-two&quot;,
+      &quot;http-committed-row-explicit-cleanup&quot;,
+      &quot;http-private-loopback-bound&quot;,
+      &quot;http-server-commit-survives-test-rollback&quot;,
+      &quot;http-sync-mockmvc-joins-test-thread-tx&quot;,
+      &quot;http-sync-mockmvc-write-rolled-back-with-test&quot;,
+      &quot;http-tcp-uses-other-thread-and-transaction&quot;,
+      &quot;observer-deep-snapshot-preserves-record-time&quot;,
+      &quot;replace-any-dynamic-is-h2&quot;,
+      &quot;replace-default-dynamic-keeps-mysql&quot;,
+      &quot;replace-default-static-is-h2&quot;,
+      &quot;replace-none-static-keeps-mysql&quot;,
+      &quot;sql-inferred-fixture-rolled-back&quot;,
+      &quot;sql-isolated-explicit-child-first-cleanup&quot;,
+      &quot;sql-isolated-fixture-survives-test-rollback&quot;,
+      &quot;toy-assigned-id-check-fails-at-flush&quot;,
+      &quot;toy-beforeall-seed-is-not-test-managed-tx&quot;,
+      &quot;toy-committed-test-row-explicit-cleanup&quot;,
+      &quot;toy-default-test-rollback-no-aftercommit&quot;,
+      &quot;toy-end-commit-fires-once-and-observes-committed-row&quot;,
+      &quot;toy-flagforcommit-alone-does-not-fire-listener&quot;,
+      &quot;toy-identity-check-fails-during-persist&quot;,
+      &quot;toy-no-flush-rollback-has-zero-insert-statements&quot;,
+      &quot;toy-no-outer-test-tx-lazy-exception&quot;,
+      &quot;toy-outer-test-tx-hides-lazy-boundary&quot;,
+      &quot;toy-requiresnew-commit-survives-test-rollback&quot;
+    ],
+    &quot;facts&quot;: {
+      &quot;adapter-source-finder-assert-body&quot;: {
+        &quot;product1Present&quot;: true,
+        &quot;product80Present&quot;: false,
+        &quot;engine&quot;: {
+          &quot;engine&quot;: &quot;MySQL&quot;,
+          &quot;version&quot;: &quot;8.4.11&quot;,
+          &quot;dataSourceClass&quot;: &quot;com.zaxxer.hikari.HikariDataSource&quot;
+        }
+      },
+      &quot;adapter-source-page-assert-body&quot;: {
+        &quot;content&quot;: 10,
+        &quot;total&quot;: 79,
+        &quot;pages&quot;: 8,
+        &quot;idsUnordered&quot;: [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10
+        ]
+      },
+      &quot;engine-private-probe-cleaned&quot;: {
+        &quot;mysqlDeletedRows&quot;: 1
+      },
+      &quot;engine-same-comparison-mysql-ai-ci-vs-h2-mode&quot;: {
+        &quot;mysqlCase&quot;: 1,
+        &quot;mysqlAccent&quot;: 1,
+        &quot;h2ModeCase&quot;: 0,
+        &quot;h2ModeAccent&quot;: 0,
+        &quot;mysqlColumnCollation&quot;: &quot;utf8mb4_0900_ai_ci&quot;,
+        &quot;h2Settings&quot;: &quot;MODE=MySQL;DATABASE_TO_LOWER=TRUE; no IGNORECASE/collation override&quot;,
+        &quot;caseSql&quot;: &quot;SELECT CASE WHEN word=&#39;CAFE&#39; THEN 1 ELSE 0 END FROM v04_extra.case_probe WHERE id=1&quot;,
+        &quot;accentSql&quot;: &quot;SELECT CASE WHEN word=&#39;café&#39; THEN 1 ELSE 0 END FROM v04_extra.case_probe WHERE id=1&quot;
+      },
+      &quot;engine-unique-accent-native1062-vs-h2-two&quot;: {
+        &quot;mysqlError&quot;: {
+          &quot;type&quot;: &quot;java.sql.SQLIntegrityConstraintViolationException&quot;,
+          &quot;code&quot;: 1062,
+          &quot;state&quot;: &quot;23000&quot;
+        },
+        &quot;mysqlRows&quot;: 1,
+        &quot;h2ModeRows&quot;: 2,
+        &quot;mysqlEngine&quot;: {
+          &quot;engine&quot;: &quot;MySQL&quot;,
+          &quot;version&quot;: &quot;8.4.11&quot;,
+          &quot;dataSourceClass&quot;: &quot;org.springframework.jdbc.datasource.DriverManagerDataSource&quot;
+        },
+        &quot;h2Engine&quot;: {
+          &quot;engine&quot;: &quot;H2&quot;,
+          &quot;version&quot;: &quot;2.4.240 (2025-09-22)&quot;,
+          &quot;dataSourceClass&quot;: &quot;org.springframework.jdbc.datasource.DriverManagerDataSource&quot;
+        }
+      },
+      &quot;http-committed-row-explicit-cleanup&quot;: {
+        &quot;deletedServerRows&quot;: 1
+      },
+      &quot;http-private-loopback-bound&quot;: {
+        &quot;address&quot;: &quot;127.0.0.1&quot;,
+        &quot;portMatchesActualConnector&quot;: true,
+        &quot;scope&quot;: &quot;additional Boot4.1.1/Tomcat11/JDBC H2 app, source OrderHttpTest not executed&quot;
+      },
+      &quot;http-server-commit-survives-test-rollback&quot;: {
+        &quot;testMarker100AfterRollback&quot;: 0,
+        &quot;server201AfterRollback&quot;: 1
+      },
+      &quot;http-sync-mockmvc-joins-test-thread-tx&quot;: {
+        &quot;sameThread&quot;: true,
+        &quot;markerSeen&quot;: 1,
+        &quot;applicationTxActive&quot;: true,
+        &quot;testManagedTxActive&quot;: true,
+        &quot;scope&quot;: &quot;synchronous dispatcher only, async MVC not tested&quot;
+      },
+      &quot;http-sync-mockmvc-write-rolled-back-with-test&quot;: {
+        &quot;marker110AfterRollback&quot;: 0,
+        &quot;mockmvc211AfterRollback&quot;: 0
+      },
+      &quot;http-tcp-uses-other-thread-and-transaction&quot;: {
+        &quot;status&quot;: 201,
+        &quot;serverThreadDifferent&quot;: true,
+        &quot;uncommittedTestMarkerSeenByServer&quot;: 0,
+        &quot;serverApplicationTxActive&quot;: true,
+        &quot;serverTestManagedTxActive&quot;: false,
+        &quot;testThreadTestTransactionActive&quot;: true
+      },
+      &quot;observer-deep-snapshot-preserves-record-time&quot;: {
+        &quot;capturedRows&quot;: 1,
+        &quot;capturedNestedId&quot;: 1,
+        &quot;originalListAfterClear&quot;: 0,
+        &quot;originalNestedAfterChange&quot;: 99
+      },
+      &quot;observer-mutable-source&quot;: {
+        &quot;values&quot;: [
+          {
+            &quot;id&quot;: 1
+          }
+        ]
+      },
+      &quot;observer-trigger-rewrite&quot;: {
+        &quot;phase&quot;: &quot;after original nested mutation and list clear&quot;
+      },
+      &quot;replace-any-dynamic-is-h2&quot;: {
+        &quot;engine&quot;: &quot;H2&quot;,
+        &quot;version&quot;: &quot;2.4.240 (2025-09-22)&quot;,
+        &quot;dataSourceClass&quot;: &quot;org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseFactory$EmbeddedDataSourceProxy&quot;,
+        &quot;replace&quot;: &quot;ANY&quot;
+      },
+      &quot;replace-default-dynamic-keeps-mysql&quot;: {
+        &quot;engine&quot;: &quot;MySQL&quot;,
+        &quot;version&quot;: &quot;8.4.11&quot;,
+        &quot;dataSourceClass&quot;: &quot;com.zaxxer.hikari.HikariDataSource&quot;,
+        &quot;origin&quot;: &quot;DynamicPropertySource URL, not Testcontainers&quot;
+      },
+      &quot;replace-default-static-is-h2&quot;: {
+        &quot;engine&quot;: &quot;H2&quot;,
+        &quot;version&quot;: &quot;2.4.240 (2025-09-22)&quot;,
+        &quot;dataSourceClass&quot;: &quot;org.springframework.jdbc.datasource.embedded.EmbeddedDatabaseFactory$EmbeddedDataSourceProxy&quot;,
+        &quot;annotationDefault&quot;: &quot;NON_TEST&quot;
+      },
+      &quot;replace-none-static-keeps-mysql&quot;: {
+        &quot;engine&quot;: &quot;MySQL&quot;,
+        &quot;version&quot;: &quot;8.4.11&quot;,
+        &quot;dataSourceClass&quot;: &quot;com.zaxxer.hikari.HikariDataSource&quot;,
+        &quot;replace&quot;: &quot;NONE&quot;
+      },
+      &quot;sql-inferred-fixture-rolled-back&quot;: {
+        &quot;activeBeforeEnd&quot;: true,
+        &quot;productAfterRollback&quot;: 0,
+        &quot;categoryAfterRollback&quot;: 0
+      },
+      &quot;sql-isolated-explicit-child-first-cleanup&quot;: {
+        &quot;deletedProduct&quot;: 1,
+        &quot;deletedCategory&quot;: 1,
+        &quot;productAfterCleanup&quot;: 0
+      },
+      &quot;sql-isolated-fixture-survives-test-rollback&quot;: {
+        &quot;productAfterTestRollback&quot;: 1,
+        &quot;categoryAfterTestRollback&quot;: 1
+      },
+      &quot;toy-assigned-id-check-fails-at-flush&quot;: {
+        &quot;beforeFlushHibernatePrepared&quot;: 0,
+        &quot;afterFlushHibernatePrepared&quot;: 1,
+        &quot;error&quot;: {
+          &quot;type&quot;: &quot;org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException&quot;,
+          &quot;code&quot;: 23513,
+          &quot;state&quot;: &quot;23513&quot;
+        },
+        &quot;rowsAfterRollback&quot;: 0
+      },
+      &quot;toy-beforeall-seed-is-not-test-managed-tx&quot;: {
+        &quot;beforeAllTestTransactionActive&quot;: false,
+        &quot;committedSeedOrder&quot;: 1,
+        &quot;committedSeedLine&quot;: 101
+      },
+      &quot;toy-committed-test-row-explicit-cleanup&quot;: {
+        &quot;deletedRows&quot;: 1,
+        &quot;remainingRows&quot;: 0
+      },
+      &quot;toy-default-test-rollback-no-aftercommit&quot;: {
+        &quot;callsBeforeEnd&quot;: 0,
+        &quot;callsAfterRollback&quot;: 0,
+        &quot;rowsAfterRollback&quot;: 0
+      },
+      &quot;toy-end-commit-fires-once-and-observes-committed-row&quot;: {
+        &quot;calls&quot;: [
+          {
+            &quot;id&quot;: 72,
+            &quot;independentConnectionRows&quot;: 1
+          }
+        ],
+        &quot;rowsAfterEnd&quot;: 1
+      },
+      &quot;toy-flagforcommit-alone-does-not-fire-listener&quot;: {
+        &quot;activeAfterFlagBeforeEnd&quot;: true,
+        &quot;callsAfterFlagBeforeEnd&quot;: 0
+      },
+      &quot;toy-identity-check-fails-during-persist&quot;: {
+        &quot;hibernatePreparedAtPersist&quot;: 1,
+        &quot;error&quot;: {
+          &quot;type&quot;: &quot;org.h2.jdbc.JdbcSQLIntegrityConstraintViolationException&quot;,
+          &quot;code&quot;: 23513,
+          &quot;state&quot;: &quot;23513&quot;
+        },
+        &quot;rowsAfterRollback&quot;: 0
+      },
+      &quot;toy-no-flush-rollback-has-zero-insert-statements&quot;: {
+        &quot;negativeAmount&quot;: -1,
+        &quot;hibernatePreparedBeforeRollback&quot;: 0,
+        &quot;rowsAfterRollback&quot;: 0,
+        &quot;scope&quot;: &quot;passing persist call alone did not test DB CHECK&quot;
+      },
+      &quot;toy-no-outer-test-tx-lazy-exception&quot;: {
+        &quot;testTransactionActive&quot;: false,
+        &quot;initializedBeforeSize&quot;: false,
+        &quot;error&quot;: &quot;LazyInitializationException&quot;,
+        &quot;hibernatePreparedStatements&quot;: 1
+      },
+      &quot;toy-outer-test-tx-hides-lazy-boundary&quot;: {
+        &quot;testTransactionActive&quot;: true,
+        &quot;initializedBeforeSize&quot;: false,
+        &quot;lines&quot;: 1,
+        &quot;hibernatePreparedStatements&quot;: 2,
+        &quot;scope&quot;: &quot;additional H2 model/service, no DTO/HTTP&quot;
+      },
+      &quot;toy-requiresnew-commit-survives-test-rollback&quot;: {
+        &quot;outer74AfterRollback&quot;: 0,
+        &quot;inner73AfterOuterRollback&quot;: 1
+      }
+    }
+  },
+  &quot;junit&quot;: [
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.DefaultDynamicReplaceTest&quot;,
+      &quot;method&quot;: &quot;dynamicUrlDefaultNonTestKeepsMySQL()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.DefaultStaticReplaceTest&quot;,
+      &quot;method&quot;: &quot;staticUrlDefaultNonTestUsesH2()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.ExplicitAnyReplaceTest&quot;,
+      &quot;method&quot;: &quot;explicitAnyReplacesDynamicWithH2()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.ExplicitNoneReplaceTest&quot;,
+      &quot;method&quot;: &quot;explicitNoneKeepsStaticMySQL()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.NativeAdapterTest&quot;,
+      &quot;method&quot;: &quot;countsActiveProductsWithMysql()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.NativeAdapterTest&quot;,
+      &quot;method&quot;: &quot;excludesSoftDeletedProduct()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.ProductServiceUnitTest&quot;,
+      &quot;method&quot;: &quot;mapsPageAndDelegatesPageable()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.ProductServiceUnitTest&quot;,
+      &quot;method&quot;: &quot;mapsResponseAndThrowsForMissingProduct()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.SqlFixtureTest&quot;,
+      &quot;method&quot;: &quot;inferredJoinsTestRollback()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;com.example.practice.product.SqlFixtureTest&quot;,
+      &quot;method&quot;: &quot;isolatedCommitNeedsCleanup()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.extra.EngineDifferentialTest&quot;,
+      &quot;method&quot;: &quot;mysqlModeDoesNotCopyMysqlCollation()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.http.HttpBoundaryTest&quot;,
+      &quot;method&quot;: &quot;actualTcpServerCommitEscapesTestRollback()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.http.HttpBoundaryTest&quot;,
+      &quot;method&quot;: &quot;synchronousMockMvcSharesTestTransaction()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.support.ObservationSnapshotTest&quot;,
+      &quot;method&quot;: &quot;storesValueAtObservationTime()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.toy.ToyTransactionTest&quot;,
+      &quot;method&quot;: &quot;explicitFlushExposesAssignedIdConstraint()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.toy.ToyTransactionTest&quot;,
+      &quot;method&quot;: &quot;flagForCommitWaitsForEndAndListenerObservesCommit()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.toy.ToyTransactionTest&quot;,
+      &quot;method&quot;: &quot;identityNeedsInsertDuringPersist()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.toy.ToyTransactionTest&quot;,
+      &quot;method&quot;: &quot;noFlushRollbackNeverChecksDeferredConstraint()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.toy.ToyTransactionTest&quot;,
+      &quot;method&quot;: &quot;outerTestTransactionKeepsLazyOpen()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.toy.ToyTransactionTest&quot;,
+      &quot;method&quot;: &quot;requiresNewEscapesOuterTestRollback()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.toy.ToyTransactionTest&quot;,
+      &quot;method&quot;: &quot;rollbackDoesNotInvokeAfterCommit()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    },
+    {
+      &quot;class&quot;: &quot;v04.toy.ToyTransactionTest&quot;,
+      &quot;method&quot;: &quot;serviceAloneClosesLazyContext()&quot;,
+      &quot;passed&quot;: true,
+      &quot;skipped&quot;: false
+    }
+  ],
+  &quot;checks&quot;: [
+    &quot;private-native-mysql8.4.11&quot;,
+    &quot;source-seed-products80-active79&quot;,
+    &quot;private-http-server-stopped&quot;,
+    &quot;java-explicit-checks-match-stdout&quot;,
+    &quot;java-check-and-fact-ids-cover-declared-probes&quot;,
+    &quot;junit-exact22-cases-in11-expected-classes&quot;,
+    &quot;junit-all-discovered-cases-pass-no-skips&quot;,
+    &quot;source-tc-class-not-run&quot;,
+    &quot;source-seed-row-counts-preserved-fixture-cleaned&quot;
+  ],
+  &quot;trace&quot;: [
+    {
+      &quot;sql&quot;: &quot;CREATE DATABASE v04_extra CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci&quot;,
+      &quot;rows&quot;: null,
+      &quot;affectedRows&quot;: 1
+    },
+    {
+      &quot;sql&quot;: &quot;CREATE TABLE v04_extra.case_probe(id INT PRIMARY KEY,word VARCHAR(30) NOT NULL UNIQUE)&quot;,
+      &quot;rows&quot;: null,
+      &quot;affectedRows&quot;: 0
+    },
+    {
+      &quot;sql&quot;: &quot;SELECT VERSION()AS mysql,@@version_compile_machine AS machine,@@version_compile_os AS os,@@sql_mode AS sqlMode,@@autocommit AS autocommit,@@transaction_isolation AS isolation,@@time_zone AS timeZone&quot;,
+      &quot;rows&quot;: [
+        {
+          &quot;mysql&quot;: &quot;8.4.11&quot;,
+          &quot;machine&quot;: &quot;arm64&quot;,
+          &quot;os&quot;: &quot;macos15&quot;,
+          &quot;sqlMode&quot;: &quot;ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION&quot;,
+          &quot;autocommit&quot;: 1,
+          &quot;isolation&quot;: &quot;REPEATABLE-READ&quot;,
+          &quot;timeZone&quot;: &quot;+00:00&quot;
+        }
+      ],
+      &quot;affectedRows&quot;: null
+    },
+    {
+      &quot;sql&quot;: &quot;SELECT COUNT(*)AS total,SUM(deleted_at IS NULL)AS active FROM ds_practice.product&quot;,
+      &quot;rows&quot;: [
+        {
+          &quot;total&quot;: 80,
+          &quot;active&quot;: &quot;79&quot;
+        }
+      ],
+      &quot;affectedRows&quot;: null
+    },
+    {
+      &quot;sql&quot;: &quot;SELECT COUNT(*)AS total,SUM(deleted_at IS NULL)AS active FROM ds_practice.product&quot;,
+      &quot;rows&quot;: [
+        {
+          &quot;total&quot;: 80,
+          &quot;active&quot;: &quot;79&quot;
+        }
+      ],
+      &quot;affectedRows&quot;: null
+    },
+    {
+      &quot;sql&quot;: &quot;SELECT(SELECT COUNT(*)FROM ds_practice.product WHERE id=9001)AS product,(SELECT COUNT(*)FROM ds_practice.category WHERE id=9001)AS category&quot;,
+      &quot;rows&quot;: [
+        {
+          &quot;product&quot;: 0,
+          &quot;category&quot;: 0
+        }
+      ],
+      &quot;affectedRows&quot;: null
+    }
+  ]
+}</code></pre></details><details><summary>CHECK·JUnit 식별자 목록</summary><pre><code>{
+  &quot;native&quot;: [
+    &quot;private-native-mysql8.4.11&quot;,
+    &quot;source-seed-products80-active79&quot;,
+    &quot;private-http-server-stopped&quot;,
+    &quot;java-explicit-checks-match-stdout&quot;,
+    &quot;java-check-and-fact-ids-cover-declared-probes&quot;,
+    &quot;junit-exact22-cases-in11-expected-classes&quot;,
+    &quot;junit-all-discovered-cases-pass-no-skips&quot;,
+    &quot;source-tc-class-not-run&quot;,
+    &quot;source-seed-row-counts-preserved-fixture-cleaned&quot;
+  ],
+  &quot;java&quot;: [
+    &quot;engine-private-probe-cleaned&quot;,
+    &quot;engine-same-comparison-mysql-ai-ci-vs-h2-mode&quot;,
+    &quot;engine-unique-accent-native1062-vs-h2-two&quot;,
+    &quot;http-committed-row-explicit-cleanup&quot;,
+    &quot;http-private-loopback-bound&quot;,
+    &quot;http-server-commit-survives-test-rollback&quot;,
+    &quot;http-sync-mockmvc-joins-test-thread-tx&quot;,
+    &quot;http-sync-mockmvc-write-rolled-back-with-test&quot;,
+    &quot;http-tcp-uses-other-thread-and-transaction&quot;,
+    &quot;observer-deep-snapshot-preserves-record-time&quot;,
+    &quot;replace-any-dynamic-is-h2&quot;,
+    &quot;replace-default-dynamic-keeps-mysql&quot;,
+    &quot;replace-default-static-is-h2&quot;,
+    &quot;replace-none-static-keeps-mysql&quot;,
+    &quot;sql-inferred-fixture-rolled-back&quot;,
+    &quot;sql-isolated-explicit-child-first-cleanup&quot;,
+    &quot;sql-isolated-fixture-survives-test-rollback&quot;,
+    &quot;toy-assigned-id-check-fails-at-flush&quot;,
+    &quot;toy-beforeall-seed-is-not-test-managed-tx&quot;,
+    &quot;toy-committed-test-row-explicit-cleanup&quot;,
+    &quot;toy-default-test-rollback-no-aftercommit&quot;,
+    &quot;toy-end-commit-fires-once-and-observes-committed-row&quot;,
+    &quot;toy-flagforcommit-alone-does-not-fire-listener&quot;,
+    &quot;toy-identity-check-fails-during-persist&quot;,
+    &quot;toy-no-flush-rollback-has-zero-insert-statements&quot;,
+    &quot;toy-no-outer-test-tx-lazy-exception&quot;,
+    &quot;toy-outer-test-tx-hides-lazy-boundary&quot;,
+    &quot;toy-requiresnew-commit-survives-test-rollback&quot;
+  ],
+  &quot;junit&quot;: [
+    &quot;com.example.practice.product.DefaultDynamicReplaceTest#dynamicUrlDefaultNonTestKeepsMySQL()&quot;,
+    &quot;com.example.practice.product.DefaultStaticReplaceTest#staticUrlDefaultNonTestUsesH2()&quot;,
+    &quot;com.example.practice.product.ExplicitAnyReplaceTest#explicitAnyReplacesDynamicWithH2()&quot;,
+    &quot;com.example.practice.product.ExplicitNoneReplaceTest#explicitNoneKeepsStaticMySQL()&quot;,
+    &quot;com.example.practice.product.NativeAdapterTest#countsActiveProductsWithMysql()&quot;,
+    &quot;com.example.practice.product.NativeAdapterTest#excludesSoftDeletedProduct()&quot;,
+    &quot;com.example.practice.product.ProductServiceUnitTest#mapsPageAndDelegatesPageable()&quot;,
+    &quot;com.example.practice.product.ProductServiceUnitTest#mapsResponseAndThrowsForMissingProduct()&quot;,
+    &quot;com.example.practice.product.SqlFixtureTest#inferredJoinsTestRollback()&quot;,
+    &quot;com.example.practice.product.SqlFixtureTest#isolatedCommitNeedsCleanup()&quot;,
+    &quot;v04.extra.EngineDifferentialTest#mysqlModeDoesNotCopyMysqlCollation()&quot;,
+    &quot;v04.http.HttpBoundaryTest#actualTcpServerCommitEscapesTestRollback()&quot;,
+    &quot;v04.http.HttpBoundaryTest#synchronousMockMvcSharesTestTransaction()&quot;,
+    &quot;v04.support.ObservationSnapshotTest#storesValueAtObservationTime()&quot;,
+    &quot;v04.toy.ToyTransactionTest#explicitFlushExposesAssignedIdConstraint()&quot;,
+    &quot;v04.toy.ToyTransactionTest#flagForCommitWaitsForEndAndListenerObservesCommit()&quot;,
+    &quot;v04.toy.ToyTransactionTest#identityNeedsInsertDuringPersist()&quot;,
+    &quot;v04.toy.ToyTransactionTest#noFlushRollbackNeverChecksDeferredConstraint()&quot;,
+    &quot;v04.toy.ToyTransactionTest#outerTestTransactionKeepsLazyOpen()&quot;,
+    &quot;v04.toy.ToyTransactionTest#requiresNewEscapesOuterTestRollback()&quot;,
+    &quot;v04.toy.ToyTransactionTest#rollbackDoesNotInvokeAfterCommit()&quot;,
+    &quot;v04.toy.ToyTransactionTest#serviceAloneClosesLazyContext()&quot;
+  ],
+  &quot;facts&quot;: [
+    &quot;adapter-source-finder-assert-body&quot;,
+    &quot;adapter-source-page-assert-body&quot;,
+    &quot;engine-private-probe-cleaned&quot;,
+    &quot;engine-same-comparison-mysql-ai-ci-vs-h2-mode&quot;,
+    &quot;engine-unique-accent-native1062-vs-h2-two&quot;,
+    &quot;http-committed-row-explicit-cleanup&quot;,
+    &quot;http-private-loopback-bound&quot;,
+    &quot;http-server-commit-survives-test-rollback&quot;,
+    &quot;http-sync-mockmvc-joins-test-thread-tx&quot;,
+    &quot;http-sync-mockmvc-write-rolled-back-with-test&quot;,
+    &quot;http-tcp-uses-other-thread-and-transaction&quot;,
+    &quot;observer-deep-snapshot-preserves-record-time&quot;,
+    &quot;observer-mutable-source&quot;,
+    &quot;observer-trigger-rewrite&quot;,
+    &quot;replace-any-dynamic-is-h2&quot;,
+    &quot;replace-default-dynamic-keeps-mysql&quot;,
+    &quot;replace-default-static-is-h2&quot;,
+    &quot;replace-none-static-keeps-mysql&quot;,
+    &quot;sql-inferred-fixture-rolled-back&quot;,
+    &quot;sql-isolated-explicit-child-first-cleanup&quot;,
+    &quot;sql-isolated-fixture-survives-test-rollback&quot;,
+    &quot;toy-assigned-id-check-fails-at-flush&quot;,
+    &quot;toy-beforeall-seed-is-not-test-managed-tx&quot;,
+    &quot;toy-committed-test-row-explicit-cleanup&quot;,
+    &quot;toy-default-test-rollback-no-aftercommit&quot;,
+    &quot;toy-end-commit-fires-once-and-observes-committed-row&quot;,
+    &quot;toy-flagforcommit-alone-does-not-fire-listener&quot;,
+    &quot;toy-identity-check-fails-during-persist&quot;,
+    &quot;toy-no-flush-rollback-has-zero-insert-statements&quot;,
+    &quot;toy-no-outer-test-tx-lazy-exception&quot;,
+    &quot;toy-outer-test-tx-hides-lazy-boundary&quot;,
+    &quot;toy-requiresnew-commit-survives-test-rollback&quot;
+  ]
+}</code></pre></details><details><summary>독립 임시복사·native/HTTP 재현 검토</summary><pre><code>{
+  &quot;date&quot;: &quot;2026-10-20&quot;,
+  &quot;reviewer&quot;: &quot;p09_review independent temporarycopy source/compile/runtime review&quot;,
+  &quot;temporaryProof&quot;: &quot;/var/folders/v7/q1cs_f5d0n7cccrbydpm88xr0000gn/T/v04-review-proof-_zwcmhdm/source-proof&quot;,
+  &quot;runtime&quot;: &quot;/Users/ds/research/javaexperience-v04-20261020/_data/reviewer-runtime/run-z1bk0957&quot;,
+  &quot;compileOriginalExit&quot;: 0,
+  &quot;nativeChecks&quot;: 9,
+  &quot;javaChecks&quot;: 28,
+  &quot;junitCases&quot;: 22,
+  &quot;junitClasses&quot;: 11,
+  &quot;facts&quot;: 32,
+  &quot;frozenEntireMatch&quot;: true,
+  &quot;dependencySHAs&quot;: 132,
+  &quot;sourceScope&quot;: &quot;completeTCclass compileonly/noTCnoDocker/SC; nativeadapterreusesassertbody2&quot;,
+  &quot;runtimeCleanup&quot;: &quot;actualHTTPsocketclosedafterworkerexit;MySQLshutdownexit0/serverStoppedtrue&quot;,
+  &quot;seedScope&quot;: &quot;80/active79 rowcounts +product/category9001absence, notallseedvalues&quot;,
+  &quot;knownObserverBug&quot;: &quot;deeprecord-time snapshotfixed; finalcalls72/independent1 andnested1 preserved&quot;,
+  &quot;unresolvedFindings&quot;: [],
+  &quot;notVerified&quot;: [
+    &quot;UI/browser/pixel/learner&quot;,
+    &quot;sourceTC/Docker/ServiceConnection/runtimecontainerlifecycle&quot;,
+    &quot;originalOrder/HTTPpatterns&quot;,
+    &quot;otherHTTPengines/asyncMVC/speedratios/allisolation/locking/collations&quot;
+  ]
+}</code></pre></details><details><summary>공식 출처 메인 대조·조회 한계</summary><pre><code>{
+  &quot;date&quot;: &quot;2026-10-20&quot;,
+  &quot;route&quot;: &quot;direct Codex CLI gpt-6-luna/OpenAI; help/access verified; research exit0; noLiteLLM&quot;,
+  &quot;mainOpened&quot;: [
+    {
+      &quot;url&quot;: &quot;https://docs.spring.io/spring-boot/api/java/org/springframework/boot/jdbc/test/autoconfigure/AutoConfigureTestDatabase.html&quot;,
+      &quot;claim&quot;: &quot;4.1.1 default replaceNON_TEST&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://docs.spring.io/spring-boot/api/java/org/springframework/boot/jdbc/test/autoconfigure/AutoConfigureTestDatabase.Replace.html&quot;,
+      &quot;claim&quot;: &quot;recognizedtestDB ContainerMetadata/DynamicPropertySource/TC JDBC exclusions; explicitNONE not universallyrequired&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://docs.spring.io/spring-framework/docs/7.0.9/javadoc-api/org/springframework/test/context/transaction/TestTransaction.html&quot;,
+      &quot;claim&quot;: &quot;flag only changes completion outcome; end performs commit/rollback&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://h2database.com/html/features.html&quot;,
+      &quot;claim&quot;: &quot;MODE partial compatibility, actual target2.4.240 versions toresolve&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/executing-sql.html&quot;,
+      &quot;claim&quot;: &quot;7.0.9 SQLinit vsper-testSql/ISOLATED andafterphase&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://docs.spring.io/spring-framework/reference/testing/testcontext-framework/tx.html&quot;,
+      &quot;claim&quot;: &quot;7.0.9 testmanaged thread binding/defaultrollback/TestTransaction&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://docs.spring.io/spring-framework/reference/data-access/transaction/event.html&quot;,
+      &quot;claim&quot;: &quot;transaction-bound defaultAFTER_COMMIT&quot;
+    },
+    {
+      &quot;url&quot;: &quot;https://docs.spring.io/spring-boot/reference/testing/spring-boot-applications.html&quot;,
+      &quot;claim&quot;: &quot;RANDOM_PORT separatethread/transaction&quot;
+    }
+  ],
+  &quot;currentPreflight&quot;: &quot;Docker sockets connect refused, not general software prohibition; TC source compile-only planned, no container startup&quot;,
+  &quot;runtimeStatus&quot;: &quot;observercorrected native9/Java28/JUnit22/facts32 wholefrozen replay +independent temp replay match; actualTCP1 andsyncMockMvc1 areaddedBootJDBC/H2app, sourceTCcompileonly&quot;,
+  &quot;dependencyArtifacts&quot;: 132
+}</code></pre></details><details><summary>마지막 replay의 실제 자체 HTTP listener 식별자</summary><pre><code>{
+  &quot;port&quot;: 56079,
+  &quot;address&quot;: &quot;127.0.0.1&quot;,
+  &quot;pid&quot;: 49241
+}</code></pre></details><details><summary>마지막 replay의 HTTP socket 종료 확인</summary><pre><code>{
+  &quot;listener&quot;: {
+    &quot;port&quot;: 56079,
+    &quot;address&quot;: &quot;127.0.0.1&quot;,
+    &quot;pid&quot;: 49241
+  },
+  &quot;tcpClosedAfterWorkerExit&quot;: true
+}</code></pre></details><details><summary>마지막 replay의 실제 TCP 응답 원문</summary><pre><code>{
+  &quot;url&quot;: &quot;http://127.0.0.1:56079/v04/probe?id=201&amp;marker=100&quot;,
+  &quot;status&quot;: 201,
+  &quot;bodyExact&quot;: &quot;{\&quot;id\&quot;:201,\&quot;markerSeen\&quot;:0,\&quot;applicationTxActive\&quot;:true,\&quot;testManagedTxActive\&quot;:false,\&quot;threadId\&quot;:56}&quot;,
+  &quot;testThreadId&quot;: 1
+}</code></pre></details><details><summary>마지막 replay의 동기 MockMvc 응답 원문</summary><pre><code>{
+  &quot;status&quot;: 201,
+  &quot;bodyExact&quot;: &quot;{\&quot;id\&quot;:211,\&quot;markerSeen\&quot;:1,\&quot;applicationTxActive\&quot;:true,\&quot;testManagedTxActive\&quot;:true,\&quot;threadId\&quot;:1}&quot;,
+  &quot;testThreadId&quot;: 1
+}</code></pre></details>
+ </details><details class="v04-legacy"><summary>기존 전체 테스트 DB 개념 지도 보기 · 추가 실측과 구분</summary><section class="knowledge-page-map" aria-label="문서 읽기 지도"><div class="knowledge-page-map-head"><div><p class="knowledge-page-map-kicker">Verification &amp; tests <span>· V04</span></p><h2>이 문서에서 볼 내용</h2><p>계층별 테스트와 검증</p></div><span class="knowledge-page-map-count">8개 주제</span></div><nav class="knowledge-page-steps" aria-label="문서의 실제 절로 이동"><a class="knowledge-page-step" href="#1-한-줄로-말하면"><span class="knowledge-page-step-no">01</span><span>1. 한 줄로 말하면</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#2-당장-알아야-할-것"><span class="knowledge-page-step-no">02</span><span>2. 당장 알아야 할 것</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#3-따라-하기"><span class="knowledge-page-step-no">03</span><span>3. 따라 하기</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#4-치트시트"><span class="knowledge-page-step-no">04</span><span>4. 치트시트</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#5-자주-나는-에러와-해결"><span class="knowledge-page-step-no">05</span><span>5. 자주 나는 에러와 해결</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#6-한-단계-더"><span class="knowledge-page-step-no">06</span><span>6. 한 단계 더</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#7-자가점검-qa-면접-대비"><span class="knowledge-page-step-no">07</span><span>7. 자가점검 Q&amp;A (면접 대비)</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a><a class="knowledge-page-step" href="#8-참고문헌"><span class="knowledge-page-step-no">08</span><span>8. 참고문헌</span><span class="knowledge-page-step-arrow" aria-hidden="true">↘</span></a></nav></section></details></section><section id="kr-reading" data-kr-reading aria-label="V04. 테스트 DB 전략 설명"><h1 class="kr-reading-title" tabindex="-1">V04. 테스트 DB 전략</h1><h1 class="kr-source-title" id="v04-테스트-db-전략--h2-vs-testcontainers-데이터-준비-transactional의-함정"><a class="anchor" href="#v04-테스트-db-전략--h2-vs-testcontainers-데이터-준비-transactional의-함정" aria-hidden="true">#</a>V04. 테스트 DB 전략 — H2 vs Testcontainers, 데이터 준비, @Transactional의 함정</h1><div class="knowledge-reader-original"><details class="v04-original" id="v04-original"><summary>원문 전체 · 코드·버전별 변화·실무 가이드·참고문헌</summary>
 <blockquote>
 <p>3줄 요약 — 서비스·도메인 로직은 DB 없이 빠르게 검증하고, SQL·제약·방언을 검증할 Repository/API 테스트에는 운영과 같은 DB 엔진을 쓴다.
 Spring Boot 4.1의 <code>@DataJpaTest</code>는 기본적으로 임베디드 DB로 바꾸고 테스트마다 트랜잭션을 롤백하므로, Testcontainers를 붙일 때는 DB 교체를 명시적으로 끈다.
@@ -312,7 +1764,7 @@ class OrderHttpTest {
   window.addEventListener('hashchange', () => reveal(location.hash));
   reveal(location.hash);
 })();
-</script>
+</script></details></div></section></div></div></div>
 
 </main>
 
@@ -320,5 +1772,7 @@ class OrderHttpTest {
 
 
 <script src="../../tools/site/knowledge-learning.bundle.js?v=3d51af7dd3f7" defer></script>
-</body>
+
+
+<script src="../../tools/site/knowledge-reader.js?v=96bf759b9c70" defer></script><script src="../../tools/site/v04-learning.bundle.js?v=ddb037fae2c3" defer></script></body>
 </html>

@@ -1,0 +1,1546 @@
+// 원문과 최종 frozen 추가 실험을 구분하는 보충 학습 데이터.
+export const b01AssetRoot = '../design/b01-2026-10-20/images/';
+export const B01_RUNS = {
+  "java": {
+    "runtime": {
+      "javaVersion": "21.0.6",
+      "springVersion": "7.0.9",
+      "securityCryptoVersion": "7.1.1"
+    },
+    "checks": [
+      "extra-mac-byte-comparison",
+      "extra-password-encoder-delegating-matches",
+      "extra-version-comparison-is-not-jwt-revocation",
+      "observer-record-time-deep-snapshot",
+      "source-codemac-known-vector",
+      "source-issue-fixed-clock-memory-email",
+      "source-issue-memory-sms-six-digits",
+      "source-limit-stub-stops-before-replace",
+      "source-reset-fragment-extra-wrapper",
+      "source-sender-failure-after-memory-store-write"
+    ],
+    "facts": {
+      "extra-mac-byte-comparison": {
+        "equalInputMatches": true,
+        "changedInputMatches": false,
+        "digestBytes": 32,
+        "scope": "extra MessageDigest.isEqual call; timing not measured; original verifier absent"
+      },
+      "extra-password-encoder-delegating-matches": {
+        "factory": "PasswordEncoderFactories.createDelegatingPasswordEncoder",
+        "securityVersion": "7.1.1",
+        "storedPrefix": "{bcrypt}",
+        "correctMatches": true,
+        "wrongMatches": false,
+        "scope": "extra standalone encoder call; no login handler/HTTP/cost benchmark"
+      },
+      "extra-version-comparison-is-not-jwt-revocation": {
+        "issuedVersion": 0,
+        "currentVersion": 1,
+        "extraVersionCheckAccepts": false,
+        "scope": "extra integer comparison; no JWT parse/signature/filter/session authentication"
+      },
+      "observer-record-time-deep-snapshot": {
+        "recordTimeOrderSize": 3,
+        "sourceTraceAfterClear": 0
+      },
+      "source-codemac-known-vector": {
+        "algorithm": "HmacSHA256",
+        "hexCharacters": 64,
+        "knownVectorMatches": true,
+        "scope": "public fixed test input; no production key"
+      },
+      "source-issue-fixed-clock-memory-email": {
+        "order": [
+          "limit",
+          "replace",
+          "email"
+        ],
+        "codeDigits": 6,
+        "leadingZeroPreserved": true,
+        "storedMacCharacters": 64,
+        "issuedAt": "2026-10-20T00:00:00Z",
+        "expiresAt": "2026-10-20T00:05:00Z",
+        "ttlSeconds": 300,
+        "emailStubCalls": 1,
+        "scope": "direct new source service; extra memory store/sender; not DB/Spring proxy/email delivery"
+      },
+      "source-issue-memory-sms-six-digits": {
+        "order": [
+          "limit",
+          "replace",
+          "sms"
+        ],
+        "codeDigits": 6,
+        "digitsOnly": true,
+        "smsStubCalls": 1,
+        "scope": "SMS branch only; no provider/network/delivery"
+      },
+      "source-limit-stub-stops-before-replace": {
+        "order": [
+          "limit"
+        ],
+        "rejectedByStub": true,
+        "newStoreWrites": 0,
+        "scope": "extra limit stub; real cooldown/day/IP policy absent"
+      },
+      "source-reset-fragment-extra-wrapper": {
+        "randomInputBytes": 32,
+        "base64urlCharacters": 43,
+        "paddingPresent": false,
+        "storedDigestBytes": 32,
+        "sentValueHashesToStoredDigest": true,
+        "expiresAt": "2026-10-20T00:15:00Z",
+        "ttlSeconds": 900,
+        "mailStubCalls": 1,
+        "scope": "original fragment inside extra wrapper; deterministic demo bytes, no actual link or mail"
+      },
+      "source-sender-failure-after-memory-store-write": {
+        "order": [
+          "limit",
+          "replace",
+          "email"
+        ],
+        "senderFailure": true,
+        "memoryStoreWrites": 1,
+        "scope": "added memory store not DB commit; source outbox/retry implementation absent"
+      }
+    }
+  },
+  "redis": {
+    "checks": [
+      "extra-local-vs-shared-threshold40",
+      "extra-lua-runtime-error-does-not-undo-incr",
+      "extra-split-incr-without-expire-leaves-key",
+      "private-redis-probe-keys-explicit-cleanup",
+      "private-redis-two-independent-clients",
+      "source-lua-expiry-next-window-starts-one",
+      "source-lua-first-expiry-fixed-window",
+      "source-lua-two-client-shared-count60",
+      "source-subsecond-window-truncates-to-zero"
+    ],
+    "facts": {
+      "extra-local-vs-shared-threshold40": {
+        "addedThreshold": 40,
+        "separateLocalCounts": [
+          30,
+          30
+        ],
+        "localCountsWouldPermit": 60,
+        "sharedCountWouldPermit": 40,
+        "scope": "extra decision calculation; original Lua only returns count, no HTTP limiter implemented"
+      },
+      "extra-lua-runtime-error-does-not-undo-incr": {
+        "runtimeError": true,
+        "countAfterError": 1,
+        "ttlAfterError": -1,
+        "scope": "same source Lua with extra invalid expiry argument; atomic is not error rollback"
+      },
+      "extra-split-incr-without-expire-leaves-key": {
+        "count": 1,
+        "ttl": -1,
+        "scope": "deliberately stop after INCR; EXPIRE not sent; not process crash test"
+      },
+      "private-redis-probe-keys-explicit-cleanup": {
+        "deletedLongLivingKeys": 4,
+        "remainingProbeKeys": 0
+      },
+      "private-redis-two-independent-clients": {
+        "redisVersion": "8.10.2",
+        "differentClientIds": true,
+        "scope": "new loopback/password/ownPID guard; not existing Redis"
+      },
+      "source-lua-expiry-next-window-starts-one": {
+        "firstWindowCount": 1,
+        "expiredKeyAbsent": true,
+        "nextWindowCount": 1,
+        "scope": "actual TTL wait bounded4s; no latency or throughput claim"
+      },
+      "source-lua-first-expiry-fixed-window": {
+        "first": 1,
+        "second": 2,
+        "sameAbsoluteExpiry": true,
+        "positiveTtlWithin60s": true,
+        "scope": "first request expiry not sliding refresh; raw expiry perrun only"
+      },
+      "source-lua-two-client-shared-count60": {
+        "callsPerClient": [
+          30,
+          30
+        ],
+        "uniqueResults": 60,
+        "resultMin": 1,
+        "resultMax": 60,
+        "finalSharedCount": 60,
+        "scope": "two independent clients/workerthreads same key, not production app nodes/HTTP"
+      },
+      "source-subsecond-window-truncates-to-zero": {
+        "inputMillis": 999,
+        "windowToSeconds": 0,
+        "returns": [
+          1,
+          1
+        ],
+        "keyExists": false,
+        "scope": "source lacks positive whole-second config validation; not 999ms rate protection"
+      }
+    }
+  },
+  "mysql": {
+    "checks": [
+      "extra-activation-requires-matching-live-challenge",
+      "extra-challenge-concurrent-consume-one-winner",
+      "extra-consume-activation-commit-observer",
+      "extra-expiry-boundary-and-attempt-limit",
+      "extra-failure-counter-needs-commit",
+      "extra-reset-commit-hash-version-sessions-tokens",
+      "extra-reset-concurrent-one-version-increment",
+      "extra-reset-mid-failure-rolls-back-all",
+      "extra-reset-token-owner-mismatch-no-write",
+      "extra-sequential-resend-replaces-old-challenge",
+      "extra-signup-two-prechecks-unique-one-winner",
+      "private-account-fixtures-cleaned-seed-count-kept",
+      "private-native-mysql-socket-only",
+      "source-migration-applied-private-copy"
+    ],
+    "facts": {
+      "private-native-mysql-socket-only": {
+        "version": "8.4.11",
+        "skipNetworking": true,
+        "mysqlx": false,
+        "scope": "fresh datadir/socket/ownPID; application probe CRUD only"
+      },
+      "source-migration-applied-private-copy": {
+        "columns": [
+          {
+            "COLUMN_NAME": "credential_version",
+            "IS_NULLABLE": "NO",
+            "COLUMN_DEFAULT": "0"
+          },
+          {
+            "COLUMN_NAME": "member_status",
+            "IS_NULLABLE": "NO",
+            "COLUMN_DEFAULT": "PENDING"
+          },
+          {
+            "COLUMN_NAME": "password_hash",
+            "IS_NULLABLE": "YES",
+            "COLUMN_DEFAULT": null
+          }
+        ],
+        "scope": "original DDL unchanged; existing hash backfill/NOT NULL step not executed"
+      },
+      "extra-signup-two-prechecks-unique-one-winner": {
+        "precheckCounts": [
+          0,
+          0
+        ],
+        "insertOutcomes": [
+          1,
+          1062
+        ],
+        "storedRows": 1,
+        "scope": "two independent connections; same literal email; no normalization or HTTP409 implementation"
+      },
+      "extra-consume-activation-commit-observer": {
+        "consumeAffected": 1,
+        "independentBeforeCommit": "PENDING",
+        "independentAfterCommit": "ACTIVE",
+        "reuseAffected": 0,
+        "scope": "added email-only policy/direct SQL; source registration service absent"
+      },
+      "extra-activation-requires-matching-live-challenge": {
+        "wrongOwnerAffected": 0,
+        "expiredAffected": 0,
+        "memberStates": [
+          "PENDING",
+          "PENDING"
+        ],
+        "scope": "added guarded helper; mismatched owner/expired paths do not activate; not HTTP auth"
+      },
+      "extra-challenge-concurrent-consume-one-winner": {
+        "affectedRows": [
+          0,
+          1
+        ],
+        "scope": "two connections/same added conditional UPDATE"
+      },
+      "extra-expiry-boundary-and-attempt-limit": {
+        "expiresEqualsNowAffected": 0,
+        "attemptsAtLimitAffected": 0,
+        "addedMaxAttempts": 3,
+        "scope": "extra policy; not source store implementation"
+      },
+      "extra-failure-counter-needs-commit": {
+        "afterRolledBackWrongAttempt": 0,
+        "committedWrongAffected": [
+          1,
+          1,
+          1
+        ],
+        "finalAttempts": 3,
+        "correctCodeAfterLimitAffected": 0,
+        "scope": "added direct SQL experiment; throwing+rollback would lose increment"
+      },
+      "extra-sequential-resend-replaces-old-challenge": {
+        "oldChallengeDeleted": 1,
+        "oldConsumeAffected": 0,
+        "newConsumeAffected": 1,
+        "scope": "added single transaction/sequential resend; concurrent resend not tested"
+      },
+      "extra-reset-token-owner-mismatch-no-write": {
+        "affected": 0,
+        "tokenOwnerUnchanged": true,
+        "requestedOwnerUnchanged": true,
+        "scope": "added token/member_id predicate; no HTTP handle/authentication tested"
+      },
+      "extra-reset-mid-failure-rolls-back-all": {
+        "before": {
+          "hashMarker": "demo-hash-v1",
+          "version": 0,
+          "tokenUsed": 0,
+          "sessionRows": 2,
+          "unusedResetRows": 2,
+          "auditRows": 0
+        },
+        "afterRollback": {
+          "hashMarker": "demo-hash-v1",
+          "version": 0,
+          "tokenUsed": 0,
+          "sessionRows": 2,
+          "unusedResetRows": 2,
+          "auditRows": 0
+        },
+        "scope": "added DB hash marker/session rows only; not external Redis/JWT revocation"
+      },
+      "extra-reset-commit-hash-version-sessions-tokens": {
+        "affected": 1,
+        "reuseAffected": 0,
+        "afterCommit": {
+          "hashMarker": "demo-hash-v2",
+          "version": 1,
+          "tokenUsed": 1,
+          "sessionRows": 0,
+          "unusedResetRows": 0,
+          "auditRows": 1
+        },
+        "scope": "symbolic demo hash marker; Java PasswordEncoder separate; same DB session table not real session/JWT validation"
+      },
+      "extra-reset-concurrent-one-version-increment": {
+        "affectedRows": [
+          0,
+          1
+        ],
+        "after": {
+          "hashMarker": "demo-hash-v2",
+          "version": 1,
+          "tokenUsed": 1,
+          "sessionRows": 0,
+          "unusedResetRows": 0,
+          "auditRows": 1
+        },
+        "scope": "two connections same token; no HTTP status or timing test"
+      },
+      "private-account-fixtures-cleaned-seed-count-kept": {
+        "seedMemberCount": 200,
+        "afterMemberCount": 200,
+        "remainingFixtureRows": {
+          "b01_session": 0,
+          "b01_audit": 0,
+          "verification_challenge": 0,
+          "password_reset_token": 0
+        },
+        "scope": "rowcount only; copied migration remains private; not all seed values compared"
+      }
+    }
+  }
+};
+export const B01_ASSETS = {
+  "B01-signup": {
+    "file": "B01-signup-v3.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "사전 중복 조회를 통과하면 가입이 보장될까요?",
+    "focus": {
+      "signup-schema": [
+        4,
+        13,
+        34,
+        62
+      ],
+      "signup-precheck": [
+        39,
+        13,
+        57,
+        33
+      ],
+      "signup-unique": [
+        39,
+        13,
+        57,
+        75
+      ]
+    }
+  },
+  "B01-issue": {
+    "file": "B01-issue-v2.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "발급 코드는 무엇을 어떤 순서로 호출할까요?",
+    "focus": {
+      "issue-email": [
+        1,
+        22,
+        37,
+        55
+      ],
+      "issue-sms": [
+        38,
+        22,
+        36,
+        55
+      ],
+      "issue-limit": [
+        74,
+        22,
+        25,
+        55
+      ]
+    }
+  },
+  "B01-mac": {
+    "file": "B01-mac.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "짧은 코드의 MAC과 비교는 무엇을 검증했을까요?",
+    "focus": {
+      "mac-vector": [
+        7,
+        13,
+        44,
+        45
+      ],
+      "mac-compare": [
+        52,
+        13,
+        41,
+        45
+      ]
+    }
+  },
+  "B01-delivery": {
+    "file": "B01-delivery-v3.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "저장 뒤 발송 실패가 나면 무엇이 남을까요?",
+    "focus": {
+      "delivery-write": [
+        6,
+        14,
+        43,
+        30
+      ],
+      "delivery-failure": [
+        49,
+        14,
+        46,
+        30
+      ]
+    }
+  },
+  "B01-challenge": {
+    "file": "B01-challenge-v4.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "인증 코드 소비와 ACTIVE는 언제 보일까요?",
+    "focus": {
+      "challenge-before": [
+        2,
+        11,
+        31,
+        67
+      ],
+      "challenge-commit": [
+        2,
+        53,
+        31,
+        34
+      ],
+      "challenge-race": [
+        33,
+        11,
+        37,
+        70
+      ],
+      "challenge-boundary": [
+        70,
+        11,
+        29,
+        70
+      ]
+    }
+  },
+  "B01-resend": {
+    "file": "B01-resend-v5.jpg",
+    "width": 1670,
+    "height": 941,
+    "ready": true,
+    "alt": "실패 횟수와 재발급은 어떻게 남길까요?",
+    "focus": {
+      "resend-attempts": [
+        1,
+        11,
+        48,
+        76
+      ],
+      "resend-replace": [
+        50,
+        11,
+        48,
+        76
+      ]
+    }
+  },
+  "B01-reset": {
+    "file": "B01-reset-v4.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "reset token과 DB 변경은 어디까지 한 단위일까요?",
+    "focus": {
+      "reset-token": [
+        6,
+        1,
+        91,
+        30
+      ],
+      "reset-rollback": [
+        10,
+        37,
+        44,
+        45
+      ],
+      "reset-commit": [
+        55,
+        37,
+        42,
+        45
+      ]
+    }
+  },
+  "B01-password": {
+    "file": "B01-password-v2.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "password hash와 credential version은 같은 보장일까요?",
+    "focus": {
+      "password-encoder": [
+        10,
+        4,
+        50,
+        52
+      ],
+      "password-version": [
+        59,
+        4,
+        34,
+        84
+      ]
+    }
+  },
+  "B01-counter": {
+    "file": "B01-counter-v4.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "두 client가 같은 Redis key를 세면 어떻게 될까요?",
+    "focus": {
+      "counter-fixed": [
+        1,
+        9,
+        52,
+        35
+      ],
+      "counter-shared": [
+        53,
+        9,
+        46,
+        40
+      ],
+      "counter-decision": [
+        13,
+        50,
+        80,
+        42
+      ]
+    }
+  },
+  "B01-counter-edge": {
+    "file": "B01-counter-edge-v3.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "Lua 원자 실행이면 오류와 잘못된 창도 해결될까요?",
+    "focus": {
+      "counter-edge-split": [
+        1,
+        8,
+        24,
+        70
+      ],
+      "counter-edge-error": [
+        26,
+        8,
+        25,
+        70
+      ],
+      "counter-edge-window": [
+        52,
+        8,
+        47,
+        70
+      ]
+    }
+  }
+};
+export const B01_LESSONS = [
+  {
+    "id": "signup",
+    "question": "사전 중복 조회를 통과하면 가입이 보장될까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "원문 migration은 외부 연습 schema 사본에 적용했습니다. 가입 경합은 추가 두 연결·같은 literal email이며 정규화·API409 구현은 없습니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "signup-schema",
+        "title": "원문 DDL의 초기 상태",
+        "lead": "PENDING 기본값과 nullable password_hash를 추가했습니다. 기존 hash 채움과 NOT NULL 전환은 실행하지 않았습니다.",
+        "code": "ALTER TABLE member DROP CHECK ck_member_status;\nALTER TABLE member MODIFY member_status VARCHAR(20) NOT NULL DEFAULT 'PENDING';\nALTER TABLE member ADD COLUMN password_hash VARCHAR(255) NULL,\n  ADD COLUMN email_verified_at DATETIME(6) NULL,\n  ADD COLUMN phone_verified_at DATETIME(6) NULL,\n  ADD COLUMN credential_version INT NOT NULL DEFAULT 0,\n  ADD CONSTRAINT ck_member_status CHECK\n    (member_status IN ('PENDING','ACTIVE','SUSPENDED','WITHDRAWN'));",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "member_status 기본값",
+            "PENDING"
+          ],
+          [
+            "credential_version 기본값",
+            "0"
+          ],
+          [
+            "password_hash nullable",
+            "YES"
+          ],
+          [
+            "실제 엔진",
+            "private MySQL8.4.11 · socket-only"
+          ]
+        ],
+        "checks": [
+          "source-migration-applied-private-copy",
+          "private-native-mysql-socket-only"
+        ],
+        "runKeys": [
+          "mysql.facts.source-migration-applied-private-copy",
+          "mysql.facts.private-native-mysql-socket-only"
+        ],
+        "image": "B01-signup"
+      },
+      {
+        "id": "signup-precheck",
+        "title": "두 요청 모두 사전 조회0",
+        "lead": "추가 두 독립 연결은 모두0을 조회했습니다. 사전 조회만으로 INSERT 경쟁을 막지 못합니다.",
+        "code": " def signup(c,i,barrier):\n  c.begin();seen=query(c,\"SELECT COUNT(*)AS n FROM ds_practice.member WHERE email='race@example.invalid'\")[0]['n'];barrier.wait(timeout=5)\n  try:query(c,\"INSERT INTO ds_practice.member(login_id,name,email,member_status,created_at,updated_at)VALUES(%s,'경합 fixture','race@example.invalid','PENDING',%s,%s)\",('race-'+str(i),NOW,NOW));c.commit();return[seen,1]\n  except pymysql.IntegrityError as e:c.rollback();return[seen,e.args[0]]",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "독립 연결 precheck",
+            "[0,0]"
+          ],
+          [
+            "입력 범위",
+            "같은 literal email · 정규화 미실행"
+          ]
+        ],
+        "checks": [
+          "extra-signup-two-prechecks-unique-one-winner"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-signup-two-prechecks-unique-one-winner"
+        ],
+        "image": "B01-signup"
+      },
+      {
+        "id": "signup-unique",
+        "title": "UNIQUE에서 한 요청만 저장",
+        "lead": "추가 INSERT 결과는 성공1건과 MySQL1062이며 저장 행은1입니다. HTTP 응답 관측이 아닙니다.",
+        "code": " def signup(c,i,barrier):\n  c.begin();seen=query(c,\"SELECT COUNT(*)AS n FROM ds_practice.member WHERE email='race@example.invalid'\")[0]['n'];barrier.wait(timeout=5)\n  try:query(c,\"INSERT INTO ds_practice.member(login_id,name,email,member_status,created_at,updated_at)VALUES(%s,'경합 fixture','race@example.invalid','PENDING',%s,%s)\",('race-'+str(i),NOW,NOW));c.commit();return[seen,1]\n  except pymysql.IntegrityError as e:c.rollback();return[seen,e.args[0]]",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "INSERT 결과",
+            "[1,1062]"
+          ],
+          [
+            "저장 행",
+            "1"
+          ],
+          [
+            "cleanup seed member count",
+            "200 → 200"
+          ],
+          [
+            "cleanup 추가 fixture",
+            "모든 대상0 · seed 값 전체 비교 아님"
+          ]
+        ],
+        "checks": [
+          "extra-signup-two-prechecks-unique-one-winner",
+          "private-account-fixtures-cleaned-seed-count-kept"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-signup-two-prechecks-unique-one-winner",
+          "mysql.facts.private-account-fixtures-cleaned-seed-count-kept"
+        ],
+        "image": "B01-signup"
+      }
+    ]
+  },
+  {
+    "id": "issue",
+    "question": "발급 코드는 무엇을 어떤 순서로 호출할까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "원문 service를 direct new로 호출했습니다. 추가 memory store/sender·고정 시계·결정적 난수이며 Spring proxy·DB·실제 발송은 아닙니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "issue-email",
+        "title": "EMAIL: limit → replace → email",
+        "lead": "6자리·앞자리0 보존, MAC64자리,5분 만료를 관측했습니다. 보안 난수 품질 검증이 아닙니다.",
+        "code": "        Instant now=clock.instant(); store.enforceCooldownAndDailyLimit(memberId,channel,now);\n        String code=String.format(Locale.ROOT,\"%06d\",random.nextInt(1_000_000));\n        store.replaceActive(memberId,purpose,channel,codeMac.mac(code),now,now.plus(Duration.ofMinutes(5)));\n        if (channel.equals(\"EMAIL\")) sender.sendEmail(target,code); else sender.sendSms(target,code);",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "호출 순서",
+            "limit → replace → email"
+          ],
+          [
+            "코드 형태",
+            "6자리 · 앞자리0 보존"
+          ],
+          [
+            "저장 MAC 길이",
+            "64 hex characters"
+          ],
+          [
+            "발급 → 만료",
+            "2026-10-20T00:00:00Z → 2026-10-20T00:05:00Z"
+          ]
+        ],
+        "checks": [
+          "source-issue-fixed-clock-memory-email",
+          "observer-record-time-deep-snapshot"
+        ],
+        "runKeys": [
+          "java.facts.source-issue-fixed-clock-memory-email",
+          "java.facts.observer-record-time-deep-snapshot"
+        ],
+        "image": "B01-issue"
+      },
+      {
+        "id": "issue-sms",
+        "title": "SMS 분기도6자리",
+        "lead": "원문 else 분기를 추가 memory SMS sender로 호출했습니다. 통신사 전송·수신 결과가 아닙니다.",
+        "code": "        Instant now=clock.instant(); store.enforceCooldownAndDailyLimit(memberId,channel,now);\n        String code=String.format(Locale.ROOT,\"%06d\",random.nextInt(1_000_000));\n        store.replaceActive(memberId,purpose,channel,codeMac.mac(code),now,now.plus(Duration.ofMinutes(5)));\n        if (channel.equals(\"EMAIL\")) sender.sendEmail(target,code); else sender.sendSms(target,code);",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "호출 순서",
+            "limit → replace → sms"
+          ],
+          [
+            "digitsOnly / codeDigits",
+            "true / 6"
+          ],
+          [
+            "SMS stub calls",
+            "1"
+          ]
+        ],
+        "checks": [
+          "source-issue-memory-sms-six-digits"
+        ],
+        "runKeys": [
+          "java.facts.source-issue-memory-sms-six-digits"
+        ],
+        "image": "B01-issue"
+      },
+      {
+        "id": "issue-limit",
+        "title": "제한 stub가 먼저 거부",
+        "lead": "추가 제한 stub가 거부하면 새 replace는 호출되지 않습니다. 실제 cooldown/day/IP 정책은 없습니다.",
+        "code": "        Instant now=clock.instant(); store.enforceCooldownAndDailyLimit(memberId,channel,now);\n        String code=String.format(Locale.ROOT,\"%06d\",random.nextInt(1_000_000));\n        store.replaceActive(memberId,purpose,channel,codeMac.mac(code),now,now.plus(Duration.ofMinutes(5)));\n        if (channel.equals(\"EMAIL\")) sender.sendEmail(target,code); else sender.sendSms(target,code);",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "호출 순서",
+            "limit"
+          ],
+          [
+            "새 store writes",
+            "0"
+          ],
+          [
+            "거부 주체",
+            "추가 limit stub"
+          ]
+        ],
+        "checks": [
+          "source-limit-stub-stops-before-replace"
+        ],
+        "runKeys": [
+          "java.facts.source-limit-stub-stops-before-replace"
+        ],
+        "image": "B01-issue"
+      }
+    ]
+  },
+  {
+    "id": "mac",
+    "question": "짧은 코드의 MAC과 비교는 무엇을 검증했을까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "공개 고정 test key로 재현했습니다. 운영 key/RNG 안전성·온라인 제한·시간 동등성은 검증하지 않았습니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "mac-vector",
+        "title": "HmacSHA256 known vector",
+        "lead": "원문 CodeMac의 공개 known vector가 일치했습니다.",
+        "code": "    public String mac(String code) {\n        try {\n            Mac mac=Mac.getInstance(\"HmacSHA256\"); mac.init(new SecretKeySpec(key,\"HmacSHA256\"));\n            return HexFormat.of().formatHex(mac.doFinal(code.getBytes(StandardCharsets.US_ASCII)));\n        } catch (java.security.GeneralSecurityException e) {\n            throw new IllegalStateException(\"HMAC-SHA-256 unavailable\", e);\n        }\n    }",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "algorithm",
+            "HmacSHA256"
+          ],
+          [
+            "hexCharacters",
+            "64"
+          ],
+          [
+            "knownVectorMatches",
+            "true"
+          ]
+        ],
+        "checks": [
+          "source-codemac-known-vector"
+        ],
+        "runKeys": [
+          "java.facts.source-codemac-known-vector"
+        ],
+        "image": "B01-mac"
+      },
+      {
+        "id": "mac-compare",
+        "title": "같은 입력true · 다른 입력false",
+        "lead": "a·b는 같은 입력의 MAC, c는 한 자리 바꾼 입력의 MAC입니다. 추가 MessageDigest.isEqual 비교만 실행했고 원문 verifier·timing 검증은 없습니다.",
+        "code": "MessageDigest.isEqual(a,b)&&!MessageDigest.isEqual(a,c)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "digest bytes",
+            "32"
+          ],
+          [
+            "같은 입력 / 바뀐 입력",
+            "true / false"
+          ],
+          [
+            "비교 timing",
+            "미측정"
+          ]
+        ],
+        "checks": [
+          "extra-mac-byte-comparison"
+        ],
+        "runKeys": [
+          "java.facts.extra-mac-byte-comparison"
+        ],
+        "image": "B01-mac"
+      }
+    ]
+  },
+  {
+    "id": "delivery",
+    "question": "저장 뒤 발송 실패가 나면 무엇이 남을까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "memory store 쓰기와 DB commit은 다릅니다. 원문 outbox/retry 구현은 없고 실제 메일/SMS를 보내지 않았습니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "delivery-write",
+        "title": "replace는 sender보다 먼저",
+        "lead": "원문 EMAIL 경로는 limit → replace → email입니다. 이 순서가 분산 원자성을 뜻하지 않습니다.",
+        "code": "        Instant now=clock.instant(); store.enforceCooldownAndDailyLimit(memberId,channel,now);\n        String code=String.format(Locale.ROOT,\"%06d\",random.nextInt(1_000_000));\n        store.replaceActive(memberId,purpose,channel,codeMac.mac(code),now,now.plus(Duration.ofMinutes(5)));\n        if (channel.equals(\"EMAIL\")) sender.sendEmail(target,code); else sender.sendSms(target,code);",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "관측 순서",
+            "limit → replace → email"
+          ],
+          [
+            "EMAIL stub calls",
+            "1"
+          ]
+        ],
+        "checks": [
+          "source-issue-fixed-clock-memory-email"
+        ],
+        "runKeys": [
+          "java.facts.source-issue-fixed-clock-memory-email"
+        ],
+        "image": "B01-delivery"
+      },
+      {
+        "id": "delivery-failure",
+        "title": "sender 예외 뒤 memory write1",
+        "lead": "추가 sender 실패 뒤 앞선 memory 쓰기1은 남았습니다. DB rollback 결과로 해석하지 않습니다.",
+        "code": "  trace.clear();store.reject=false;sender.fail=true;before=store.writes;boolean sendFailed=false;\n  try{new VerificationCodeService(new DemoRandom(42),CLOCK,store,mac,sender).issue(90001,\"SIGNUP\",\"EMAIL\",\"learner@example.invalid\");}catch(IllegalStateException e){sendFailed=true;}",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "senderFailure",
+            "true"
+          ],
+          [
+            "memoryStoreWrites",
+            "1"
+          ],
+          [
+            "DB commit/rollback",
+            "이 메모리 실험으로 미측정"
+          ]
+        ],
+        "checks": [
+          "source-sender-failure-after-memory-store-write"
+        ],
+        "runKeys": [
+          "java.facts.source-sender-failure-after-memory-store-write"
+        ],
+        "image": "B01-delivery"
+      }
+    ]
+  },
+  {
+    "id": "challenge",
+    "question": "인증 코드 소비와 ACTIVE는 언제 보일까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "원문 store 구현은 없습니다. 추가 email-only 정책·최대 attempts3이며 소비와 활성화를 같은 DB transaction에 넣었습니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "challenge-before",
+        "title": "commit 전 observer는 PENDING",
+        "lead": "추가 소비1·회원 ACTIVE 변경 뒤에도 독립 연결은 commit 전 PENDING을 관찰했습니다.",
+        "code": "CONSUME=\"UPDATE ds_practice.verification_challenge SET consumed_at=%s WHERE id=%s AND code_mac=%s AND consumed_at IS NULL AND expires_at>%s AND attempts<3 AND purpose='SIGNUP' AND channel='EMAIL'\"\ndef consume(c,n,code='000042'):return query(c,CONSUME,(NOW,ident(n),mac(code),NOW))\ndef activate(c,owner,n):\n changed=query(c,CONSUME+' AND member_id=%s',(NOW,ident(n),mac('000042'),NOW,owner))\n if changed==1:query(c,\"UPDATE ds_practice.member SET member_status='ACTIVE',email_verified_at=%s WHERE id=%s AND member_status='PENDING'\",(NOW,owner))\n return changed",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "consumeAffected",
+            "1"
+          ],
+          [
+            "독립 observer · commit 전",
+            "PENDING"
+          ]
+        ],
+        "checks": [
+          "extra-consume-activation-commit-observer"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-consume-activation-commit-observer"
+        ],
+        "image": "B01-challenge"
+      },
+      {
+        "id": "challenge-commit",
+        "title": "commit 후 ACTIVE · 재소비0",
+        "lead": "commit 뒤 독립 연결은 ACTIVE를 보고 같은 challenge 재소비는0입니다.",
+        "code": "CONSUME=\"UPDATE ds_practice.verification_challenge SET consumed_at=%s WHERE id=%s AND code_mac=%s AND consumed_at IS NULL AND expires_at>%s AND attempts<3 AND purpose='SIGNUP' AND channel='EMAIL'\"\ndef consume(c,n,code='000042'):return query(c,CONSUME,(NOW,ident(n),mac(code),NOW))\ndef activate(c,owner,n):\n changed=query(c,CONSUME+' AND member_id=%s',(NOW,ident(n),mac('000042'),NOW,owner))\n if changed==1:query(c,\"UPDATE ds_practice.member SET member_status='ACTIVE',email_verified_at=%s WHERE id=%s AND member_status='PENDING'\",(NOW,owner))\n return changed",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "독립 observer · commit 뒤",
+            "ACTIVE"
+          ],
+          [
+            "재소비 affected",
+            "0"
+          ]
+        ],
+        "checks": [
+          "extra-consume-activation-commit-observer"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-consume-activation-commit-observer"
+        ],
+        "image": "B01-challenge"
+      },
+      {
+        "id": "challenge-race",
+        "title": "두 연결의 소비 결과[0,1]",
+        "lead": "같은 추가 조건부 UPDATE에서 하나만1행을 바꿨습니다. 요청별 순서는 고정하지 않습니다.",
+        "code": "CONSUME=\"UPDATE ds_practice.verification_challenge SET consumed_at=%s WHERE id=%s AND code_mac=%s AND consumed_at IS NULL AND expires_at>%s AND attempts<3 AND purpose='SIGNUP' AND channel='EMAIL'\"\ndef consume(c,n,code='000042'):return query(c,CONSUME,(NOW,ident(n),mac(code),NOW))\ndef activate(c,owner,n):\n changed=query(c,CONSUME+' AND member_id=%s',(NOW,ident(n),mac('000042'),NOW,owner))\n if changed==1:query(c,\"UPDATE ds_practice.member SET member_status='ACTIVE',email_verified_at=%s WHERE id=%s AND member_status='PENDING'\",(NOW,owner))\n return changed",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "affectedRows · 정렬 기록",
+            "[0,1]"
+          ]
+        ],
+        "checks": [
+          "extra-challenge-concurrent-consume-one-winner"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-challenge-concurrent-consume-one-winner"
+        ],
+        "image": "B01-challenge"
+      },
+      {
+        "id": "challenge-boundary",
+        "title": "만료 경계·attempt 한도는0",
+        "lead": "expires_at==now 또는 attempts==추가 한도3이면 소비0입니다. 추가 owner guard에서 소유자 불일치·만료 경로는 활성화하지 않았습니다.",
+        "code": "CONSUME=\"UPDATE ds_practice.verification_challenge SET consumed_at=%s WHERE id=%s AND code_mac=%s AND consumed_at IS NULL AND expires_at>%s AND attempts<3 AND purpose='SIGNUP' AND channel='EMAIL'\"\ndef consume(c,n,code='000042'):return query(c,CONSUME,(NOW,ident(n),mac(code),NOW))\ndef activate(c,owner,n):\n changed=query(c,CONSUME+' AND member_id=%s',(NOW,ident(n),mac('000042'),NOW,owner))\n if changed==1:query(c,\"UPDATE ds_practice.member SET member_status='ACTIVE',email_verified_at=%s WHERE id=%s AND member_status='PENDING'\",(NOW,owner))\n return changed",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "expires_at == now affected",
+            "0"
+          ],
+          [
+            "attempts == 3 affected",
+            "0"
+          ],
+          [
+            "최대 attempts",
+            "3 · 추가 정책"
+          ],
+          [
+            "owner 불일치 / expired activation",
+            "0 / 0 · 회원 둘 다PENDING"
+          ]
+        ],
+        "checks": [
+          "extra-expiry-boundary-and-attempt-limit",
+          "extra-activation-requires-matching-live-challenge"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-expiry-boundary-and-attempt-limit",
+          "mysql.facts.extra-activation-requires-matching-live-challenge"
+        ],
+        "image": "B01-challenge"
+      }
+    ]
+  },
+  {
+    "id": "resend",
+    "question": "실패 횟수와 재발급은 어떻게 남길까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "추가 직접 SQL 실험입니다. 실패 increment도 rollback하면 사라지며 재발급은 순차 한 transaction입니다. 동시 resend는 미검증입니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "resend-attempts",
+        "title": "실패 횟수도 commit해야 남음",
+        "lead": "잘못된 시도 increment 후 rollback하면0입니다. 별도 세 commit 뒤3이며 정답도 한도에서 소비0입니다.",
+        "code": " wrong=\"UPDATE ds_practice.verification_challenge SET attempts=attempts+1 WHERE id=%s AND consumed_at IS NULL AND expires_at>%s AND attempts<3 AND code_mac<>%s\"\n writer.begin();query(writer,wrong,(ident(5),NOW,mac('000043')));writer.rollback();rolled=query(writer,'SELECT attempts FROM ds_practice.verification_challenge WHERE id=%s',(ident(5),))[0]['attempts']\n attempts=[]\n for _ in range(3):writer.begin();attempts.append(query(writer,wrong,(ident(5),NOW,mac('000043'))));writer.commit()\n final=query(writer,'SELECT attempts FROM ds_practice.verification_challenge WHERE id=%s',(ident(5),))[0]['attempts'];accepted=consume(writer,5)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "wrong attempt rollback 뒤",
+            "0"
+          ],
+          [
+            "commit한 wrong affected",
+            "[1,1,1]"
+          ],
+          [
+            "최종 attempts / 정답 소비",
+            "3 / 0"
+          ]
+        ],
+        "checks": [
+          "extra-failure-counter-needs-commit"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-failure-counter-needs-commit"
+        ],
+        "image": "B01-resend"
+      },
+      {
+        "id": "resend-replace",
+        "title": "old 삭제 후 new만 소비",
+        "lead": "추가 순차 재발급은 이전 미소비 challenge1개를 삭제했습니다. 이전 소비0·새 소비1입니다.",
+        "code": " challenge(11,90003);writer.begin();deleted=query(writer,'DELETE FROM ds_practice.verification_challenge WHERE member_id=90003 AND consumed_at IS NULL');challenge(12,90003);writer.commit();old=consume(writer,11);new=consume(writer,12)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "oldChallengeDeleted",
+            "1"
+          ],
+          [
+            "old / new consumeAffected",
+            "0 / 1"
+          ],
+          [
+            "동시 재발급",
+            "미검증"
+          ]
+        ],
+        "checks": [
+          "extra-sequential-resend-replaces-old-challenge"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-sequential-resend-replaces-old-challenge"
+        ],
+        "image": "B01-resend"
+      }
+    ]
+  },
+  {
+    "id": "reset",
+    "question": "reset token과 DB 변경은 어디까지 한 단위일까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "원문 부분코드 wrapper와 별도 MySQL 실험입니다. 결정적 demo bytes·상징적 hash marker·추가 DB session/audit이며 실제 encoder hash 저장·외부 session/JWT 폐기가 아닙니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "reset-token",
+        "title": "32bytes → base64url43 → digest32",
+        "lead": "원문 부분코드를 추가 메모리 wrapper에서 실행했습니다. 보낸 token의 hash와 저장 digest가 일치하며 실제 링크/메일은 없습니다.",
+        "code": "byte[] bytes = new byte[32];\nsecureRandom.nextBytes(bytes);\nString rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);\nbyte[] digest = MessageDigest.getInstance(\"SHA-256\")\n        .digest(rawToken.getBytes(StandardCharsets.US_ASCII));\nresetStore.replacePrevious(memberId, digest, clock.instant().plus(Duration.ofMinutes(15)));\nmailer.sendResetLink(verifiedAddress, rawToken); // rawToken은 URL 조립 직후 폐기, 로그 금지",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "입력 bytes / base64url chars",
+            "32 / 43"
+          ],
+          [
+            "paddingPresent",
+            "false"
+          ],
+          [
+            "저장 digest bytes",
+            "32"
+          ],
+          [
+            "유효 기간",
+            "15분 · fixed clock 추가 입력"
+          ]
+        ],
+        "checks": [
+          "source-reset-fragment-extra-wrapper"
+        ],
+        "runKeys": [
+          "java.facts.source-reset-fragment-extra-wrapper"
+        ],
+        "image": "B01-reset"
+      },
+      {
+        "id": "reset-rollback",
+        "title": "중간 실패는 DB 변경을 모두 rollback",
+        "lead": "추가 reset이 session 정리 전 실패했습니다. 이후 값이 before와 같습니다.",
+        "code": "def reset(c,owner,n,fail=False):\n c.begin()\n try:\n  changed=query(c,\"UPDATE ds_practice.password_reset_token SET used_at=%s WHERE id=%s AND member_id=%s AND token_hash=%s AND used_at IS NULL AND expires_at>%s\",(NOW,ident(n),owner,hashlib.sha256(f'public-reset-fixture-{n}'.encode()).digest(),NOW))\n  if changed==0:c.rollback();return 0\n  query(c,\"UPDATE ds_practice.member SET password_hash='demo-hash-v2',credential_version=credential_version+1 WHERE id=%s\",(owner,))\n  if fail:raise RuntimeError('injected failure before session cleanup')\n  query(c,\"DELETE FROM ds_practice.b01_session WHERE member_id=%s\",(owner,));query(c,\"UPDATE ds_practice.password_reset_token SET used_at=%s WHERE member_id=%s AND used_at IS NULL\",(NOW,owner));query(c,\"INSERT INTO ds_practice.b01_audit(member_id,event_kind)VALUES(%s,'RESET')\",(owner,));c.commit();return 1\n except Exception:c.rollback();raise",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "hashMarker / version",
+            "demo-hash-v1 / 0"
+          ],
+          [
+            "tokenUsed / sessionRows",
+            "0 / 2"
+          ],
+          [
+            "unusedResetRows / auditRows",
+            "2 / 0"
+          ]
+        ],
+        "checks": [
+          "extra-reset-mid-failure-rolls-back-all"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-reset-mid-failure-rolls-back-all"
+        ],
+        "image": "B01-reset"
+      },
+      {
+        "id": "reset-commit",
+        "title": "commit 뒤 version1 · session0",
+        "lead": "추가 DB transaction이 소비·marker 변경·version 증가·DB session 삭제·다른 token 무효화·audit를 commit했습니다.",
+        "code": "def reset(c,owner,n,fail=False):\n c.begin()\n try:\n  changed=query(c,\"UPDATE ds_practice.password_reset_token SET used_at=%s WHERE id=%s AND member_id=%s AND token_hash=%s AND used_at IS NULL AND expires_at>%s\",(NOW,ident(n),owner,hashlib.sha256(f'public-reset-fixture-{n}'.encode()).digest(),NOW))\n  if changed==0:c.rollback();return 0\n  query(c,\"UPDATE ds_practice.member SET password_hash='demo-hash-v2',credential_version=credential_version+1 WHERE id=%s\",(owner,))\n  if fail:raise RuntimeError('injected failure before session cleanup')\n  query(c,\"DELETE FROM ds_practice.b01_session WHERE member_id=%s\",(owner,));query(c,\"UPDATE ds_practice.password_reset_token SET used_at=%s WHERE member_id=%s AND used_at IS NULL\",(NOW,owner));query(c,\"INSERT INTO ds_practice.b01_audit(member_id,event_kind)VALUES(%s,'RESET')\",(owner,));c.commit();return 1\n except Exception:c.rollback();raise",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "hashMarker / version",
+            "demo-hash-v2 / 1"
+          ],
+          [
+            "tokenUsed / sessionRows",
+            "1 / 0"
+          ],
+          [
+            "unusedResetRows / auditRows",
+            "0 / 1"
+          ],
+          [
+            "처리 / 재사용 affected",
+            "1 / 0"
+          ],
+          [
+            "token owner 불일치 affected",
+            "0 · 두 계정 상태 불변"
+          ]
+        ],
+        "checks": [
+          "extra-reset-commit-hash-version-sessions-tokens",
+          "extra-reset-token-owner-mismatch-no-write"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-reset-commit-hash-version-sessions-tokens",
+          "mysql.facts.extra-reset-token-owner-mismatch-no-write"
+        ],
+        "image": "B01-reset"
+      }
+    ]
+  },
+  {
+    "id": "password",
+    "question": "password hash와 credential version은 같은 보장일까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "Security Crypto7.1.1 standalone encoder와 MySQL marker는 별개입니다. JWT parse/signature/filter·로그인·실제 session 인증은 미실행입니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "password-encoder",
+        "title": "실제 encoder는 {bcrypt} + matches",
+        "lead": "추가 factory의 prefix와 matches를 확인했습니다. 운영 cost benchmark가 아닙니다.",
+        "code": "var encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();\nString encoded = encoder.encode(\"public-demo-password-not-a-real-account\");\n\nencoded.startsWith(\"{bcrypt}\")\n    && encoder.matches(\"public-demo-password-not-a-real-account\", encoded)\n    && !encoder.matches(\"public-demo-wrong-password\", encoded)",
+        "sourceFragments": [
+          "var encoder=PasswordEncoderFactories.createDelegatingPasswordEncoder();String encoded=encoder.encode(\"public-demo-password-not-a-real-account\");",
+          "encoded.startsWith(\"{bcrypt}\")&&encoder.matches(\"public-demo-password-not-a-real-account\",encoded)&&!encoder.matches(\"public-demo-wrong-password\",encoded)"
+        ],
+        "sourceNote": "B01Proof.java 원문에서 encoder·encode 문장과 matches 판정식을 분리해 발췌했습니다. 표시용 줄바꿈을 원문 코드의 연속 구간으로 주장하지 않으며 check/map 기록 plumbing은 생략했습니다. correct match=true, wrong match=false입니다.",
+        "active": [3, 4, 5],
+        "values": [
+          [
+            "storedPrefix",
+            "{bcrypt}"
+          ],
+          [
+            "correctMatches / wrongMatches",
+            "true / false"
+          ],
+          [
+            "DB 저장과 관계",
+            "DB demo-hash marker와 별도"
+          ]
+        ],
+        "checks": [
+          "extra-password-encoder-delegating-matches"
+        ],
+        "runKeys": [
+          "java.facts.extra-password-encoder-delegating-matches"
+        ],
+        "image": "B01-password"
+      },
+      {
+        "id": "password-version",
+        "title": "version mismatch는 JWT 폐기 자체가 아님",
+        "lead": "두 연결 reset은[0,1]·최종 version1입니다. 추가 정수 비교는 발급0/현재1을 거부하지만 실제 JWT 검증은 없습니다.",
+        "code": "int issuedVersion = 0, currentVersion = 1;\n\nissuedVersion != currentVersion",
+        "sourceFragments": [
+          "int issuedVersion=0,currentVersion=1;",
+          "issuedVersion!=currentVersion"
+        ],
+        "sourceNote": "B01Proof.java 원문 check의 판단식만 발췌했습니다. predicate 결과 true는 version 불일치이며, check가 반환 기록 extraVersionCheckAccepts=false와 별개입니다. mismatch=true → accepts=false로 해석합니다. check/map plumbing과 실제 JWT 검증은 표시·실행하지 않았습니다.",
+        "active": [2],
+        "values": [
+          [
+            "동시 reset affectedRows",
+            "[0,1]"
+          ],
+          [
+            "최종 credential_version",
+            "1"
+          ],
+          [
+            "추가 비교 issued / current / accepts",
+            "0 / 1 / false"
+          ],
+          [
+            "JWT filter",
+            "미실행"
+          ]
+        ],
+        "checks": [
+          "extra-reset-concurrent-one-version-increment",
+          "extra-version-comparison-is-not-jwt-revocation"
+        ],
+        "runKeys": [
+          "mysql.facts.extra-reset-concurrent-one-version-increment",
+          "java.facts.extra-version-comparison-is-not-jwt-revocation"
+        ],
+        "image": "B01-password"
+      }
+    ]
+  },
+  {
+    "id": "counter",
+    "question": "두 client가 같은 Redis key를 세면 어떻게 될까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "실제 Redis8.10.2·독립 client2개·worker thread2개입니다. 앱2개/프로세스2개가 아니며 원문 Lua는 count만 반환합니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "counter-fixed",
+        "title": "최초 expiry를 유지하는 fixed window",
+        "lead": "첫1·두 번째2이며 절대 만료 시각이 같습니다. sliding window가 아닙니다.",
+        "code": "private static final DefaultRedisScript<Long> INCR_WINDOW =\n    new DefaultRedisScript<>(\"\"\"\n        local n = redis.call('INCR', KEYS[1])\n        if n == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end\n        return n\n        \"\"\", Long.class);\n\nlong failed(String opaqueKey, Duration window) {\n    Long n = redis.execute(INCR_WINDOW, List.of(opaqueKey),\n            Long.toString(window.toSeconds()));\n    if (n == null) throw new IllegalStateException(\"rate counter unavailable\");\n    return n;\n}",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "first / second",
+            "1 / 2"
+          ],
+          [
+            "sameAbsoluteExpiry",
+            "true"
+          ],
+          [
+            "실제 TTL 관측",
+            "0보다 크고60초 이내 · raw 값은 run별"
+          ]
+        ],
+        "checks": [
+          "source-lua-first-expiry-fixed-window",
+          "private-redis-two-independent-clients"
+        ],
+        "runKeys": [
+          "redis.facts.source-lua-first-expiry-fixed-window",
+          "redis.facts.private-redis-two-independent-clients"
+        ],
+        "image": "B01-counter"
+      },
+      {
+        "id": "counter-shared",
+        "title": "30회씩 같은 key · 최종60",
+        "lead": "각30호출 결과 합집합은1..60이며 중복 없이60개입니다. client별 획득 순서는 고정하지 않습니다.",
+        "code": "    Callable<List<Long>> nodeA=()->{start.await();var results=new ArrayList<Long>();for(int i=0;i<30;i++)results.add(aa.failed(\"b01:shared\",Duration.ofSeconds(60)));return results;};\n    Callable<List<Long>> nodeB=()->{start.await();var results=new ArrayList<Long>();for(int i=0;i<30;i++)results.add(bb.failed(\"b01:shared\",Duration.ofSeconds(60)));return results;};\n    var x=pool.submit(nodeA);var y=pool.submit(nodeB);start.countDown();var xa=x.get(10,TimeUnit.SECONDS);var xb=y.get(10,TimeUnit.SECONDS);var all=new ArrayList<Long>(xa);all.addAll(xb);all.sort(Long::compare);\n    var expected=new ArrayList<Long>();for(long i=1;i<=60;i++)expected.add(i);",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "callsPerClient",
+            "[30,30]"
+          ],
+          [
+            "uniqueResults / min / max",
+            "60 / 1 / 60"
+          ],
+          [
+            "finalSharedCount",
+            "60"
+          ]
+        ],
+        "checks": [
+          "source-lua-two-client-shared-count60"
+        ],
+        "runKeys": [
+          "redis.facts.source-lua-two-client-shared-count60"
+        ],
+        "image": "B01-counter"
+      },
+      {
+        "id": "counter-decision",
+        "title": "추가 threshold40 판단의 차이",
+        "lead": "추가 계산에서 local30+30은60을 허용하지만 공유 count≤40이면40입니다. HTTP limiter 실행이 아닙니다.",
+        "code": "all.stream().filter(n->n<=40).count()==40",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "추가 threshold",
+            "40"
+          ],
+          [
+            "local / shared 판단 허용 수",
+            "60 / 40"
+          ],
+          [
+            "HTTP limiter",
+            "미구현"
+          ]
+        ],
+        "checks": [
+          "extra-local-vs-shared-threshold40"
+        ],
+        "runKeys": [
+          "redis.facts.extra-local-vs-shared-threshold40"
+        ],
+        "image": "B01-counter"
+      }
+    ]
+  },
+  {
+    "id": "counter-edge",
+    "question": "Lua 원자 실행이면 오류와 잘못된 창도 해결될까요?",
+    "source": "원문 코드 + 명시한 추가 Java·Redis·MySQL 관측",
+    "sourceNote": "atomic은 명령 끼어듦 방지이며 런타임 오류 rollback이 아닙니다. 속도·메모리·실제 공격 방어 성능은 미측정입니다.",
+    "note": "값은 각 관측 시점의 기록입니다. 코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다.",
+    "stages": [
+      {
+        "id": "counter-edge-split",
+        "title": "INCR 뒤 EXPIRE 미전송",
+        "lead": "의도적으로 INCR 뒤 멈추면 count1·TTL-1이 남았습니다. 실제 프로세스 crash 시험은 아닙니다.",
+        "code": "   a.opsForValue().increment(\"b01:split\");long missing=a.getExpire(\"b01:split\");",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "count / TTL",
+            "1 / -1"
+          ],
+          [
+            "의미",
+            "EXPIRE 미전송 · 만료 없음"
+          ]
+        ],
+        "checks": [
+          "extra-split-incr-without-expire-leaves-key"
+        ],
+        "runKeys": [
+          "redis.facts.extra-split-incr-without-expire-leaves-key"
+        ],
+        "image": "B01-counter-edge"
+      },
+      {
+        "id": "counter-edge-error",
+        "title": "Lua 오류여도 앞선 INCR은 남음",
+        "lead": "같은 Lua에 추가 invalid expiry를 넣으면 runtime error 뒤 count1·TTL-1입니다.",
+        "code": "   boolean scriptFailed=false;try{aa.failWithInvalidExpiry(\"b01:error\");}catch(org.springframework.dao.DataAccessException e){scriptFailed=true;}",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "runtimeError",
+            "true"
+          ],
+          [
+            "countAfterError / ttlAfterError",
+            "1 / -1"
+          ],
+          [
+            "오해 방지",
+            "atomic ≠ error rollback"
+          ]
+        ],
+        "checks": [
+          "extra-lua-runtime-error-does-not-undo-incr"
+        ],
+        "runKeys": [
+          "redis.facts.extra-lua-runtime-error-does-not-undo-incr"
+        ],
+        "image": "B01-counter-edge"
+      },
+      {
+        "id": "counter-edge-window",
+        "title": "999ms는0초로 잘리고 즉시 만료",
+        "lead": "원문 toSeconds는999ms를0으로 바꿔 두 호출 모두1·key 없음입니다. 별도1초 창 만료 뒤 다음 창1도 확인했습니다.",
+        "code": "   long z1=aa.failed(\"b01:zero\",Duration.ofMillis(999)),z2=aa.failed(\"b01:zero\",Duration.ofMillis(999));",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "inputMillis → windowToSeconds",
+            "999 → 0"
+          ],
+          [
+            "반환 / keyExists",
+            "[1,1] / false"
+          ],
+          [
+            "별도 만료 후 nextWindowCount",
+            "1"
+          ],
+          [
+            "cleanup remainingProbeKeys",
+            "0"
+          ]
+        ],
+        "checks": [
+          "source-subsecond-window-truncates-to-zero",
+          "source-lua-expiry-next-window-starts-one",
+          "private-redis-probe-keys-explicit-cleanup"
+        ],
+        "runKeys": [
+          "redis.facts.source-subsecond-window-truncates-to-zero",
+          "redis.facts.source-lua-expiry-next-window-starts-one",
+          "redis.facts.private-redis-probe-keys-explicit-cleanup"
+        ],
+        "image": "B01-counter-edge"
+      }
+    ]
+  }
+];
+export const b01Run = path => path.split('.').reduce((value, key) => value?.[key], B01_RUNS);

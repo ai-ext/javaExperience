@@ -1,0 +1,482 @@
+{
+  "source": "docs/knowledge/S09-jpa-hibernate.md",
+  "sourceSHA256": "23e3a001a2afbad0e4234795d9566645e25fffd5ab9f06a82b8f27b8c550d05e",
+  "questions": [
+    {
+      "id": "cache",
+      "question": "id가 있는 객체는 이미 영속 상태일까?",
+      "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 생성·저장·find",
+      "note": "ProbePost(id=42,title,version)는 원문에 없는 추가 엔티티이며 기존 Post42 예상 그림과 구분합니다. loadedState와 Entry는 Hibernate 내부 관찰값이지 표준 JPA 스냅샷 API가 아닙니다. 별도 JDBC observer는 READ_COMMITTED·autocommit이며 ORM SQL 구간과 분리합니다. Boot 앱·Spring 프록시·HTTP·OSIV·MySQL·Java 25·Docker는 미실행입니다. 이 ProbePost는 id를 직접 42로 지정합니다. 원문 PurchaseOrder의 IDENTITY 전략과 섞지 않습니다.",
+      "stages": [
+        {
+          "id": "cache-new",
+          "title": "id=42여도 아직 new",
+          "image": "S09-cache-v3.png",
+          "checks": [
+            "assigned-id-can-still-be-new"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "cache-persist",
+          "title": "persist가 관리 상태로 등록",
+          "image": "S09-cache-v3.png",
+          "checks": [
+            "persist-registered-managed",
+            "assigned-persist-delays-insert",
+            "persist-before-flush-observer-empty"
+          ],
+          "sqlPhases": [
+            "seedPersistSql"
+          ]
+        },
+        {
+          "id": "cache-seed-flush",
+          "title": "첫 flush는 INSERT 실행",
+          "image": "S09-cache-v3.png",
+          "checks": [
+            "seed-flush-insert-one",
+            "seed-flush-not-commit"
+          ],
+          "sqlPhases": [
+            "seedFlushSql"
+          ]
+        },
+        {
+          "id": "cache-seed-commit",
+          "title": "commit 뒤 외부에 첫 글",
+          "image": "S09-cache-v3.png",
+          "checks": [
+            "seed-commit-row-visible"
+          ],
+          "sqlPhases": [
+            "seedCommitSql"
+          ]
+        },
+        {
+          "id": "cache-find",
+          "title": "새 컨텍스트의 첫 find",
+          "image": "S09-cache-v3.png",
+          "checks": [
+            "first-find-one-select"
+          ],
+          "sqlPhases": [
+            "firstFindSql"
+          ]
+        },
+        {
+          "id": "cache-find-again",
+          "title": "같은 컨텍스트는 같은 객체",
+          "image": "S09-cache-v3.png",
+          "checks": [
+            "second-find-same-instance",
+            "second-find-no-select"
+          ],
+          "sqlPhases": [
+            "secondFindSql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s09-2026-10-20/source-proof/execution.json",
+        "docs/design/s09-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "flush",
+      "question": "Java 값·loadedState·DB 행은 언제 같아질까?",
+      "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 변경·commit / 별도 rollback DB",
+      "note": "ProbePost(id=42,title,version)는 원문에 없는 추가 엔티티이며 기존 Post42 예상 그림과 구분합니다. loadedState와 Entry는 Hibernate 내부 관찰값이지 표준 JPA 스냅샷 API가 아닙니다. 별도 JDBC observer는 READ_COMMITTED·autocommit이며 ORM SQL 구간과 분리합니다. Boot 앱·Spring 프록시·HTTP·OSIV·MySQL·Java 25·Docker는 미실행입니다. commit 분기 s09_main과 rollback 분기 s09_rollback은 같은 초기 id42를 사용하는 별도 DB입니다. commit 다음에 같은 transaction을 rollback하는 순서가 아닙니다.",
+      "stages": [
+        {
+          "id": "flush-change",
+          "title": "setter 직후 Java만 변경",
+          "image": "S09-flush-v2.png",
+          "checks": [
+            "changed-java-before-flush",
+            "changed-before-flush-db-old",
+            "setter-no-sql"
+          ],
+          "sqlPhases": [
+            "setterSql"
+          ]
+        },
+        {
+          "id": "flush-flush",
+          "title": "flush가 UPDATE와 loadedState 갱신",
+          "image": "S09-flush-v2.png",
+          "checks": [
+            "dirty-flush-one-update",
+            "loaded-state-refreshes-after-flush",
+            "flush-inside-new-outside-old"
+          ],
+          "sqlPhases": [
+            "dirtyFlushSql"
+          ]
+        },
+        {
+          "id": "flush-commit",
+          "title": "commit하면 외부도 수정된 글",
+          "image": "S09-flush-v2.png",
+          "checks": [
+            "commit-outside-new-version-one"
+          ],
+          "sqlPhases": [
+            "dirtyCommitSql"
+          ]
+        },
+        {
+          "id": "flush-rollback",
+          "title": "별도 분기: DB와 Java를 구분",
+          "image": "S09-flush-v2.png",
+          "checks": [
+            "rollback-branch-flush-inside-new-outside-old",
+            "rollback-does-not-revert-java-title-here",
+            "rollback-restores-db-first-version-zero"
+          ],
+          "sqlPhases": [
+            "rollbackDirtyFlushSql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s09-2026-10-20/source-proof/execution.json",
+        "docs/design/s09-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "merge",
+      "question": "merge는 원본을 managed로 바꿀까?",
+      "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 detached 원본과 반환 객체",
+      "note": "ProbePost(id=42,title,version)는 원문에 없는 추가 엔티티이며 기존 Post42 예상 그림과 구분합니다. loadedState와 Entry는 Hibernate 내부 관찰값이지 표준 JPA 스냅샷 API가 아닙니다. 별도 JDBC observer는 READ_COMMITTED·autocommit이며 ORM SQL 구간과 분리합니다. Boot 앱·Spring 프록시·HTTP·OSIV·MySQL·Java 25·Docker는 미실행입니다. 앞서 commit한 수정된 글·version1을 기준으로 별도 EntityManager에서 merge합니다. 원본 first와 반환된 merged는 서로 다른 객체입니다.",
+      "stages": [
+        {
+          "id": "merge-detached",
+          "title": "원본은 detached로 남음",
+          "image": "S09-merge-v2.png",
+          "checks": [
+            "merge-original-remains-detached"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "merge-copied",
+          "title": "복사받은 별도 managed 반환",
+          "image": "S09-merge-v2.png",
+          "checks": [
+            "merge-returns-distinct-managed",
+            "merge-copies-current-state"
+          ],
+          "sqlPhases": [
+            "mergeReadSql"
+          ]
+        },
+        {
+          "id": "merge-returned-change",
+          "title": "반환 객체의 변경이 commit됨",
+          "image": "S09-merge-v2.png",
+          "checks": [
+            "detached-edit-does-not-follow-merge",
+            "merge-returned-edit-committed"
+          ],
+          "sqlPhases": [
+            "mergeCommitSql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s09-2026-10-20/source-proof/execution.json",
+        "docs/design/s09-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "remove",
+      "question": "remove 직후 contains=false면 DB에서도 없을까?",
+      "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ProbePost42 remove·flush·commit",
+      "note": "ProbePost(id=42,title,version)는 원문에 없는 추가 엔티티이며 기존 Post42 예상 그림과 구분합니다. loadedState와 Entry는 Hibernate 내부 관찰값이지 표준 JPA 스냅샷 API가 아닙니다. 별도 JDBC observer는 READ_COMMITTED·autocommit이며 ORM SQL 구간과 분리합니다. Boot 앱·Spring 프록시·HTTP·OSIV·MySQL·Java 25·Docker는 미실행입니다. remove 직후 JPA contains와 Hibernate 내부 Entry 상태, DB 행 존재 여부를 분리합니다.",
+      "stages": [
+        {
+          "id": "remove-scheduled",
+          "title": "contains=false·Entry=DELETED",
+          "image": "S09-remove-v2.png",
+          "checks": [
+            "removed-not-contained",
+            "remove-schedules-no-sql-yet",
+            "removed-before-flush-outside-row-kept"
+          ],
+          "sqlPhases": [
+            "removeScheduleSql"
+          ]
+        },
+        {
+          "id": "remove-flushed",
+          "title": "flush 뒤 내부는 없고 외부는 존재",
+          "image": "S09-remove-v2.png",
+          "checks": [
+            "remove-flush-one-delete",
+            "removed-inside-gone-outside-kept"
+          ],
+          "sqlPhases": [
+            "removeFlushSql"
+          ]
+        },
+        {
+          "id": "remove-committed",
+          "title": "commit 뒤 외부도 행 없음",
+          "image": "S09-remove-v2.png",
+          "checks": [
+            "remove-commit-outside-gone"
+          ],
+          "sqlPhases": [
+            "removeCommitSql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s09-2026-10-20/source-proof/execution.json",
+        "docs/design/s09-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "fetch",
+      "question": "원문 BatchSize와 fetch join은 무엇을 조회했을까?",
+      "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 PurchaseOrder / OrderLine · 추가 seed 3부모·6자식",
+      "note": "이 주제는 ProbePost가 아닌 원문 PurchaseOrder·OrderLine입니다. 각 부모의 자식은 2개이며 원문의 @BatchSize(size=32)를 유지했습니다. 캐시 비활성화·default_batch_fetch_size=0 조건입니다. raw JDBC 행 수는 ORM SQL을 별도 연결에서 재실행해 센 값이지 Hibernate가 전송받은 wire 행 계측이 아닙니다. Boot 앱·Spring 프록시·HTTP·OSIV·MySQL·Java 25·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "fetch-batch",
+          "title": "root1 + batch collection1",
+          "image": "S09-fetch-v2.png",
+          "checks": [
+            "original-list-root-one-query",
+            "original-list-three-parents",
+            "original-collections-initially-lazy",
+            "original-batch32-one-additional-query"
+          ],
+          "sqlPhases": [
+            "batchRootSql",
+            "batchCollectionSql"
+          ]
+        },
+        {
+          "id": "fetch-join",
+          "title": "fetch join: 부모3·별도 재실행 행6",
+          "image": "S09-fetch-v2.png",
+          "checks": [
+            "original-read-service-one-query",
+            "original-fetchjoin-access-no-extra-query",
+            "fetchjoin-six-jdbc-rows-not-three"
+          ],
+          "sqlPhases": [
+            "originalFetchJoinSql",
+            "fetchJoinAccessSql"
+          ]
+        },
+        {
+          "id": "fetch-graph",
+          "title": "추가 fetch graph도 이 조건에서1",
+          "image": "S09-fetch-v2.png",
+          "checks": [
+            "extra-fetchgraph-one-query-here"
+          ],
+          "sqlPhases": [
+            "extraFetchGraphSql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s09-2026-10-20/source-proof/execution.json",
+        "docs/design/s09-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "service",
+      "question": "원문 서비스의 flush와 닫힌 LAZY 접근은 어떻게 달랐을까?",
+      "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 서비스 직접 호출 / 별도 closed-context 실험",
+      "note": "원문 OrderService·OrderReadService를 직접 Java로 호출하며 transaction은 추가 probe가 수동으로 열었습니다. Spring @Transactional 프록시를 실행한 결과가 아닙니다. 닫힌 LAZY 실패 구간은 DB 행 존재 여부를 관찰한 실험이 아닙니다. Boot 앱·Spring 프록시·HTTP·OSIV·MySQL·Java 25·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "service-source-add",
+          "title": "원문 addLine: 자식2에서3",
+          "image": "S09-service-v2.png",
+          "checks": [
+            "original-service-direct-java-add-and-flush"
+          ],
+          "sqlPhases": [
+            "originalAddLineServiceSql"
+          ]
+        },
+        {
+          "id": "service-closed-lazy",
+          "title": "닫힌 뒤 컬렉션은 초기화 실패",
+          "image": "S09-service-v2.png",
+          "checks": [
+            "original-closed-collection-starts-lazy",
+            "original-closed-collection-lazy-fails",
+            "closed-lazy-emits-no-query"
+          ],
+          "sqlPhases": [
+            "closedLazyFailureSql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s09-2026-10-20/source-proof/execution.json",
+        "docs/design/s09-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "lock",
+      "question": "같은 version0을 읽은 두 수정은 모두 저장될까?",
+      "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 별도 s09_lock DB · 추가 ProbePost42",
+      "note": "ProbePost(id=42,title,version)는 원문에 없는 추가 엔티티이며 기존 Post42 예상 그림과 구분합니다. loadedState와 Entry는 Hibernate 내부 관찰값이지 표준 JPA 스냅샷 API가 아닙니다. 별도 JDBC observer는 READ_COMMITTED·autocommit이며 ORM SQL 구간과 분리합니다. Boot 앱·Spring 프록시·HTTP·OSIV·MySQL·Java 25·Docker는 미실행입니다. 별도 DB에서 처음부터 첫 글·version0을 seed했습니다. 서로 다른 두 EntityManager의 resource-local transaction을 순서대로 진행한 실험이며 HTTP 동시 요청·thread 지연·비관적 락을 측정하지 않았습니다.",
+      "stages": [
+        {
+          "id": "lock-reads",
+          "title": "두 컨텍스트가 각각 version0",
+          "image": "S09-lock.png",
+          "checks": [
+            "two-contexts-read-version-zero"
+          ],
+          "sqlPhases": [
+            "lockBothReadsSql"
+          ]
+        },
+        {
+          "id": "lock-a-commit",
+          "title": "A가 먼저 version1로 commit",
+          "image": "S09-lock.png",
+          "checks": [
+            "lock-a-commit-version-one"
+          ],
+          "sqlPhases": [
+            "lockACommitSql"
+          ]
+        },
+        {
+          "id": "lock-b-failure",
+          "title": "B의 오래된 version은 거부",
+          "image": "S09-lock.png",
+          "checks": [
+            "stale-version-flush-rejected",
+            "stale-update-does-not-overwrite-a"
+          ],
+          "sqlPhases": [
+            "lockBFailureSql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s09-2026-10-20/source-proof/execution.json",
+        "docs/design/s09-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "auto",
+      "question": "AUTO flush는 모든 조회 전에 UPDATE할까?",
+      "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 별도 s09_auto DB · 추가 ProbePost42와 원문 PurchaseOrder",
+      "note": "ProbePost(id=42,title,version)는 원문에 없는 추가 엔티티이며 기존 Post42 예상 그림과 구분합니다. loadedState와 Entry는 Hibernate 내부 관찰값이지 표준 JPA 스냅샷 API가 아닙니다. 별도 JDBC observer는 READ_COMMITTED·autocommit이며 ORM SQL 구간과 분리합니다. Boot 앱·Spring 프록시·HTTP·OSIV·MySQL·Java 25·Docker는 미실행입니다. 같은 transaction 안의 서로 다른 쿼리 공간을 비교합니다. 이 실험의 AUTO 동작을 모든 native SQL·모든 flush mode·모든 공급자로 일반화하지 않습니다. 이 transaction은 마지막에 rollback했습니다.",
+      "stages": [
+        {
+          "id": "auto-changed",
+          "title": "기본 AUTO에서 제목 변경",
+          "image": "S09-auto-v3.png",
+          "checks": [
+            "default-flush-mode-auto"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "auto-unrelated",
+          "title": "무관한 PurchaseOrder 조회",
+          "image": "S09-auto-v3.png",
+          "checks": [
+            "unrelated-query-no-post-update"
+          ],
+          "sqlPhases": [
+            "autoUnrelatedQuerySql"
+          ]
+        },
+        {
+          "id": "auto-overlap",
+          "title": "겹치는 ProbePost 조회 전 UPDATE",
+          "image": "S09-auto-v3.png",
+          "checks": [
+            "overlap-auto-update-before-select",
+            "auto-flush-still-not-commit"
+          ],
+          "sqlPhases": [
+            "autoOverlappingQuerySql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s09-2026-10-20/source-proof/execution.json",
+        "docs/design/s09-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "pagination",
+      "question": "fetch join에 maxResults(1)을 주면 항상 부모1개일까?",
+      "source": "추가 native Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 API / hint / HQL / plain-control 관측",
+      "note": "놀라운 API 동작의 추가 관측이며 페이지네이션 정확성 통과 판정이 아닙니다. 원인과 upstream 수정 여부는 미확인입니다. 온라인 가이드 7.4.13과 실행 런타임 7.4.5.Final을 구분합니다. raw 행 수는 별도 JDBC SQL 재실행값이며 Hibernate wire 수가 아닙니다. hint 강제·업그레이드·성능 개선을 권고하는 결과가 아닙니다. Boot 앱·Spring 프록시·HTTP·OSIV·MySQL·Java 25·Docker는 미실행입니다.",
+      "stages": [
+        {
+          "id": "pagination-api",
+          "title": "API max1인데 부모3개 관측",
+          "image": "S09-pagination-v3.png",
+          "checks": [
+            "pagination-fetch-api-max1-one-statement-observed",
+            "pagination-fetch-api-max1-configured-max-one",
+            "pagination-fetch-api-first0-max1-one-statement-observed",
+            "pagination-fetch-api-first0-max1-configured-max-one"
+          ],
+          "sqlPhases": [
+            "fetch-api-max1Sql",
+            "fetch-api-first0-max1Sql"
+          ]
+        },
+        {
+          "id": "pagination-memory",
+          "title": "명시 memory hint는 부모1·raw6",
+          "image": "S09-pagination-v3.png",
+          "checks": [
+            "pagination-fetch-memory-hint-max1-one-statement-observed",
+            "pagination-fetch-memory-hint-max1-configured-max-one"
+          ],
+          "sqlPhases": [
+            "fetch-memory-hint-max1Sql"
+          ]
+        },
+        {
+          "id": "pagination-hql",
+          "title": "HQL inline limit는 부모1·raw2",
+          "image": "S09-pagination-v3.png",
+          "checks": [
+            "pagination-fetch-hql-limit1-one-statement-observed"
+          ],
+          "sqlPhases": [
+            "fetch-hql-limit1Sql"
+          ]
+        },
+        {
+          "id": "pagination-root",
+          "title": "plain root 대조군은 부모1·raw1",
+          "image": "S09-pagination-v3.png",
+          "checks": [
+            "pagination-plain-root-api-max1-one-statement-observed",
+            "pagination-plain-root-api-max1-configured-max-one",
+            "pagination-plain-root-control-one-parent"
+          ],
+          "sqlPhases": [
+            "plain-root-api-max1Sql"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s09-2026-10-20/source-proof/execution.json",
+        "docs/design/s09-2026-10-20/browser-observations.json"
+      ]
+    }
+  ]
+}

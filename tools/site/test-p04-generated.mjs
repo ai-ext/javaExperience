@@ -1,0 +1,24 @@
+import {rasterDimensions} from './raster-size.mjs';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {JSDOM} from 'jsdom';
+import {P04_ASSETS,P04_LESSONS} from './p04-lesson-data.mjs';
+const root=new URL('../../',import.meta.url),read=p=>fs.readFileSync(new URL(p,root),'utf8');
+const baseline=JSON.parse(read('docs/design/p04-2026-10-20/html-baseline.json'));
+const page=new JSDOM(read('docs/knowledge/P04-constructors-builder.html'),{runScripts:'outside-only',url:'https://learn.example/docs/knowledge/P04-constructors-builder.html'}),d=page.window.document;
+assert.ok(d.querySelector('[data-p04-learning]'));
+const original=d.querySelector('#p04-original');assert.ok(original);
+const text=original.cloneNode(true);text.querySelector(':scope > summary').remove();
+assert.equal(text.textContent.replace(/\s+/g,' ').trim(),baseline.wholeSourceText,'P04 제목·서두·기존 시각 자료·원문 전체 텍스트 보존');
+assert.deepEqual([...original.querySelectorAll('pre code')].map(x=>x.textContent),baseline.code,'전체 코드 공백 포함 보존');
+for(const id of baseline.ids)assert.ok(original.querySelector(`[id="${id}"]`),'기존 원문 앵커 '+id);
+const ids=[...d.querySelectorAll('[id]')].map(x=>x.id);assert.equal(new Set(ids).size,ids.length,'중복 앵커 없음');
+for(const a of Object.values(P04_ASSETS)){assert.equal(a.ready,true);const bytes=fs.readFileSync(new URL('docs/design/p04-2026-10-20/images/'+a.file,root));assert.equal(rasterDimensions(bytes).width,a.width);assert.equal(rasterDimensions(bytes).height,a.height);}
+page.window.eval(read('tools/site/p04-learning.bundle.js'));
+assert.equal(d.querySelectorAll('[data-p04-topic] option').length,P04_LESSONS.length);
+const select=d.querySelector('[data-p04-topic]');select.value='builder';select.dispatchEvent(new page.window.Event('change'));
+d.querySelector('[data-p04-stage="builder-invalid"]').click();
+assert.match(d.querySelector('[data-p04-image]').src,/P04-builder-invalid-v2\.jpg/,'독립 실패를 유효한 Builder 그림과 섞지 않음');
+select.value='record';select.dispatchEvent(new page.window.Event('change'));d.querySelector('[data-p04-stage="record-bad"]').click();
+assert.match(d.querySelector('[data-p04-state]').textContent,/displayName\.isBlank\(\) 검사도달하지 않음/,'첫 예외 뒤 두 번째 검사 미도달');
+page.window.close();console.log(`P04 생성 HTML: 원문 ${baseline.wholeSourceText.length}자·코드 ${baseline.code.length}개·앵커 ${baseline.ids.length}개·실제 bundle·이미지${Object.keys(P04_ASSETS).length}개 보존/분리 통과`);

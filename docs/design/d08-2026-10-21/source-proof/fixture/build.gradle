@@ -1,0 +1,30 @@
+plugins { id 'java'; id 'org.springframework.boot' version '4.1.1' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+version = '1.0.0'
+springBoot { mainClass = 'proof.NativeApplication' }
+dependencies {
+    implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+    implementation 'org.springframework.boot:spring-boot-starter'
+    testImplementation platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+    testImplementation 'org.junit.jupiter:junit-jupiter:6.0.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:6.0.3'
+}
+test { useJUnitPlatform() }
+// 추가 예시의 산출물 생성은 테스트 성공에 명시적으로 의존한다.
+tasks.named('bootJar') { dependsOn tasks.named('test') }
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+tasks.register('recordDependencies') {
+    doLast {
+        def rows = [runtime: configurations.runtimeClasspath, test: configurations.testRuntimeClasspath].collectEntries { key, config ->
+            [(key): config.resolvedConfiguration.resolvedArtifacts.collect {
+                [coordinate: it.moduleVersion.id.toString(), file: it.file.absolutePath,
+                 sha256: java.security.MessageDigest.getInstance('SHA-256').digest(it.file.bytes).encodeHex().toString()]
+            }.sort { a,b -> a.coordinate <=> b.coordinate }]
+        }
+        file('dependencies.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(rows)) + '\n'
+    }
+}

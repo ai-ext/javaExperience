@@ -13,7 +13,7 @@ export function renderHomeVisual(root, fromAbs, renderedHtml) {
     ['DB-01', 'SQL과 DB부터', '기존 데이터로 응답과 테이블을 연결합니다.'],
   ];
   return `<section class="home-visual" aria-labelledby="home-title">
-  <div class="home-intro"><p class="home-eyebrow">직접 만들며 배우는 백엔드</p><h1 id="home-title" data-home-intro-title>작은 API부터, <span>하나의 서비스까지.</span></h1><p data-home-intro-description>글 작성·조회·소통이 되는 게시판을 직접 만듭니다.<br>기능 하나씩 구현하고, 응답과 DB 결과로 확인하세요.</p></div>
+  <div class="home-intro"><p class="home-eyebrow">직접 만들며 배우는 백엔드</p><h1 id="home-title" data-home-intro-title>작은 API부터, <span>하나의 서비스까지.</span></h1><p data-home-intro-description>글 작성·조회·소통이 되는 게시판을 직접 만듭니다.<br>기능 하나씩 구현하고, 응답과 DB 결과로 확인하세요.</p><a class="home-concept-direct" href="docs/knowledge/README.html">개념부터 이해하기 →</a></div>
   <div class="home-hero">
     <article class="home-task" aria-labelledby="home-task-title">
       <p class="home-task-tag" data-home-tag>첫 시작 · 0-1</p><h2 class="home-task-title" id="home-task-title" data-home-title>${task.title}</h2><p class="home-task-lead" data-home-description>${task.description}</p>

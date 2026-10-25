@@ -1,0 +1,304 @@
+# S09. JPA·Hibernate
+
+> 3줄 요약 — JPA는 객체 상태와 관계형 데이터 사이의 표준 계약이고 Hibernate는 그 계약을 SQL로 실행하는 ORM 구현체다.
+> 영속성 컨텍스트는 트랜잭션 범위에서 동일성·변경 감지·쓰기 지연을 제공하지만, 쿼리 수와 잠금까지 자동으로 최적화해 주지는 않는다.
+> 기본 추천은 짧은 `@Transactional` 서비스, LAZY 연관관계, 요청별 fetch 계획, `@Version` 낙관적 락이며 OSIV는 끈다.
+
+## 1. 왜 알아야 하나
+
+운영에서 흔한 장애는 `findAll()` 한 번이 아니라 그 다음 줄에서 시작한다. 주문 100건을 읽고 각 주문의 고객·항목을 순회했더니 SQL이 1+100+100번 나가 커넥션 풀이 잠기는 것이 N+1이다. 반대로 모든 연관관계를 EAGER로 바꾸면 목록 화면에서 필요 없는 테이블까지 한꺼번에 조인해 결과 행이 폭증한다.
+
+`@Transactional`이 끝난 뒤 LAZY 필드를 응답 DTO 변환 중 읽으면 `LazyInitializationException`이 난다. OSIV가 이를 가려 주면 HTTP 응답을 만드는 동안 DB를 다시 조회해 응답 지연이 커지고, 이미 끝난 업무 트랜잭션 뒤에 데이터가 추가 로딩되는 혼란이 생긴다.
+
+또 다른 실수는 `entity.setStatus(...)` 뒤에 `save()`를 매번 호출해야 저장된다고 생각하는 것이다. 관리 상태 엔티티는 변경 감지 대상이므로 트랜잭션 커밋 시 반영된다. 반대로 `flush()`가 커밋이라고 착각하면 아직 롤백 가능한 SQL 전송 시점과 실제 트랜잭션 확정 시점을 혼동한다.
+
+양방향 연관관계에서 반대편 컬렉션만 고치면 DB FK가 바뀌지 않는다. 두 사용자가 같은 재고를 수정할 때 버전 칼럼이 없으면 마지막 커밋이 앞선 수정을 조용히 덮어쓸 수 있다.
+
+이 문서는 엔티티 수명주기와 Hibernate 동작을 실무 관점에서 다룬다. Spring Data 리포지토리와 쿼리 도구 비교는 → S10 참조. 트랜잭션 프록시·전파 속성은 → S08 참조.
+
+## 2. 핵심 개념
+
+| 용어 | 뜻 | 실무에서 기억할 점 |
+|---|---|---|
+| JPA / Jakarta Persistence | 자바 ORM 표준 API·매핑 규약 | 구현체 자체가 아니다. 현재 기준은 Jakarta Persistence 3.2다. |
+| Hibernate ORM | JPA `EntityManager` 계약을 구현하고 자체 기능도 제공하는 ORM | Boot 4.1.1 관리 버전은 7.4.5.Final이다. |
+| 엔티티 | 영속성 컨텍스트가 식별자 기반으로 추적하는 객체 | `@Entity`, 식별자, 접근 가능한 기본 생성자 등 규약을 지켜야 한다. |
+| 영속성 컨텍스트 | 현재 작업 단위에서 관리 엔티티와 스냅샷을 보관하는 공간 | 1차 캐시, 동일성 보장, dirty checking의 기반이다. 2차 캐시와 다르다. |
+| flush | 변경 사항을 SQL로 동기화하는 동작 | SQL 실행일 뿐 커밋이 아니다. 제약 위반이 여기서 드러날 수 있다. |
+| 연관관계 주인 | FK 또는 연결 테이블 변경을 실제 기록하는 쪽 | `mappedBy`가 붙은 쪽은 반대편 필드를 가리키는 읽기 측이다. |
+| proxy / 지연 로딩 | 실제 연관 객체를 필요할 때 조회하도록 대신 놓는 객체 | 영속성 컨텍스트가 열린 상태에서 접근해야 초기화할 수 있다. |
+| OSIV | 웹 요청 동안 `EntityManager`를 열어 두는 패턴 | 응답 직렬화의 지연 로딩을 허용하지만 트랜잭션 종료 후 SQL도 가능해진다. |
+| 낙관적 / 비관적 락 | 버전 충돌 검출 / DB 잠금으로 동시 변경 제어 | 충돌이 드문 짧은 변경은 낙관적 락, 경합이 높고 즉시 직렬화가 필요하면 비관적 락을 검토한다. |
+
+### 엔티티 상태
+
+| 상태 | 의미 | 다음 전이 예 |
+|---|---|---|
+| 비영속(new/transient) | 컨텍스트가 모르는 새 객체 | `persist()` → 영속 |
+| 영속(managed) | 컨텍스트가 식별자와 변경을 추적 | 커밋·명시 flush → SQL 동기화 |
+| 준영속(detached) | 식별자는 있으나 현재 컨텍스트가 추적하지 않음 | 새 컨텍스트에서 `merge()` → 상태를 복사한 별도 영속 객체 |
+| 삭제(removed) | 삭제 예약 상태 | flush → DELETE SQL |
+
+`merge(detached)`는 전달된 객체를 다시 관리 상태로 바꾸는 명령이 아니다. 상태를 복사한 관리 인스턴스를 반환하므로 반환값을 사용해야 한다. 같은 식별자의 객체가 이미 관리 중이면 그 객체로 상태가 병합된다.
+
+### 헷갈리는 매핑 옵션
+
+| 구분 | 동작 | 선택 기준 |
+|---|---|---|
+| `cascade` | 엔티티 생명주기 작업을 연관 객체에 전파 | 부모와 자식의 생성·삭제 수명이 정말 함께할 때만 `PERSIST`, `REMOVE` 또는 `ALL` |
+| `orphanRemoval=true` | 부모 컬렉션에서 빠진 자식을 고아로 보고 삭제 | 자식이 부모 없이 존재할 수 없는 소유 관계에만 사용 |
+| JPA cascade와 DB `ON DELETE CASCADE` | ORM 작업 전파와 FK 제약의 DB 삭제 규칙 | 서로 대체물이 아니다. 대량 삭제·다른 DB 클라이언트가 있으면 DB 규칙도 별도 설계 |
+| `FetchType.LAZY`와 `EAGER` | 초기 조회에 포함할 데이터 계약 | 연관관계 기본은 대체로 LAZY가 안전하다. 필요 화면의 fetch 계획은 쿼리 단위로 결정 |
+
+JPA는 `@ManyToOne`과 `@OneToOne` 기본 fetch를 EAGER로, 컬렉션 관계를 LAZY로 정의한다. 기본값에 의존하지 말고 단일값 연관관계도 `fetch = LAZY`를 명시해 조회 범위를 호출부에서 통제한다. Hibernate의 LAZY 구현은 프록시나 바이트코드 향상에 의존한다. 엔티티 클래스나 메서드를 `final`로 만들거나 생성자를 막으면 프록시 생성이 제한될 수 있다.
+
+## 3. 내부 동작·원리
+
+### 조회부터 변경 저장까지
+
+```text
+EntityManager.find(Order, id)
+        │
+        ├─ 1차 캐시에 식별자 존재 → 같은 인스턴스 반환
+        └─ 없으면 SELECT → 엔티티와 스냅샷을 컨텍스트에 등록
+                                       │
+        애플리케이션이 필드 변경 ────────┘
+                                       │
+              flush 지점에서 스냅샷 비교(dirty checking)
+                                       │
+                            필요한 INSERT/UPDATE/DELETE 실행
+                                       │
+                         DB 트랜잭션 commit 또는 rollback
+```
+
+영속성 컨텍스트는 `(타입, 식별자)`마다 관리 인스턴스를 하나 둔다. 같은 컨텍스트의 두 번째 `find()`는 캐시 객체를 줄 수 있지만, 컨텍스트 종료 후 공유되는 애플리케이션 캐시는 아니다.
+
+`persist()`와 변경은 쓰기 지연될 수 있다. `FlushModeType.AUTO`이면 커밋 전, 결과와 겹치는 JPQL/HQL 실행 전 또는 명시적 `flush()`에서 DML을 동기화한다. IDENTITY 생성 등은 더 일찍 INSERT가 필요할 수 있다. dirty checking은 현재 상태를 조회 당시 스냅샷과 비교한다. flush 후에도 트랜잭션은 rollback될 수 있으므로 flush는 커밋이 아니다.
+
+### 관계형 매핑과 주인
+
+관계 주인은 보통 FK가 있는 `@ManyToOne`이다. `mappedBy`가 붙은 컬렉션만 수정하면 FK는 그대로일 수 있으므로 helper에서 양쪽을 갱신한다.
+
+`cascade`는 지정 작업을 전파하고 `orphanRemoval`은 관계에서 제거한 자식을 삭제한다. 공유 참조에 REMOVE를 전파하지 않는다. 식별자는 불변으로 두고 enum은 순서 변경에 안전한 `EnumType.STRING`을 권한다.
+
+### LAZY와 N+1
+
+LAZY 연관관계는 초기 SQL을 줄이지만, 객체 접근이 공짜가 되지는 않는다. 부모 목록 한 번 조회 후 각 부모의 컬렉션을 읽으면 아직 초기화되지 않은 컬렉션마다 SELECT가 나가 1+N이 된다. 해결은 전역 EAGER가 아니라 해당 유스케이스의 fetch 계획이다.
+
+- `join fetch`: 한 SQL로 가져오지만 일대다에서는 부모 행이 자식 수만큼 늘어난다. `distinct`가 객체 중복을 정리해도 전송 행은 줄지 않는다. 컬렉션 fetch join 페이지네이션은 부모 단위 결과를 보장하기 어렵다.
+- `@EntityGraph`: JPA 표준 fetch graph로 조회 시 필요한 속성 경로를 선언한다. 쿼리 자체와 로딩 계획을 분리하기 좋다. 그래프가 N+1 방지의 보장은 아니므로 SQL 수를 확인한다.
+- `@BatchSize(size=32)` 또는 `hibernate.default_batch_fetch_size`: 여러 LAZY 키를 `IN (...)`으로 묶어 조회한다. N+1 횟수를 줄이지만 한 쿼리로 합치는 것은 아니다.
+- 화면에 필요한 소수 칼럼만 반환하는 DTO 조회도 선택지다. 엔티티 그래프와 다중 조인의 세부 쿼리 선택은 → S10 참조.
+
+### OSIV와 경계
+
+Boot 웹 애플리케이션은 `spring.jpa.open-in-view=true`가 기본이다. 요청 동안 바인딩한 `EntityManager`로 직렬화 중 LAZY 로딩을 허용하지만 추가 SQL과 커넥션 점유를 감춘다. 서비스 트랜잭션에서 데이터를 완성하고 DTO로 바꾸도록 `false`를 기본 추천한다.
+
+## 4. 코드로 확인
+
+아래 예제는 Java 25 문법을 쓰지 않으며 Boot 4.1.1의 Jakarta Persistence 3.2 / Hibernate 7.4 계열 API 기준이다. 데이터베이스·부트스트랩 설정을 포함한 애플리케이션 전체는 아니고 각 파일은 의존성 주입되는 Spring 빈 또는 엔티티다. **예제 1~3: (미실행).**
+
+### 예제 1: 소유자와 양방향 관계 일관성
+
+```java
+// PurchaseOrder.java
+package example;
+import jakarta.persistence.*;
+import java.util.*;
+import org.hibernate.annotations.BatchSize;
+
+@Entity
+public class PurchaseOrder {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Version private long version;
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id ASC") @BatchSize(size = 32)
+    private List<OrderLine> lines = new ArrayList<>();
+    protected PurchaseOrder() {}
+    public Long getId() { return id; }
+    public List<OrderLine> getLines() { return lines; }
+    public void addLine(OrderLine line) { lines.add(line); line.assignTo(this); }
+    public void removeLine(OrderLine line) {
+        if (lines.remove(line)) line.assignTo(null);
+    }
+}
+```
+
+```java
+// OrderLine.java
+package example;
+import jakarta.persistence.*;
+
+@Entity @Table(name = "order_line")
+public class OrderLine {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private int quantity;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    private PurchaseOrder order;
+    protected OrderLine() {}
+    public OrderLine(int quantity) { this.quantity = quantity; }
+    void assignTo(PurchaseOrder order) { this.order = order; }
+}
+```
+
+`OrderLine.order`가 FK 주인이고 `mappedBy`가 반대편 필드명을 가리킨다. `addLine()`은 양쪽 값을 맞춘다. `persist(order)`는 cascade로 새 항목까지 전파한다.
+
+### 예제 2: 영속 상태 변경과 flush
+
+```java
+package example;
+
+import jakarta.persistence.EntityManager;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class OrderService {
+    private final EntityManager entityManager;
+
+    public OrderService(EntityManager entityManager) {
+        this.entityManager = entityManager;
+    }
+
+    @Transactional
+    public void addLine(long orderId, int quantity) {
+        PurchaseOrder order = entityManager.find(PurchaseOrder.class, orderId);
+        if (order == null) throw new IllegalArgumentException("주문 없음: " + orderId);
+
+        order.addLine(new OrderLine(quantity));
+        // 별도 update/save 없이 관리 엔티티의 변경을 flush 때 감지한다.
+        entityManager.flush(); // SQL 동기화 지점. 메서드 종료 커밋과는 다르다.
+    }
+}
+```
+
+`find()`한 `order`는 관리 상태라 변경 감지된다. `flush()`를 지우면 보통 완료 직전에 SQL이 나간다. 성공한 flush도 이후 rollback될 수 있다. Spring 트랜잭션 프록시 경계는 → S08.
+
+### 예제 3: 유스케이스에 맞춘 fetch join
+
+```java
+package example;
+
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.util.List;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+public class OrderReadService {
+    @PersistenceContext
+    private EntityManager entityManager;
+
+    @Transactional(readOnly = true)
+    public List<PurchaseOrder> findOrdersWithLines() {
+        return entityManager.createQuery(
+                "select distinct o from PurchaseOrder o " +
+                "left join fetch o.lines order by o.id",
+                PurchaseOrder.class)
+            .getResultList();
+    }
+}
+```
+
+같은 호출에서 컬렉션 추가 조회가 나지 않는다. 컬렉션 fetch join으로 페이지 처리하지 말고 부모 ID를 먼저 페이지 조회하거나 batch fetch를 검토한다. JPA `EntityGraph` 또는 Spring Data `@EntityGraph(attributePaths = "lines")`도 로딩 계획을 선언한다(→ S10).
+
+## 5. 버전별 변화 — 왜 바뀌었나
+
+| 시기 | 변화와 한계 | 실무 영향·근거 |
+|---|---|---|
+| Hibernate 6.0 | 이전 ORM의 여러 하위 시스템과 API·매핑·쿼리 언어가 누적되어 일관성이 떨어졌고, 이를 해결하기 위해 주요 영역을 재설계했다. | 마이그레이션에서 SQL 생성, 타입, HQL, API 차이를 점검해야 한다. Hibernate 7.4 소개 문서는 Hibernate 6을 전면 재설계로 설명한다. |
+| Hibernate 7.0 | 표준과 자체 API에 겹치는 타입·메서드가 있어 이중 사용과 혼란을 낳았다. | Java 17 이상과 Jakarta Persistence 3.2 기준으로 이동했다. 중복 API는 JPA 표준으로 정리하고 `Session#save/update` 등 레거시 진입점과 일부 Hibernate 애노테이션을 제거했다. 7.0부터 Apache License 2.0이다. |
+| Hibernate 7.4 | 버전별 DB 동작 차이와 예측하기 어려운 경계 사례를 바로잡을 필요가 있었다. | eager `@Any` 매핑 조인 로딩과 fetch join limit, 스키마 작업, DB별 JSON 함수, DDL 생성에 변경이 있다. ORM이 스키마 관리를 수행하는 환경은 생성 SQL diff와 마이그레이션 스크립트를 확인한다. |
+| Spring Boot 4.1.1 기준 | 하위 라이브러리 조합을 검증된 BOM으로 고정해 직접 버전 충돌을 줄인다. | Spring Data JPA 4.1.1과 Hibernate ORM 7.4.5.Final이 관리된다. `hibernate-core` 버전을 별도 지정하기보다 Boot BOM을 기본 추천한다. |
+
+주요 근거: [Hibernate 7.0 Migration Guide](https://docs.hibernate.org/orm/7.0/migration-guide/), [Hibernate 7.4 Introduction](https://docs.hibernate.org/orm/7.4/introduction/html_single/), [Hibernate 7.4 Migration Guide](https://docs.hibernate.org/orm/7.4/migration-guide/), [Spring Boot Managed Dependency Coordinates](https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html).
+
+## 6. 실무 가이드
+
+- **if** 새 엔티티라면 **then** `persist()`한다. **이유:** 새 객체를 컨텍스트에 등록한다.
+- **if** 조회한 managed 엔티티를 수정한다면 **then** 필드를 바꾸고 트랜잭션을 짧게 끝낸다. **이유:** dirty checking이 반영하므로 재저장할 필요가 없다.
+- **if** 응답에 연관 데이터가 필요하다면 **then** 서비스 안에서 fetch join·EntityGraph·DTO 조회를 계획한다. **이유:** 직렬화 중 LAZY SQL은 계층과 비용을 숨긴다.
+- **if** 컬렉션 페이지네이션이 필요하다면 **then** 컬렉션 fetch join 대신 ID 페이지 후 상세 조회 또는 batch fetch를 택한다. **이유:** 조인 행은 부모 단위 페이지를 깨뜨릴 수 있다.
+- **if** 자식이 부모와 같은 생명주기라면 **then** 필요한 cascade와 `orphanRemoval`만 적용하고 양방향 helper를 둔다. **이유:** cascade는 삭제 범위도 결정한다.
+- **if** 충돌이 드물고 재시도할 수 있다면 **then** `@Version` 낙관적 락을 기본으로 한다. **이유:** 경합이 없을 때 DB 잠금을 잡지 않는다.
+- **if** 재고처럼 강한 직렬화가 필요하다면 **then** 짧은 트랜잭션에 `PESSIMISTIC_WRITE`를 검토한다. 잠금 순서와 timeout을 정해 대기·교착을 줄인다.
+- **if** Boot 웹 API라면 **then** 기본 추천은 `spring.jpa.open-in-view=false`다. 트랜잭션 안에서 DTO로 변환해 응답 데이터와 SQL 범위를 고정한다.
+- **if** 운영 스키마를 배포한다면 **then** ORM의 `ddl-auto=update` 대신 Flyway/Liquibase 등 마이그레이션을 쓴다. 내장 DB 등 환경에 따라 Boot 기본값이 달라질 수 있어 속성을 명시한다.
+- **if** Hibernate를 올린다면 **then** Boot BOM과 해당 ORM 버전 migration guide를 확인하고 생성 DDL·대표 SQL을 점검한다. 컴파일 성공만으로 DB 동작 호환성이 보장되지는 않는다.
+
+## 7. 함정·안티패턴
+
+1. **N+1을 EAGER로 덮기**: 목록이 느리고 조인 행이 급증함 → 모든 관계를 전역 로딩 계약으로 만들고 호출별 필요를 분리하지 않음 → 연관관계는 LAZY로 두고 SQL 로그·통계로 문제를 확인한 뒤 쿼리별 fetch 계획을 지정한다.
+2. **`flush()`를 commit으로 취급**: flush 후 예외가 나면 이미 저장됐다고 오해함 → flush는 현재 트랜잭션의 SQL 동기화일 뿐 확정이 아님 → 커밋·롤백은 트랜잭션 관리자가 결정하고 외부 메시지 발송은 커밋 이후 패턴으로 다룬다(→ S08).
+3. **양방향 컬렉션 한쪽만 수정**: 객체에서는 자식이 보이지만 FK가 null이거나 이전 값임 → `mappedBy` 측만 바꿈 → 관계 helper로 주인 필드와 반대편 컬렉션을 모두 변경한다.
+4. **`CascadeType.REMOVE`를 공유 엔티티에 적용**: 주문 삭제가 상품·공유 참조까지 삭제함 → 객체 참조를 생명주기 종속과 혼동 → 독립 생명주기 엔티티에는 REMOVE 전파를 설정하지 않는다.
+5. **OSIV가 열어 둔 세션에 의존**: 서비스 종료 후 응답 변환에서 쿼리가 추가되고 느린 외부 호출 동안 커넥션이 오래 점유됨 → 요청 전체의 세션을 데이터 조회 계획으로 착각 → OSIV를 끄고 서비스 경계 안에서 DTO를 만든다.
+6. **detached 객체를 `merge()`하고 원본을 계속 사용**: 이후 수정이 DB에 안 반영되거나 부분 업데이트로 데이터가 덮임 → `merge()`가 원본을 관리 객체로 바꾼다고 오해 → 반환된 managed 인스턴스를 사용하고 API 입력 DTO를 엔티티로 통째 병합하지 않는다.
+7. **컬렉션 fetch join과 페이지네이션 결합**: 페이지별 행 수가 달라지거나 모든 조인 행을 메모리에서 자르는 경고 발생 → 부모 한 건이 자식 수만큼 SQL 행을 차지함 → 부모 ID를 페이지 단위로 조회한 뒤 상세 조회하거나 batch fetching을 쓴다.
+8. **낙관적 충돌을 일반 서버 오류로 처리**: 동시 수정 요청 중 한쪽이 500으로 끝나고 사용자가 최신 상태를 잃음 → `@Version` 충돌의 업무 의미를 정의하지 않음 → 충돌을 API의 재조회·재시도 또는 409 같은 명시적 응답으로 변환한다.
+9. **자동 DDL을 운영 스키마 마이그레이션에 사용**: 로컬에서는 되지만 운영에서 칼럼 변경·데이터 변환을 재현하지 못함 → `ddl-auto=update`가 안전한 변경 계획이라고 오해 → 개발은 명시적 `create-drop` 등으로 제한하고 운영은 스키마 도구와 검토된 migration을 사용한다.
+
+## 8. 자가점검 Q&A (면접 대비)
+
+### Q1. 영속성 컨텍스트의 1차 캐시가 애플리케이션 캐시와 다른 점은?
+
+같은 컨텍스트 안에서 엔티티 타입과 식별자에 대해 동일 인스턴스를 보장하는 작업 단위 캐시다. 요청이나 트랜잭션을 넘어 재사용하는 공유 캐시가 아니다. 변경 감지의 원본 상태를 함께 관리한다.
+
+**꼬리질문:** 같은 컨텍스트에서 같은 ID를 두 번 `find()`하면? — 이미 관리 중인 객체가 반환되어 보통 두 번째 SELECT는 없다. 쿼리 결과 캐시와 혼동하지 않는다.
+
+### Q2. dirty checking은 언제 UPDATE를 내고, `flush()`는 무엇을 보장하지 않는가?
+
+관리 엔티티가 스냅샷과 달라지면 flush 과정에서 필요한 DML을 실행한다. AUTO flush는 커밋 전이나 결과 일관성이 필요한 쿼리 전에 일어날 수 있다. `flush()`는 SQL 동기화일 뿐 트랜잭션 커밋이나 다른 트랜잭션에 대한 확정을 보장하지 않는다.
+
+**꼬리질문:** 제약조건 오류는 언제 발견될 수 있나? — persist 시점이 아니라 flush/commit의 SQL 실행 시점일 수 있으므로 오류 발생 위치를 고려해야 한다.
+
+### Q3. 양방향 일대다에서 어느 쪽이 FK를 바꾸나?
+
+FK를 가진 `@ManyToOne`이 주인인 경우가 일반적이다. `@OneToMany(mappedBy="...")` 컬렉션은 주인 필드를 가리키는 반대편 표현이다. 컬렉션만 바꾸면 메모리 그래프는 맞아도 DB 관계는 바뀌지 않을 수 있다.
+
+**꼬리질문:** 양쪽 값을 매번 바꾸려면? — 도메인 helper에서 컬렉션 추가·제거와 주인 참조 설정을 함께 한다.
+
+### Q5. LAZY를 기본으로 두어도 N+1이 생기는 이유와 대응은?
+
+LAZY는 초기 조회에서 연관 데이터를 미룰 뿐, 루프에서 연관 필드를 읽는 비용을 없애지 않는다. 부모 N개를 조회한 뒤 각 자식 컬렉션을 초기화하면 추가 조회 N개가 생긴다. 유스케이스별 fetch join·EntityGraph·batch fetching으로 필요한 데이터를 묶는다.
+
+**꼬리질문:** fetch join으로 목록 페이지까지 처리해도 되나? — 단일값 관계는 고려할 수 있지만 컬렉션은 행 증폭으로 부모 페이지 단위가 깨질 수 있어 분리 조회나 batch 전략을 검토한다.
+
+### Q6. OSIV를 끄면 어떤 코드 구조가 필요해지는가?
+
+컨트롤러나 JSON 직렬화가 LAZY 엔티티를 직접 펼치지 않게 해야 한다. 서비스 트랜잭션 안에서 필요한 관계를 조회하고 응답 DTO로 변환한다. 조회 요구가 명시되어 SQL 발생 위치와 응답 형태를 추적하기 쉬워진다.
+
+**꼬리질문:** 열린 OSIV면 서비스 바깥에서 지연 로딩이 안전한가? — 조회는 될 수 있어도 트랜잭션 범위와 다른 시점의 DB 조회가 되어 일관성과 커넥션 수명 문제를 감춘다.
+
+### Q7. `merge()` 호출 뒤 원래 객체를 계속 써도 되는가?
+
+아니다. `merge()`는 전달된 상태를 현재 컨텍스트의 관리 객체에 복사하고 그 관리 객체를 반환한다. 새 관리 객체일 수도 있으므로 반환값으로 후속 변경을 수행해야 한다. 부분 DTO를 엔티티에 병합하면 누락 필드가 덮일 위험도 있다.
+
+**꼬리질문:** 조회한 managed 객체를 수정할 때는? — 같은 트랜잭션에서 변경 감지가 동작하므로 보통 merge/save 호출이 필요 없다.
+
+### Q8. 낙관적 락과 비관적 락은 어떻게 고르는가?
+
+낙관적 락은 `@Version`으로 커밋 시점에 충돌을 검출하며 경합이 낮을 때 기본 선택이다. 비관적 락은 DB 잠금을 먼저 잡아 경합을 직렬화하지만 대기·교착과 연결 점유가 발생한다. 업무 처리 시간과 충돌률, 재시도 정책을 함께 본다.
+
+**꼬리질문:** 낙관적 락 충돌은 언제 발생할 수 있나? — UPDATE가 실행되는 flush/commit 경계에서 이전 버전과 DB 버전이 다르면 발생할 수 있다.
+
+### Q9. Hibernate 7 업그레이드에서 코드 컴파일 외에 무엇을 점검하나?
+
+Hibernate 7.0은 Java 17+/Jakarta Persistence 3.2를 기준으로 표준 API 정리와 레거시 API 제거를 포함한다. 마이그레이션 가이드의 API·DDL·DB 동작 변경을 체크한다. Boot BOM의 Hibernate 7.4.5.Final과 일치하는 가이드를 적용하고 실제 DB에서 대표 쿼리와 스키마 diff를 확인한다.
+
+**꼬리질문:** Hibernate 7.0 가이드만으로 7.4 업그레이드를 점검할 수 있나? — 아니다. 7.4 migration guide에서 7.4 계열의 추가 동작·DDL 변경도 확인한다.
+
+## 9. 참고문헌
+
+- Hibernate ORM 7.0 User Guide — https://docs.jboss.org/hibernate/orm/7.0/userguide/html_single/Hibernate_User_Guide.html — 영속성 컨텍스트, flush, 관계, fetching, locking 관련 장 구성과 동작 근거.
+- Hibernate ORM 7.4 User Guide — https://docs.hibernate.org/orm/7.4/userguide/html_single/Hibernate_User_Guide.html — Boot 4.1 관리 계열 사용자 가이드; 컨텍스트·flush·fetch·locking 기준.
+- A Short Guide to Hibernate 7 — https://docs.hibernate.org/orm/7.4/introduction/html_single/ — Hibernate 6 재설계 배경과 컨텍스트·프록시·fetch·락 주제 개요.
+- Hibernate ORM 7.0 Migration Guide — https://docs.hibernate.org/orm/7.0/migration-guide/ — Java 17, Jakarta Persistence 3.2, API·매핑 제거와 변경.
+- Hibernate ORM 7.4 Migration Guide — https://docs.hibernate.org/orm/7.4/migration-guide/ — 7.4의 fetch join·스키마·JSON·DDL 동작 변경.
+- SQL Databases :: Spring Boot — https://docs.spring.io/spring-boot/reference/data/sql.html — JPA 자동 구성, 엔티티 검색과 관련 구성.
+- Common Application Properties :: Spring Boot — https://docs.spring.io/spring-boot/appendix/application-properties/index.html — `spring.jpa.open-in-view` 기본값과 DDL 설정 의미.
+- Managed Dependency Coordinates :: Spring Boot — https://docs.spring.io/spring-boot/appendix/dependency-versions/coordinates.html — Boot 4.1.1 관리 Hibernate ORM 7.4.5.Final 및 Spring Data JPA 4.1.1.
+- Jakarta Persistence 3.2 Specification — https://jakarta.ee/specifications/persistence/3.2/jakarta-persistence-spec-3.2 — 엔티티 상태, 영속성 컨텍스트, fetch graph와 동시성 락의 표준 규약.
