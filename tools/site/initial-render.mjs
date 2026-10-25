@@ -114,6 +114,36 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
 function prepareFirstPaint({panelMap,dayPanels,servicePanels,knowledgeCategories}) {
   const root=document.documentElement;
   root.classList.add('js');
+  document.addEventListener('click',event=>{
+    const apiButton=event.target?.closest?.('[data-sf-api-collapse]');
+    if(apiButton){
+      const catalog=apiButton.closest('[data-sf-catalog]');
+      for(const group of catalog?.querySelectorAll('[data-sf-api-group]')||[]){
+        if(group===apiButton.closest('[data-sf-api-group]'))continue;
+        const rows=group.querySelector('[data-sf-api-rows]'),button=group.querySelector('[data-sf-api-collapse]');
+        if(rows&&button){rows.hidden=true;button.setAttribute('aria-expanded','false');const icon=button.querySelector('[aria-hidden="true"]');if(icon)icon.textContent='›';}
+      }
+    }
+    const link=event.target?.closest?.('a[href]');if(!link)return;
+    let target;try{target=new URL(link.href,location.href)}catch{return}
+    if(!/\/(?:docs\/knowledge|lessons)\//.test(target.pathname))return;
+    const current=new URL(location.href);
+    const carried=current.searchParams.get('return');
+    const eligible=/\/(?:course\/(?:spring\/D\d{2}|java\/J\d{2})|scenario\/features\/[^/]+)\.html$/.test(current.pathname);
+    const destination=carried|| (eligible?current.pathname+current.search+current.hash:'');
+    if(destination)target.searchParams.set('return',destination);
+    link.href=target.href;
+  },true);
+  const returnValue=new URLSearchParams(location.search).get('return');
+  if(returnValue && /^(?:\/(?:course\/(?:spring\/D\d{2}|java\/J\d{2})|scenario\/features\/[^/]+)\.html)(?:[?#].*)?$/.test(returnValue)){
+    const addReturn=()=>{
+      if(!document.querySelector('main.site-main .site-concept-frame'))return;
+      if(document.querySelector('.concept-return-link'))return;
+      const heading=document.querySelector('main.site-main .site-frame-content h1');if(!heading)return;
+      const link=document.createElement('a');link.className='concept-return-link';link.href=returnValue;link.textContent='이전 작업 화면으로 돌아가기';heading.before(link);
+    };
+    document.addEventListener('DOMContentLoaded',addReturn,{once:true});
+  }
   let format='yml';try {if(localStorage.getItem('javaexperience.course.config-format.v1')==='properties')format='properties';}catch{}
   root.dataset.configFormat=format;
   let id='';try{id=decodeURIComponent(location.hash.slice(1));}catch{}

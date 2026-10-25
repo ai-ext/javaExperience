@@ -170,6 +170,14 @@ function renderExerciseDocument(body, id, isJava, springHref, visualGuide) {
     if (visualGuide && guideSection) guideSection.querySelector('h2').insertAdjacentHTML('afterend', renderVisualGuide(visualGuide));
     const topReturn = article.querySelector(':scope > .course-exercise-nav');
     if (topReturn) {
+      const dayLink = topReturn.querySelector('a');
+      if (dayLink) {
+        const primaryReturn = doc.createElement('a');
+        primaryReturn.className = 'exercise-return-primary';
+        primaryReturn.href = dayLink.href;
+        primaryReturn.textContent = `${dayLink.textContent.split(' · ')[0]}로 돌아가기`;
+        head.append(primaryReturn);
+      }
       const support = doc.createElement('details');
       support.className = 'exercise-context-links';
       support.innerHTML = '<summary>실행 위치·연결 일자·이전 연습</summary>';
@@ -341,8 +349,7 @@ function renderStepSection(section, fromRel, course, step) {
   const day = course.days.find(d => d.steps.some(s => s.id === step.id));
   const next = day.steps[day.steps.indexOf(step) + 1];
   const nextLink = `<a class="step-next" href="${next ? `#step-${next.id.toLowerCase()}` : '#오늘-순서'}">${next ? `다음 순서 ${NUMS[next.no - 1]} →` : '오늘 순서로 돌아가기 ↑'}</a>`;
-  const done = `<p class="step-done"><label><input type="checkbox" class="step-check" data-step="${esc(step.id)}"> 이 순서를 끝냈다</label></p>`;
-  return `${head}${facts}${renderCoursePostVisual({ stepId: step.id })}${renderCourseApiWorkspace({ stepId: step.id })}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${done}${nextLink}</div></section>`;
+  return `${head}${facts}${renderCoursePostVisual({ stepId: step.id })}${renderCourseApiWorkspace({ stepId: step.id })}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${nextLink}</div></section>`;
 }
 
 function dayPager(day, fromRel, course) {
@@ -387,10 +394,7 @@ export function dayCrumbs(sourceRel, course) {
   const id = path.posix.basename(sourceRel, '.md');
   const day = course.days.find((d) => d.id === id);
   if (!day) return '';
-  const index = course.days.indexOf(day);
-  const prev = course.days[index - 1];
-  const next = course.days[index + 1];
-  return `<nav class="course-crumbs day-crumbs" aria-label="현재 위치"><div class="day-location-links"><p class="crumbs"><a href="../README.html">과정 안내</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <a href="README.html">일자 목록</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <span aria-current="page">${esc(day.id)}</span></p><p class="course-crumbs-jump">${prev ? `<a href="${prev.id}.html" rel="prev" aria-label="이전 날 ${prev.id}: ${esc(prev.title)}">← 이전 ${prev.id}</a>` : ''}${next ? `<a href="${next.id}.html" rel="next" aria-label="다음 날 ${next.id}: ${esc(next.title)}">다음 ${next.id} →</a>` : ''}</p></div></nav>`;
+  return `<nav class="course-crumbs day-crumbs" aria-label="현재 위치"><div class="day-location-links"><p class="crumbs"><a href="../README.html">과정 안내</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <a href="README.html">일자 목록</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <span aria-current="page">${esc(day.id)}</span></p></div></nav>`;
 }
 
 export function renderDayPage(sourceRel, body, course) {

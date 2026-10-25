@@ -163,7 +163,7 @@ test('개념 흡수는 여섯 분류의 수·일자 근거와 공통 파일 부�
  assert.ok(tiles.every(tile=>tile.matches('.visual-file')));
  assert.ok(doc.querySelector('.kc-results.visual-file-grid'));
  assert.equal(doc.querySelectorAll('.kc-result.visual-file').length,134);
- assert.equal(doc.querySelector('.concept-nav-group[data-concept-nav="domains"]').open,true);
+ assert.equal(doc.querySelector('.concept-nav-group[data-concept-nav="domains"]').open,false,'목록은 본문 분야 타일로 고르므로 사이드바 분류는 접어 둔다');
  assert.equal(doc.querySelector('.concept-nav-group[data-concept-nav="units"]').open,false);
  dom.window.close();
 });
@@ -200,6 +200,7 @@ test('개념 목록의 직접 패널 주소는 첫 페인트 전에 기본 해�
   assert.ok(doc.getElementById('first-paint-state').textContent.includes(`#${id}{display:block`));
   win.dispatchEvent(new win.Event('load'));
   assert.equal(win.location.hash,`#${id}`,'URL 복원은 hashchange 없는 replaceState');
+  doc.getElementById('first-paint-state')?.stopEarlySelection?.();
   win.close();
  }
 });

@@ -10,6 +10,7 @@ const routes={홈:'index.html','일자 목록':'course/spring/README.html','과�
 Object.assign(routes, {'Spring 분야':'docs/knowledge/README.html#kc-category-spring', ...Object.fromEntries(CORE_UNITS.map(unit=>[unit.id, `lessons/concept-core.html?unit=${unit.id}`]))});
 Object.assign(routes, {홈:'index.html','일자 목록':'course/spring/README.html','과정 지도':'course/map.html','기능 상세':'scenario/features/posts-create-read.html','출발 자료':'course/start/README.html','개념 학습':'docs/knowledge/README.html',Java:'course/java/README.html',티켓:'course/tickets/README.html','서비스 만들기':'scenario/README.html','실전 미션':'practice/MISSIONS.html','일자 상세':'course/spring/D05.html','Java 상세':'course/java/J05.html','티켓 상세':'course/tickets/B01.html','더미 데이터':'course/start/dummy/README.html','운영 실습':'course/start/ops/README.html','서비스 상세':'scenario/ch0-first-steps/0-1-ts-to-java.html','개념 상세':'docs/knowledge/P16-json-jackson-practical.html','레슨':'lessons/README.html','구현 티켓':'tickets/README.html'});
 Object.assign(routes, {'일반 개념 리더':'docs/knowledge/J01-types-string.html','장면 개념 리더':'docs/knowledge/P09-java-syntax-basics.html','레슨 상세':'lessons/A1-client-server-http.html','학습 순서':'docs/knowledge/README.html#kc-sequence','Spring 분야':'docs/knowledge/README.html#kc-category-spring', ...Object.fromEntries(CORE_UNITS.map(unit=>[unit.id, `lessons/concept-core.html?unit=${unit.id}`]))});
+Object.assign(routes, {'API EXPLORER':'scenario/README.html#journey-all-apis'});
 const pairs=[['출발 자료','개념 학습'],['일자 목록','Java'],['티켓','서비스 만들기'],['홈','과정 지도'],['서비스 만들기','일자 목록'],['서비스 만들기','기능 상세'],['실전 미션','개념 학습']];
 const server = await startCheckServer();
 const base = server.base;
@@ -21,10 +22,25 @@ try{
  await fs.mkdir(`${out}/${stage}`,{recursive:true});
  for(const [name,file]of Object.entries(routes)){
   await page.goto(`${base}/${file}`);await page.waitForLoadState('networkidle');
+  if(name==='API EXPLORER')await page.evaluate(()=>scrollTo(0,0));
   pages[name]=await page.evaluate(()=>{
    const rect=selector=>{const e=document.querySelector(selector),r=e?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;};
    return {header:rect('.site-topbar'),menu:rect('.site-topbar nav'),sidebar:rect('.site-frame-sidebar,.page-sidebar,.day-today'),content:rect('.site-frame-content,.page-navigation-content,.home-dashboard-content,.day-stepper-main'),labels:[...document.querySelectorAll('.site-topbar nav>a')].map(e=>e.textContent),floating:[...document.querySelectorAll('main *')].filter(e=>{const r=e.getBoundingClientRect();return r.width>0&&r.height>0&&!e.closest('[hidden]')&&!e.closest('.site-frame-sidebar')&&['sticky','fixed'].includes(getComputedStyle(e).position);}).map(e=>e.className)};
   });
+  if(name==='홈'){
+   const home=await page.evaluate(()=>{const today=document.querySelector('.ch-today'),title=today?.querySelector('h2'),action=today?.querySelector('.ch-actions a'),row=today?.querySelector('.ch-today-steps li'),tag=today?.querySelector('.ch-tag');return{padding:getComputedStyle(today).padding,title:getComputedStyle(title).fontSize,action:getComputedStyle(action).minHeight,row:getComputedStyle(row).minHeight,tail:getComputedStyle(tag,'::after').borderTopWidth};});
+   assert.deepEqual(home,{padding:'32px',title:'26px',action:'48px',row:'44px',tail:'9px'},'홈 오늘 할 일 카드 VF 치수');
+  }
+  if(name==='API EXPLORER'){
+   const explorer=await page.evaluate(()=>({open:[...document.querySelectorAll('[data-sf-api-group]')].filter(group=>!group.querySelector('[data-sf-api-rows]').hidden).length,visible:[...document.querySelectorAll('[data-sf-api-collapse]')].filter(button=>button.checkVisibility({contentVisibilityAuto:true})&&button.getBoundingClientRect().top<900&&button.getBoundingClientRect().bottom>0).length,rows:[...document.querySelectorAll('[data-sf-api-row]')].filter(row=>row.checkVisibility({contentVisibilityAuto:true})).length}));
+   assert.equal(explorer.open,0,'API EXPLORER는 첫 페인트에 큰 결과 묶음을 펼치지 않음');
+   assert.ok(explorer.visible>=6,'첫 화면에서 6개 이상 기능·메서드 묶음 선택 가능');
+   assert.equal(explorer.rows,0,'묶음을 고르기 전 API 상세 행은 닫혀 있음');
+  }
+  if(name==='일자 상세'){
+   const day=await page.evaluate(()=>{const chip=document.querySelector('.day-progress-chip'),track=document.querySelector('.day-progress-track'),sql=document.querySelector('.sql-questions>li');return{chip:[getComputedStyle(chip).display,getComputedStyle(chip).minHeight,getComputedStyle(chip).padding,getComputedStyle(chip).borderRadius,getComputedStyle(chip).fontSize,getComputedStyle(chip).lineHeight],track:[getComputedStyle(track).height,getComputedStyle(track).margin,getComputedStyle(track).borderRadius],sql:getComputedStyle(sql).display,doneChecks:document.querySelectorAll('.day-stepper-main .step-done input.step-check').length};});
+   assert.deepEqual(day,{chip:['inline-flex','24px','3px 8px','999px','12px','18px'],track:['6px','12px 0px 16px','999px'],sql:'block',doneChecks:0},'일자 단계 VF 치수·단일 완료 조작');
+  }
   const space=await page.evaluate(measureServiceSpace);
   if(space){pages[name].space=space;if(stage!=='before'){assert.ok(space.firstViewport.blankRatio<0.5,`${name}: 첫 화면 빈 영역 50% 미만`);assert.ok(space.fullContent.blankRatio<0.4,`${name}: 전체 빈 영역 40% 미만`);assert.ok(space.fullContent.maxBlankHeight<=160,`${name}: 연속 빈 높이 160px 이하`);if(space.stageWidthRatio!==null)assert.ok(space.stageWidthRatio>=0.9,`${name}: 본문 너비 90% 이상`);}}
   await page.screenshot({path:`${out}/${stage}/frame-${file.replace(/[^a-zA-Z0-9.-]/g,'-')}.png`});
