@@ -37,9 +37,9 @@ Java·Spring·티켓·출발 자료는 45일 과정 안의 자료다. 45일 과�
 - check:reload: 0~1.5초 DOM·CLS 측정과 40ms 간격 캡처 요청. 기본 페이지·해시 단계·저장 설정을 같은 조건으로 비교한다. 실제 캡처 시각을 JSON에 남긴다.
 - 사이트 test·audit·HTML 링크 검사, 대비 quick, tools/course 전체 test.
 
-측정 원자료와 캡처: /private/tmp/claude-501/-Users-ds-orca-workspaces-javaExperience-pleco/272c0b18-3a88-4698-8151-fd238e411541/scratchpad/r25/
+측정 원자료와 캡처는 검사 실행 시 출력되는 저장소 밖 임시 결과 폴더에 저장한다. `--out`으로 보관 위치를 지정할 수 있다.
 
-18998 포트의 Python 서버만 사용한다. Git 스테이징·커밋·stash·reset과 패키지 설치는 하지 않는다. check:generated의 HEAD 대조 실패는 미커밋 변경이 있는 이번 작업에서 재빌드 일치 여부와 구분한다.
+`check:frame`·`check:reload`와 공통 Playwright 실행기는 저장소 루트를 빈 포트에 직접 제공하고 검사 종료 시 자체 서버만 닫는다. `--base-url` 또는 `SITE_BASE_URL`로 외부 서버를 지정할 수도 있다. Playwright는 `PLAYWRIGHT_MODULE`을 우선하고, 없으면 node_modules의 `playwright`를 찾는다. 둘 다 사용할 수 없으면 설치·지정 방법을 출력하고 종료 코드 2를 반환한다. Git 스테이징·커밋·stash·reset과 패키지 설치는 하지 않는다. check:generated의 HEAD 대조 실패는 미커밋 변경이 있는 이번 작업에서 재빌드 일치 여부와 구분한다.
 
 ## 검증 결과 (2026-10-25)
 
@@ -69,4 +69,4 @@ Java·Spring·티켓·출발 자료는 45일 과정 안의 자료다. 45일 과�
 | 설정 탭 | 0.696313 | 9 | 0 / 0 / 0ms |
 | 저장 설정 | 0.692424 | 11 | 0 / 0 / 0ms |
 
-전체 문서 465개 공통 틀 검사, 새로고침 24종, 사이트 검사 51개, course 테스트 162개, HTML 화면 검사 25개, 대비 13개 페이지·991개 상태를 통과했다. check:generated는 미커밋 HTML 보호 조건에서 exit 2이며 통과로 표시하지 않는다. 새 시각화 항목은 미검토로 유지했다. 상세 원자료와 로그는 /private/tmp/claude-501/-Users-ds-orca-workspaces-javaExperience-pleco/272c0b18-3a88-4698-8151-fd238e411541/scratchpad/r25/RESULTS.md에 기록했다.
+전체 문서 465개 공통 틀 검사, 새로고침 24종, 사이트 검사 51개, course 테스트 162개, HTML 화면 검사 25개, 대비 13개 페이지·991개 상태를 통과했다. check:generated는 미커밋 HTML 보호 조건에서 exit 2이며 통과로 표시하지 않는다. 새 시각화 항목은 미검토로 유지했다. 상세 원자료와 로그는 당시 검사의 임시 결과 폴더에 기록했다.

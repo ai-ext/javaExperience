@@ -1,17 +1,17 @@
 import fs from 'node:fs/promises';
-import { createRequire } from 'node:module';
+import { arg, loadPlaywright, checkOutput, startCheckServer } from './check-runtime.mjs';
 import assert from 'node:assert/strict';
-const require=createRequire(import.meta.url);
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'/Users/ds/.claude/skills/gstack/node_modules/playwright');
-const arg=name=>process.argv.find(v=>v.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
+const { chromium } = loadPlaywright();
+const out = await checkOutput('frame');
 const stage=arg('stage')||'after';
-const out=arg('out')||'/private/tmp/claude-501/-Users-ds-orca-workspaces-javaExperience-pleco/272c0b18-3a88-4698-8151-fd238e411541/scratchpad/r25';
-const base=process.env.SITE_BASE_URL||'http://127.0.0.1:18998';
 const routes={홈:'index.html','45일 과정':'course/spring/README.html','출발 자료':'course/start/README.html','개념 학습':'docs/knowledge/README.html',Java:'course/java/README.html',티켓:'course/tickets/README.html','서비스 만들기':'scenario/README.html','실전 미션':'practice/MISSIONS.html','일자 상세':'course/spring/D05.html','Java 상세':'course/java/J05.html','티켓 상세':'course/tickets/B01.html','더미 데이터':'course/start/dummy/README.html','운영 실습':'course/start/ops/README.html','서비스 상세':'scenario/ch0-first-steps/0-1-ts-to-java.html','개념 상세':'docs/knowledge/P16-json-jackson-practical.html','레슨':'lessons/README.html','구현 티켓':'tickets/README.html'};
 const pairs=[['출발 자료','개념 학습'],['45일 과정','Java'],['티켓','서비스 만들기'],['홈','45일 과정'],['실전 미션','개념 학습']];
-const browser=await chromium.launch({headless:true});
+const server = await startCheckServer();
+const base = server.base;
+let browser;
 const pages={},transitions=[],allPages=[];
 try{
+ browser = await chromium.launch({headless:true});
  const page=await browser.newPage({viewport:{width:1440,height:900},colorScheme:'dark'});
  await fs.mkdir(`${out}/${stage}`,{recursive:true});
  for(const [name,file]of Object.entries(routes)){
@@ -51,7 +51,7 @@ try{
    allPages.push({file,...row});if(allPages.length%50===0)console.log(`전체 틀 ${allPages.length}/${files.length}`);
   }
  }
-}finally{await browser.close();}
+}finally{try { await browser?.close(); } finally { await server.close(); }}
 await fs.writeFile(`${out}/frame-${stage}.json`,JSON.stringify({viewport:{width:1440,height:900},pages,transitions,allPages},null,2));
 console.table(transitions.map(t=>({이동:`${t.from} → ${t.to}`,...t.diff})));
 if(stage!=='before')for(const [name,row]of Object.entries(pages)){assert.deepEqual(row.labels,['홈','45일 과정','서비스 만들기','실전 미션','개념 학습'],name);for(const [element,keys]of Object.entries({header:['x','y','height'],menu:['x','y'],sidebar:['x','y','width'],content:['x','y','width']}))for(const key of keys)assert.equal(row[element]?.[key],pages['홈'][element][key],`${name}: ${element}.${key}`);}

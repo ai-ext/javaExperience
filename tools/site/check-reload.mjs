@@ -1,18 +1,18 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createRequire } from 'node:module';
+import { arg, loadPlaywright, checkOutput, startCheckServer } from './check-runtime.mjs';
 import assert from 'node:assert/strict';
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || '/Users/ds/.claude/skills/gstack/node_modules/playwright');
-const arg = name => process.argv.find(value => value.startsWith(`--${name}=`))?.split('=').slice(1).join('=');
-const base = process.env.SITE_BASE_URL || 'http://127.0.0.1:18998';
+const { chromium } = loadPlaywright();
+const out = await checkOutput('reload');
 const stage = arg('stage') || 'after';
-const out = arg('out') || '/private/tmp/claude-501/-Users-ds-orca-workspaces-javaExperience-pleco/272c0b18-3a88-4698-8151-fd238e411541/scratchpad/r25';
 export const pages = [['홈','index.html'],['일자 목록','course/spring/README.html'],['일자','course/spring/D05.html'],['지도','course/map.html'],['Java','course/java/J05.html'],['티켓','course/tickets/B01.html'],['출발 자료','course/start/README.html'],['개념','docs/knowledge/README.html'],['서비스 만들기','scenario/README.html'],['실전 미션','practice/MISSIONS.html'],['과정 안내','course/README.html'],['레슨','lessons/README.html'],['구현 티켓','tickets/README.html'],['설정 탭','course/spring/D01.html#step-d01-2'],['저장 설정','course/spring/D05.html#step-d05-2'],['더미 데이터','course/start/dummy/README.html'],['운영 실습','course/start/ops/README.html'],['서비스 상세','scenario/ch0-first-steps/0-1-ts-to-java.html'],['개념 상세','docs/knowledge/P16-json-jackson-practical.html'],['저장 진도 홈','index.html'],['선택 티켓 일자','course/spring/D14.html'],['입력 검증 상세','scenario/ch1-create-post/1-5-validation.html'],['DB 실습 상세','scenario/db-query-journey/db-01-response-to-query.html'],['JWT 상세','scenario/ch10-project/10-4-login-jwt.html']];
 await fs.mkdir(path.join(out,stage),{recursive:true});
-const browser = await chromium.launch({headless:true});
+const server = await startCheckServer();
+const base = server.base;
+let browser;
 const results=[];
 try {
+  browser = await chromium.launch({headless:true});
   for (const [index,[type,file]] of pages.entries()) {
     const context=await browser.newContext({viewport:{width:1440,height:900},colorScheme:'dark'});
     const page=await context.newPage(); const errors=[];
@@ -64,6 +64,6 @@ try {
     await page.screenshot({path:path.join(out,stage,`${index}-final.png`),fullPage:index===0});
     await context.close();
   }
-} finally {await browser.close();}
+} finally {try { await browser?.close(); } finally { await server.close(); }}
 await fs.writeFile(path.join(out,`${stage}.json`),JSON.stringify({date:new Date().toISOString(),base,viewport:{width:1440,height:900},scriptDelayMs:120,intervalMs:40,results},null,2));
 if(stage!=='before')for(const row of results){assert.equal(row.errors.length,0,`${row.file}: pageerror`);assert.equal(row.nav.length,5,`${row.file}: 메뉴 수`);assert.equal(row.navOverflow,0,`${row.file}: 메뉴 넘침`);assert.equal(row.overflow,0,`${row.file}: 화면 넘침`);assert.ok(row.cls<0.00001,`${row.file}: CLS ${row.cls}`);assert.equal(row.flashed,0,`${row.file}: 보였다 사라짐 ${JSON.stringify(row.changed)}`);assert.equal(row.whiteMs,0,`${row.file}: 흰 화면`);assert.equal(row.selectionChanges,0,`${row.file}: 선택 상태 점프`);assert.equal(row.fontChanges,0,`${row.file}: 글꼴 교체`);}
