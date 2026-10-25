@@ -2,7 +2,7 @@
   "version": 1,
   "id": "flush-observation",
   "title": "저장 직후 SQL 조회 결과 확인하기",
-  "summary": "10-12 JPA write와 MyBatis read가 같은 transaction/connection에서 flush 전후에 언제 보이는지 실제 SQL과 응답으로 확인한다.",
+  "summary": "같은 트랜잭션에서 JPA로 바꾼 값이 MyBatis 조회에 언제 보이는지 확인하세요. flush 전·후·commit/rollback 후를 별도 관찰하고 HTTP 응답과 구분합니다.",
   "difficulty": "고급",
   "prerequisites": [
     "posts-create-read"
@@ -26,10 +26,10 @@
             "legacy:10-12"
           ],
           "brief": {
-            "purpose": "10-12 JPA write와 MyBatis read가 같은 transaction/connection에서 flush 전후에 언제 보이는지 실제 SQL과 응답으로 확인한다.",
+            "purpose": "같은 트랜잭션에서 JPA로 바꾼 값이 MyBatis 조회에 언제 보이는지 확인하세요. flush 전·후·commit/rollback 후를 별도 관찰하고 HTTP 응답과 구분합니다.",
             "task": "POST/PUT 뒤 MyBatis listItem이 새 값을 반환하는지, flush 없는 경로는 이전 값이 보이는지, rollback/별도 connection은 다른 시점인지 구분한다.",
             "preconditions": [
-              "10-7 listItem fields를 확인하고 project-v1 post39 또는 실제 capture id를 사용한다.",
+              "원문 10-12는 선택 과제입니다. 두 기술을 같은 트랜잭션에서 쓰는 관찰을 선택했을 때만 수행하고, 미선택은 미완료와 구분.",
               "같은 transaction에서 JPA와 MyBatis가 함께 실행되도록 실습 설정을 확인한다."
             ],
             "scenario": [
@@ -65,7 +65,7 @@
               "Same transaction connection can observe flushed write; another DB client cannot observe before commit; rollback undoes DB update."
             ],
             "inputs": [
-              "PUT /api/v1/posts/39 title=\"[채점] 10-12 수정 후\", tags=[\"after\"], visibility=\"PRIVATE\".",
+              "원문 P 생성 응답의 실제 data.id를 U/G와 관찰 SQL에 재사용합니다. post39는 별도로 준비한 경우에만 씁니다. 외부 DB 관찰 연결의 격리 수준·트랜잭션 시작 시각·조회 시각을 기록.",
               "Control request without flush on disposable test code: expected mapper old title/tags `check`,`flush`; JPA response detail new values.",
               "Invalid title blank or tags beyond 5 / blank tag; rollback observation."
             ],
@@ -96,7 +96,7 @@
                 "title": "Flush before read",
                 "start": "post39 old title and tags [check,flush]",
                 "action": "PUT title=[채점] 10-12 수정 후, tags=[after], visibility=PRIVATE",
-                "result": "200; MyBatis listItem reads new values after flush; commit still pending"
+                "result": "트랜잭션 내부에서 flush 뒤 MyBatis 조회가 새 title/tags/visibility를 읽는 것을 SQL 로그와 함께 관찰합니다. 이 시점과 트랜잭션 종료 후 브라우저가 받은 HTTP 200을 분리해서 기록."
               },
               {
                 "title": "Read before flush control",
@@ -122,15 +122,15 @@
               "POST/PUT response listItem contract and invalid-input no-write confirmed."
             ],
             "hints": [
-              "If JPA detail is new but MyBatis listItem is old, which database operation should appear before the mapper SELECT?",
-              "After flush but before commit, should an unrelated database connection see the uncommitted row?",
-              "When rollback follows flush, what value should a fresh connection observe after transaction end?"
+              "JPA detail은 새 값인데 MyBatis listItem은 이전 값이라면 SELECT 전 어떤 SQL이 실행됐는지 볼까요?",
+              "flush 뒤 commit 전의 내부 연결과 별도 연결은 각각 무엇을 볼 수 있나요?",
+              "rollback 종료 후 새 연결에서 읽은 값이 이전 값인지 어떻게 확인할까요?"
             ]
           },
           "hints": [
-            "If JPA detail is new but MyBatis listItem is old, which database operation should appear before the mapper SELECT?",
-            "After flush but before commit, should an unrelated database connection see the uncommitted row?",
-            "When rollback follows flush, what value should a fresh connection observe after transaction end?"
+            "JPA detail은 새 값인데 MyBatis listItem은 이전 값이라면 SELECT 전 어떤 SQL이 실행됐는지 볼까요?",
+            "flush 뒤 commit 전의 내부 연결과 별도 연결은 각각 무엇을 볼 수 있나요?",
+            "rollback 종료 후 새 연결에서 읽은 값이 이전 값인지 어떻게 확인할까요?"
           ],
           "recipeIds": [
             "legacy:10-12:L",

@@ -143,7 +143,7 @@ function resolvePath(pathValue, params) {
   const path = pathValue.replace(/\{([A-Za-z][A-Za-z0-9_]*)\}/g, (_, key) => {
     const value = params[key];
     if (value == null || String(value) === '') throw new Error(`${key} 값을 입력해 주세요.`);
-    if (/(?:^id$|id$)/i.test(key) && !/^[1-9][0-9]*$/.test(String(value))) throw new Error(`${key}는 0으로 시작하지 않는 양의 정수 ID여야 합니다.`);
+    if (/(?:^id$|id$)/i.test(key) && !/^(?:[1-9][0-9]*|[A-Za-z][A-Za-z0-9._:-]{0,127})$/.test(String(value))) throw new Error(`${key}는 0으로 시작하지 않는 양의 정수 ID 또는 안전한 자원 ID 문자열이어야 합니다.`);
     return encodeURIComponent(String(value));
   });
   if (/[{}]/.test(path)) throw new Error('경로의 변수 값을 확인해 주세요.');
@@ -259,5 +259,5 @@ function hasJsonPath(object, path) {
 
 function validResourceId(value) {
   if (typeof value === 'number') return Number.isSafeInteger(value) && value > 0 ? String(value) : null;
-  return typeof value === 'string' && /^[1-9][0-9]*$/.test(value) ? value : null;
+  return typeof value === 'string' && /^(?:[1-9][0-9]*|[A-Za-z][A-Za-z0-9._:-]{0,127})$/.test(value) ? value : null;
 }

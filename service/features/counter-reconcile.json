@@ -2,7 +2,7 @@
   "version": 1,
   "id": "counter-reconcile",
   "title": "실제 관계와 어긋난 숫자 바로잡기",
-  "summary": "8-5 ADMIN recount에서 실제 post_like 및 nondeleted comment 관계와 counter 불일치만 집합 갱신한다.",
+  "summary": "게시글의 좋아요·댓글 숫자가 실제 관계 수와 다른 행만 고치세요. 운영자 실행 후 불일치가 0이고 두 번째 실행은 값을 더 바꾸지 않으면 끝입니다.",
   "difficulty": "고급",
   "prerequisites": [
     "likes",
@@ -27,7 +27,7 @@
             "legacy:8-5"
           ],
           "brief": {
-            "purpose": "8-5 ADMIN recount에서 실제 post_like 및 nondeleted comment 관계와 counter 불일치만 집합 갱신한다.",
+            "purpose": "게시글의 좋아요·댓글 숫자가 실제 관계 수와 다른 행만 고치세요. 운영자 실행 후 불일치가 0이고 두 번째 실행은 값을 더 바꾸지 않으면 끝입니다.",
             "task": "실행 전 mismatch SELECT 결과를 기록하고 tok-p01로 POST /api/admin/recount, 재검사해 D1/D2=0 및 두 번째 실행 무변화를 확인한다.",
             "preconditions": [
               "학습용 practice DB에서만 작업하고 post별 like_count/comment_count와 relation aggregates를 먼저 읽는다.",
@@ -71,7 +71,7 @@
               "repeat SELECT and endpoint; then ordinary member and no token."
             ],
             "success": [
-              "D1 active like_count mismatch=0; D2 live comment_count mismatch=0.",
+              "ADMIN의 POST /api/admin/recount는 200이며 likeFixed/commentFixed에 보정 내역을 돌려줍니다. 원문 fixture의 글 93 like_count는 6→4, 글 22 comment_count는 9→8입니다. 이미 보정했다면 두 배열은 비어야 합니다.",
               "repeated recount produces no further count changes.",
               "deleted posts remain outside update."
             ],
@@ -123,15 +123,15 @@
               "401/403 keep counts and second run is stable."
             ],
             "hints": [
-              "Which table is the source of truth for like_count if the cached column is already wrong?",
-              "Should a soft-deleted comment contribute to comment_count under the D2 check?",
-              "How can before-select IDs and affected row count prove the batch changed only rows that needed repair?"
+              "캐시된 like_count가 이미 틀렸다면 어느 관계 행 수를 기준으로 삼아야 할까요?",
+              "삭제된 댓글이 D2의 comment_count에 포함되면 어떤 차이가 생길까요?",
+              "보정 전 SELECT의 id와 실제 변경 행을 대조하면 무관한 글을 바꾸지 않았음을 어떻게 확인할까요?"
             ]
           },
           "hints": [
-            "Which table is the source of truth for like_count if the cached column is already wrong?",
-            "Should a soft-deleted comment contribute to comment_count under the D2 check?",
-            "How can before-select IDs and affected row count prove the batch changed only rows that needed repair?"
+            "캐시된 like_count가 이미 틀렸다면 어느 관계 행 수를 기준으로 삼아야 할까요?",
+            "삭제된 댓글이 D2의 comment_count에 포함되면 어떤 차이가 생길까요?",
+            "보정 전 SELECT의 id와 실제 변경 행을 대조하면 무관한 글을 바꾸지 않았음을 어떻게 확인할까요?"
           ],
           "recipeIds": [
             "legacy:8-5:X1",
@@ -144,7 +144,7 @@
               "title": "선택한 원문 recipe 실행",
               "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
               "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
-              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+              "record": "원문 8-5의 D1/D2 불일치 SELECT를 실행 전후 연결합니다. post id·deleted_at·like_count·comment_count와 실제 post_like/미삭제 comment 집계를 비교하여 전후 후보 id, 변경 수, 401/403 후 불변을 기록."
             }
           ],
           "concepts": [

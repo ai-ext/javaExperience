@@ -63,6 +63,14 @@ test('catalog renders one feature card, grouping, filters, Explorer routes and c
   assert.equal((withRoutes.match(/data-sf-api-row data-sf-method=/g) || []).length, 1);
 });
 
+test('catalog search includes original day id, title, and aliases for linked course units', () => {
+  const source={id:'course:D30-1',kind:'course',title:'계약을 실행 가능한 호환 테스트로 고정',dayId:'D30',dayTitle:'API 변경 협의와 하위 호환',searchAliases:['D30','API 변경 협의와 하위 호환','하위','호환']};
+  const linked={...feature,variants:[{...feature.variants[0],stages:[{...feature.variants[0].stages[0],sourceUnits:['course:D30-1']}]}]};
+  const html=renderServiceCatalog({features:[linked],sourceIndex:{units:[...sourceIndex.units,source]},apiRecipes:[],rootPrefix:'../'});
+  const searchText=html.match(/data-sf-search="([^"]*)"/)[1];
+  for(const term of ['D30','API 변경 협의와 하위 호환','하위','호환'])assert.ok(searchText.includes(term),term);
+});
+
 test('feature renderer exposes full brief without script, hides hints until a click, and preserves root-relative references', () => {
   const html = renderServiceFeature({ feature, features: [feature, { id: 'members-auth', title: '회원 가입과 로그인' }], sourceIndex, apiRecipes: [recipe, relatedRecipe], rootPrefix: '../../' });
   assert.equal((html.match(/data-sf-stage-panel/g) || []).length, 2);

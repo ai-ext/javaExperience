@@ -2,7 +2,7 @@
   "version": 1,
   "id": "api-docs",
   "title": "내 API를 실행 가능한 문서로 공개하기",
-  "summary": "OpenAPI 문서가 실제 요청·응답 계약과 일치하고 사용자가 직접 실행할 수 있게 한다.",
+  "summary": "사용자가 문서에서 API를 실행할 수 있게 하고, 공개용 문서에는 사용자 API만 보여 주세요. 실제 정상·오류 응답과 문서의 상태 코드·필드를 맞추면 끝입니다.",
   "difficulty": "중급",
   "group": "개발과 검증",
   "prerequisites": [
@@ -27,7 +27,7 @@
             "legacy:13-7"
           ],
           "brief": {
-            "purpose": "OpenAPI 문서가 실제 요청·응답 계약과 일치하고 사용자가 직접 실행할 수 있게 한다.",
+            "purpose": "사용자가 문서에서 API를 실행할 수 있게 하고, 공개용 문서에는 사용자 API만 보여 주세요. 실제 정상·오류 응답과 문서의 상태 코드·필드를 맞추면 끝입니다.",
             "task": "Swagger UI와 사용자용 API 그룹을 구성하고 명세와 검증 결과를 맞춘다.",
             "preconditions": [
               "시나리오 DB(`community`) — 앱을 기본 프로파일로 띄운다.",
@@ -55,7 +55,7 @@
               "API path/method/status/error schema와 bearer 인증 표시는 실제 controller/security 설정을 따른다. 원문에 없는 endpoint를 추가하지 않는다. 문서 그룹은 사용자용 먼저."
             ],
             "inputs": [
-              "legacy:13-7:A: GET /v3/api-docs/public; case=사용자용 문서(JSON); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"A\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.openapi\",\"matches\":\"^3\\\\.1\\\\.\"},{\"path\":\"$.info.title\",\"equals\":\"javaExperience 게시판 API\"},{\"path\":\"$.components.securitySchemes.bearerAuth.type\",\"equals\":\"http\"},{\"path\":\"$.components.securitySchemes.bearerAuth.scheme\",\"equals\":\"bearer\"},{\"path\":\"$.paths./api/posts.post\",\"exists\":true},{\"path\":\"$.paths./api/posts/{id}.get\",\"exists\":true}]}},{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"A\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.paths./api/reports.post.summary\",\"equals\":\"글·댓글 신고\"},{\"path\":\"$.paths./api/reports.post.responses.409.description\",\"equals\":\"이미 신고함\"},{\"path\":\"$.paths./api/reports.post.responses.400\",\"exists\":true},{\"path\":\"$.paths./api/me/notifications.get.parameters[*].name\",\"contains\":\"unreadOnly\"},{\"path\":\"$.paths./api/me/notifications.get.parameters[*].name\",\"contains\":\"size\"},{\"path\":\"$.paths./api/me/notifications.get.parameters[*].name\",\"contains\":\"cursor\"},{\"path\":\"$.paths./api/me/notifications.get.parameters[*].name\",\"notContains\":\"me\"},{\"path\":\"$.paths./api/reports.post.parameters\",\"exists\":false}]}},{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"A\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.paths./api/admin/reports\",\"exists\":false},{\"path\":\"$.paths./api/admin/posts/{id}/status\",\"exists\":false}]}}]",
+              "GET /v3/api-docs/public은 200이며 openapi는 3.1.x, info.title은 javaExperience 게시판 API, bearerAuth는 type=http/scheme=bearer입니다. public에는 글·신고 API가 있고 운영자 API는 없습니다. admin 문서에는 운영자 API가 있고 /api/posts는 없습니다. Swagger 기본 그룹은 public.",
               "legacy:13-7:B: GET /v3/api-docs/admin; case=운영용 문서(JSON); source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"B\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.paths./api/admin/reports.get\",\"exists\":true},{\"path\":\"$.paths./api/admin/reports/resolve.post\",\"exists\":true},{\"path\":\"$.paths./api/posts\",\"exists\":false}]}}]",
               "legacy:13-7:S: GET /v3/api-docs/swagger-config; case=Swagger UI 설정; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"S\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.urls[*].name\",\"contains\":\"public\"},{\"path\":\"$.urls[*].name\",\"contains\":\"admin\"}],\"bodyText\":{\"contains\":\"\\\"urls.primaryName\\\":\\\"public\\\"\"}}}]",
               "legacy:13-7:U: GET /swagger-ui/index.html; case=Swagger UI 화면; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"U\",\"expect\":{\"status\":200,\"headers\":{\"Content-Type\":{\"contains\":\"text/html\"}},\"bodyText\":{\"contains\":\"swagger-ui\"}}}]"
@@ -76,6 +76,10 @@
                 "start": "사용자용 API와 운영자용 API가 실제 서버에 구현돼 있습니다.",
                 "action": "/v3/api-docs/public과 원본 문서 경로를 열어 실제 operation·입력·응답·Bearer 설정을 비교합니다.",
                 "result": "문서의 경로·필드·오류 예시와 실제 서버의 응답을 대조합니다. 명세 파일이 열린 것만으로 모든 API 실행 완료로 표시하지 않습니다."
+              },
+              {
+                "title": "구체 값과 전후 비교",
+                "description": "문서의 POST /api/reports 설명에서 중복 신고 409의 설명이 이미 신고함인지 확인합니다. 실제 신고 요청의 정상/중복 사례를 관련 기능에서 실행하고 status와 오류 필드를 문서와 비교합니다. 문서 경로 자체의 실패 코드는 원본 확인 필요."
               }
             ],
             "work": [
@@ -98,7 +102,14 @@
             "legacy:13-7:S",
             "legacy:13-7:U"
           ],
-          "executionChecks": [],
+          "executionChecks": [
+            {
+              "title": "명세와 실제 API의 입력·응답 맞추기 · 결과 대조",
+              "command": "원문과 내 프로젝트에서 확정한 실제 실행 명령을 기록합니다. 미확정 명령은 실행 완료로 표시하지 않습니다.",
+              "expected": "이 단계의 정상·실패·보존 기준과 실제 결과를 구분합니다.",
+              "record": "문서에 기재한 업무 요청 1개 이상의 정상·실패 응답을 실제 서버와 비교해 method/path/status/필드의 차이를 기록합니다. 업무 DB는 해당 요청의 보존 기준으로 확인하고 문서 GET 자체에는 쓰기 SQL을 요구하지 않습니다."
+            }
+          ],
           "choices": [],
           "concepts": [],
           "references": [

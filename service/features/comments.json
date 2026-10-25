@@ -2,7 +2,7 @@
   "version": 1,
   "id": "comments",
   "title": "글에 댓글과 답글 남기기",
-  "summary": "course D05의 댓글 관계 테이블과 작성·목록·삭제 API를 연결해 글별 댓글의 안정적 순서를 확인한다.",
+  "summary": "글에 댓글을 남기고 목록에서 확인한 뒤 삭제하세요. 답글·수정·삭제 표시는 선택한 프로젝트의 계약에 따라 확인합니다.",
   "difficulty": "기초",
   "prerequisites": [
     "posts-create-read"
@@ -31,10 +31,10 @@
             "course:D05-4"
           ],
           "brief": {
-            "purpose": "course D05의 댓글 관계 테이블과 작성·목록·삭제 API를 연결해 글별 댓글의 안정적 순서를 확인한다.",
+            "purpose": "글에 댓글을 남기고 목록에서 확인한 뒤 삭제하세요. 답글·수정·삭제 표시는 선택한 프로젝트의 계약에 따라 확인합니다.",
             "task": "글 3에 댓글을 작성하고 목록·삭제를 실행해 생성한 commentId와 postId 관계를 검증한다.",
             "preconditions": [
-              "spec-board course recipe를 선택한다. 글과 회원 id는 실제 API 응답/fixture에서 확인한다.",
+              "board 과정 프로젝트의 댓글 계약을 사용합니다. project-v1의 /api/v1 경로와 응답 wrapper를 섞지 않습니다. postId와 commentId는 각각 실제 응답/fixture에서 확인합니다.",
               "요구된 DB 설계는 직접 선택하되 comment가 없는 글과 여러 댓글이 있는 글을 준비한다."
             ],
             "scenario": [
@@ -61,7 +61,7 @@
             ],
             "policies": [
               "course D05-3/4가 정한 안정적 댓글 순서와 relationship은 유지한다.",
-              "작성은 토큰 주체 author를 사용한다. 댓글 없는 응답은 빈 배열 []이며 만들어낸 placeholder를 추가하지 않는다.",
+              "댓글 목록은 {items:[],nextCursor:null} 형태의 CommentPage입니다. 내용은 공백 불가·최대 500자이며 작성자는 토큰에서 결정합니다. 작성자 또는 ADMIN 삭제는 204, 다른 USER 삭제는 403입니다.",
               "삭제는 course API recipe의 DELETE /api/comments/{commentId} contract를 따른다."
             ],
             "inputs": [
@@ -118,7 +118,7 @@
               "실패 요청 전후 댓글 수를 읽는다."
             ],
             "done": [
-              "작성201·목록200·삭제204가 course recipe와 일치한다.",
+              "비인증 목록 GET 200, 댓글 20개에서 SQL 2회 이하, 작성 201·본인/ADMIN 삭제 204·타인 삭제 403을 확인합니다. commentId와 부모 postId를 구별해 실패 전후 댓글 행 수를 대조.",
               "빈 목록 및 post/member FK 정책을 확인했다.",
               "실패 후 댓글 데이터가 보존됐다."
             ],
@@ -315,7 +315,7 @@
               "title": "선택한 원문 recipe 실행",
               "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
               "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
-              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+              "record": "post 11의 부모 id1·답글 id2/id5·삭제 id4/id6 및 viewer 차단 관계를 원문 5-3 fixture와 대조합니다. 댓글 201 뒤 실제 id를 사용하고 삭제된 부모의 placeholder와 남은 답글 id를 함께 기록."
             }
           ],
           "concepts": [
@@ -521,7 +521,7 @@
               "title": "선택한 원문 recipe 실행",
               "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
               "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
-              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+              "record": "comment 11의 content·edited_at을 PATCH 전후 SELECT로 비교합니다. A→B는 새 시각, B→B는 기존 시각, 1001자는 400이며 B/기존 시각 유지입니다. 목록 top/reply의 edited와 삭제 placeholder의 edited=false도 비교."
             }
           ],
           "concepts": [
@@ -614,7 +614,7 @@
             ],
             "inputs": [
               "POST /api/v1/posts/28/comments {content:\"[채점] 첫 댓글\"}.",
-              "reply {content:\"답글 A\",parentId:<top comment id>}; failure parentId=42.",
+              "post 28에서 생성한 실제 top-level commentId를 답글 parentId로 사용합니다. 답글의 실제 id를 다시 parentId로 보내면 400입니다. 삭제는 /api/v1/comments/{commentId}의 200, data:null이며 부모 삭제 후 보이는 답글은 유지.",
               "GET list; DELETE /api/v1/comments/{own id}."
             ],
             "success": [

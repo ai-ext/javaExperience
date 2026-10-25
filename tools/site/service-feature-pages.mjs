@@ -273,11 +273,14 @@ export function renderServiceCatalog({ features = [], sourceIndex = [], apiRecip
     const uniqueStages = new Set(stages.map(({ stage }) => stage.id || stage.title));
     const recipesForFeature = [...new Set(stages.flatMap(({ stage }) => list(stage.recipeIds)))].map((id) => apiRecipes.find((recipe) => recipe.id === id)).filter(Boolean);
     const apiCount = new Set(recipesForFeature.map((recipe) => `${recipe.project}\u0000${recipe.method}\u0000${recipe.path}`)).size;
-    const sourceTitles = stages.flatMap(({ stage }) => list(stage.sourceUnits).map((id) => sourceEntries(sourceIndex).find((unit) => unit.id === id)?.title || id));
+    const sourceTerms = stages.flatMap(({ stage }) => list(stage.sourceUnits).flatMap((id) => {
+      const source = sourceEntries(sourceIndex).find((unit) => unit.id === id);
+      return [id, source?.title, source?.dayId, source?.dayTitle, ...list(source?.searchAliases)].filter(Boolean);
+    }));
     const apiPaths = stages.flatMap(({ stage }) => list(stage.recipeIds).map((id) => apiRecipes.find((recipe) => recipe.id === id)?.path || id));
     const preview = featurePreview(feature).replace(/src="([^"]+)"/, (_, asset) => `src="${esc(linkHref(asset, rootPrefix))}"`);
     const group = feature.group || '서비스 기능';
-    const markup = `<article class="sf-feature-card" data-sf-feature-card data-sf-id="${esc(feature.id)}" data-sf-difficulty="${esc(feature.difficulty || '')}" data-sf-projects="${esc(featureProjects.join('|'))}" data-sf-group="${esc(group)}" data-sf-search="${esc([feature.id, feature.title, feature.summary, group, ...featureProjects, ...list(feature.prerequisites), ...sourceTitles, ...apiPaths].join(' '))}">
+    const markup = `<article class="sf-feature-card" data-sf-feature-card data-sf-id="${esc(feature.id)}" data-sf-difficulty="${esc(feature.difficulty || '')}" data-sf-projects="${esc(featureProjects.join('|'))}" data-sf-group="${esc(group)}" data-sf-search="${esc([feature.id, feature.title, feature.summary, group, ...featureProjects, ...list(feature.prerequisites), ...sourceTerms, ...apiPaths].join(' '))}">
       <a class="sf-card-preview" href="${esc(href)}">${preview}</a><div class="sf-card-body"><div class="sf-card-meta"><span>${esc(group)}</span><span>${esc(feature.difficulty || '난이도 미정')}</span>${feature.status === 'authored' ? '<span class="sf-authored">기획서 작성</span>' : '<span class="sf-draft">기획 중</span>'}<span data-sf-progress-badge hidden>진행 기록 있음</span></div><h3><a href="${esc(href)}">${esc(feature.title)}</a></h3><p>${esc(feature.summary || '')}</p><dl><div><dt>먼저</dt><dd>${prerequisiteMarkup(feature.prerequisites, feature.id, authored, rootPrefix)}</dd></div><div><dt>프로젝트</dt><dd>${featureProjects.map(esc).join(' · ') || '프로젝트 미정'}</dd></div></dl><footer><span>${uniqueStages.size}개 단계 · API ${apiCount}개</span><a href="${esc(href)}">기획서 열기 →</a></footer></div></article>`;
     return { group, markup };
   });

@@ -29,6 +29,13 @@ const ALLOWED_VALUES = Object.freeze({
   paymentKey: 'payment-demo',
   orderId: '',
 });
+// D10 원문은 가입 성공 201을 본문 규칙으로 명시하고 check 표의 상태칸만 비워 둔다.
+// O1은 채점 제외 관찰이므로 자동 기대 상태를 추가하지 않는다.
+const LEGACY_EXPECTED_STATUS_OVERRIDES = Object.freeze({
+  'legacy:10-3:A': [201],
+  'legacy:10-3:B1': [201],
+  'legacy:10-3:B2': [201],
+});
 const DEFAULT_PATH_VALUES = Object.freeze({ couponId: '1' });
 
 function refsFor(sourcePath, pointer, other = []) {
@@ -177,10 +184,29 @@ export function normalizedSourceProject(levelId, project, routePath = '') {
 
 function outputFields(bodyDescription) {
   if (/(?:Response|Page|Item)\[\]/.test(String(bodyDescription || ''))) return [];
-  const braces = String(bodyDescription || '').match(/\{([^{}]+)\}/g) || [];
+  const text = String(bodyDescription || '');
+  const objectStart = text.indexOf('{');
+  if (objectStart < 0) return [];
+  let depth = 0, objectEnd = -1;
+  for (let index = objectStart; index < text.length; index += 1) {
+    if (text[index] === '{') depth += 1;
+    else if (text[index] === '}' && --depth === 0) { objectEnd = index; break; }
+  }
+  if (objectEnd < 0) return [];
+  const root = text.slice(objectStart + 1, objectEnd);
+  const entries = [];
+  let start = 0, nested = 0;
+  for (let index = 0; index <= root.length; index += 1) {
+    if (root[index] === '{' || root[index] === '[') nested += 1;
+    else if (root[index] === '}' || root[index] === ']') nested -= 1;
+    else if ((root[index] === ',' || index === root.length) && nested === 0) {
+      entries.push(root.slice(start, index));
+      start = index + 1;
+    }
+  }
   const fields = [];
-  for (const group of braces) for (const raw of group.slice(1, -1).split(',')) {
-    const name = raw.trim().replace(/\[\]$/, '');
+  for (const entry of entries) {
+    const name = entry.trim().split(':', 1)[0].replace(/\[\]$/, '');
     if (/^[A-Za-z_$][\w$]*$/.test(name)) fields.push(name);
   }
   return unique(fields);
@@ -209,6 +235,10 @@ function boardRecipe(endpoint, courseContractByEndpoint, endpointIndex, sourceIn
   const isMultipart = sourceFields.some((field) => field.in === 'multipart/form-data' || field.type === 'xlsx file');
   const bodyKind = isMultipart ? 'multipart' : bodyType;
   const { headers, manualCheck } = requestHeaders(endpoint, bodyKind);
+  const successBody = String(endpoint.success?.body || '');
+  if (/\[[^\]]*\]|;\s*\w+\s*\{/.test(successBody)) {
+    manualCheck.push('응답 자동 확인은 JSON 최상위 필드까지입니다. 배열 원소·중첩 DTO는 기대 응답 설명과 실제 JSON을 직접 비교하세요.');
+  }
   const query = {};
   const requiredQuery = fieldsByLocation(sourceFields, 'query').filter((field) => field.required).map((field) => field.name);
   const statuses = expectedStatuses(endpoint.success?.status);
@@ -262,7 +292,7 @@ function boardRecipe(endpoint, courseContractByEndpoint, endpointIndex, sourceIn
     expected: {
       statuses,
       bodyMode,
-      description: endpoint.success?.body || '',
+      description: successBody,
       fields: outputFields(endpoint.success?.body),
       sourceStatusText: endpoint.success?.status,
       sourceChecks: sourceCourseChecks,
@@ -350,7 +380,10 @@ function parseLegacyManifests() {
         }
         const body = request.body ?? null;
         const bodyKind = body == null ? 'none' : typeof body === 'string' ? (looksLikeJson(body) ? 'json' : 'text') : 'json';
-        const statuses = unique(checksForRequest.flatMap(({ assertion }) => expectedStatuses(assertion.expect?.status)));
+        const statuses = unique([
+          ...checksForRequest.flatMap(({ assertion }) => expectedStatuses(assertion.expect?.status)),
+          ...(LEGACY_EXPECTED_STATUS_OVERRIDES[caseId] || []),
+        ]);
         const sourceChecks = checksForRequest.map(({ check, checkIndex, assertion }) => ({
           id: check.id || `check-${checkIndex + 1}`,
           pointer: `/checks/${checkIndex}`,
@@ -363,6 +396,8 @@ function parseLegacyManifests() {
         const classification = legacyClassification(request, sourceChecks);
         const manualBindings = manualBindingsForRequest(request);
         const requiredFields = body && typeof body === 'object' && !Array.isArray(body) ? Object.keys(body) : [];
+        const capturesSignupId = ['A', 'B1', 'B2'].includes(request.id)
+          && String(sourceUnitId) === 'legacy:10-3' && request.method === 'POST' && request.path === '/api/v1/users';
         const recipe = {
           id: caseId, caseId, label: request.title || `${levelTitle} · ${request.id}`,
           project, method: request.method, path: request.path,
@@ -377,7 +412,7 @@ function parseLegacyManifests() {
             description: describeSourceChecks(sourceChecks) || (classification === 'preparation-without-assertion'
               ? '준비 요청입니다. 원문에 연결된 자동 기대 상태가 없으므로 실행 결과를 따로 기록하세요.'
               : '원문에 연결된 기대 상태가 없습니다. 응답을 직접 확인하고 기록하세요.'),
-            fields: [], sourceChecks, assertions,
+            fields: capturesSignupId ? ['data.id'] : [], sourceChecks, assertions,
             assertionSupport: { httpStatus: statuses.length > 0 ? 'automatic' : 'unavailable', jsonPath: 'manual', responseHeaders: 'manual' },
           },
           sourceCases: [],
@@ -388,9 +423,10 @@ function parseLegacyManifests() {
             sourceChecks.map((check) => ({ path: sourcePath, pointer: `/check-blocks/${blockNo - 1}${check.pointer}` }))),
           sourceUnits: [sourceUnitId],
           classification,
+          ...(capturesSignupId ? { capture: { key: 'userId', jsonPath: 'data.id' } } : {}),
           ...(manualBindings.length ? { manualBindings, needsInput: unique(manualBindings.map((item) => item.name)) } : {}),
         };
-        if (!checksForRequest.length) recipe.needsReview = [{ reason: classification === 'preparation-without-assertion'
+        if (!checksForRequest.length && !statuses.length) recipe.needsReview = [{ reason: classification === 'preparation-without-assertion'
           ? '준비 요청이라 이 요청 자체의 기대 상태를 원문에서 확인할 수 없습니다.'
           : '연결된 원문 check가 없어 기대 상태를 채우지 않았습니다.', classification }];
         else if (!statuses.length && assertions.length) recipe.needsReview = [{ reason: '원문 JSON/header assertion은 보존했지만 HTTP 상태 코드는 이 요청에 연결되어 있지 않습니다.', classification }];
