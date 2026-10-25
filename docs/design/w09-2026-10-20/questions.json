@@ -1,0 +1,280 @@
+{
+  "source": "docs/knowledge/W09-why-dto.md",
+  "sourceSHA256": "168007fa2f8a3205c00186c9e96c11dc826aa235baff5076237a07a3997b8468",
+  "questions": [
+    {
+      "id": "session",
+      "question": "Session이 닫히면 DB 행도 사라질까?",
+      "source": "격리 추가 실험 · Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 / Jackson 3.1.5 / MapStruct 1.6.3 · W09Proof의 closed/open/observer 실험",
+      "note": "추가 fixture의 주문 id=1·PAID·고객 Mina·total=12000.00을 사용합니다. 실패한 것은 닫힌 Session을 통한 지연 초기화입니다. 별도 JDBC 연결의 관찰 SELECT는 ORM SQL 계수와 분리합니다. 각 새 Session 실험을 같은 연결의 연속 상태로 섞지 않습니다. MySQL·Boot·OSIV 요청·실제 HTTP·Java 25·Spring Data Repository는 미실행입니다.",
+      "stages": [
+        {
+          "id": "session-find",
+          "title": "find 뒤 연관은 미초기화",
+          "image": "W09-session-v3.png",
+          "checks": [
+            "closed-initial-customer-lazy",
+            "closed-initial-items-lazy"
+          ],
+          "sqlPhases": [
+            "closedFindSql[0] · 바인딩값 미기록"
+          ]
+        },
+        {
+          "id": "session-closed",
+          "title": "Session 종료 뒤 getter 실패",
+          "image": "W09-session-v3.png",
+          "checks": [
+            "closed-session-lazy-error",
+            "closed-error-no-query"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "session-observer",
+          "title": "별도 JDBC로는 같은 행 관찰",
+          "image": "W09-session-v3.png",
+          "checks": [
+            "closed-independent-observer-row"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "session-open",
+          "title": "새 열린 Session에서는 고객 조회",
+          "image": "W09-session-v3.png",
+          "checks": [
+            "open-before-customer-lazy",
+            "open-customer-name",
+            "open-getter-one-query"
+          ],
+          "sqlPhases": [
+            "openGetterSql[0] · 바인딩값 미기록"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/w09-2026-10-20/source-proof/execution.json",
+        "docs/design/w09-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "serialization",
+      "question": "엔티티를 JSON으로 쓰다가 SQL도 실행될까?",
+      "source": "격리 추가 실험 · Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 / Jackson 3.1.5 / MapStruct 1.6.3 · 열린 Session 직렬화 / 별도 plain 순환 실험",
+      "note": "전체 writeValueAsString 실행 뒤 entitySerializationSql[0]은 고객, [1]은 항목 SELECT였으며 누계 2입니다. 첫 세 장면은 이 종단 관측과 원문 getter·LAZY 관계를 연결한 설명 구간입니다. 고객과 항목 연관은 둘 다 OrderEntity에서 읽으며 그림의 단계간 화살표는 읽는 순서를 나타냅니다. getter마다 멈춘 줄 계측이 아닙니다. 원시 SQL에는 바인딩값이 기록되지 않았습니다. 별도 plain 순환 객체도 같은 계열 예외를 확인했습니다. MySQL·Boot·OSIV 요청·실제 HTTP·Java 25·Spring Data Repository는 미실행입니다.",
+      "stages": [
+        {
+          "id": "serialization-start",
+          "title": "추가 조회를 세기 전",
+          "image": "W09-serialization-v3.png",
+          "checks": [],
+          "sqlPhases": []
+        },
+        {
+          "id": "serialization-customer",
+          "title": "customer를 읽는 연결",
+          "image": "W09-serialization-v3.png",
+          "checks": [],
+          "sqlPhases": [
+            "entitySerializationSql[0] · 바인딩값 미기록"
+          ]
+        },
+        {
+          "id": "serialization-items",
+          "title": "items를 읽고 order로 돌아가는 연결",
+          "image": "W09-serialization-v3.png",
+          "checks": [
+            "entity-serialization-triggered-query"
+          ],
+          "sqlPhases": [
+            "entitySerializationSql[0] · 바인딩값 미기록",
+            "entitySerializationSql[1] · 바인딩값 미기록"
+          ]
+        },
+        {
+          "id": "serialization-failed",
+          "title": "실행 종단: 예외로 완성 실패",
+          "image": "W09-serialization-v3.png",
+          "checks": [
+            "entity-serialization-fails",
+            "plain-bidirectional-cycle-fails"
+          ],
+          "sqlPhases": [
+            "entitySerializationSql[0] · 바인딩값 미기록",
+            "entitySerializationSql[1] · 바인딩값 미기록"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/w09-2026-10-20/source-proof/execution.json",
+        "docs/design/w09-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "public-contract",
+      "question": "엔티티 내부 필드가 JSON에 나올까?",
+      "source": "격리 추가 실험 · Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 / Jackson 3.1.5 / MapStruct 1.6.3 · plainCustomer / CustomerPublic 추가 실험",
+      "note": "DB fixture 고객의 이메일과 섞지 않습니다. 여기의 별도 plainCustomer는 Mina·m@example.com·internal-only를 넣은 원문 CustomerEntity 객체입니다. 조회나 권한 검사를 수행한 객체가 아닙니다. DTO의 공개 필드 선택과 접근 권한 검증은 별도 책임입니다. MySQL·Boot·OSIV 요청·실제 HTTP·Java 25·Spring Data Repository는 미실행입니다.",
+      "stages": [
+        {
+          "id": "public-entity",
+          "title": "직접 쓰면 세 프로퍼티 공개",
+          "image": "W09-public-contract-v3.png",
+          "checks": [
+            "direct-customer-internal-visible"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "public-dto",
+          "title": "같은 객체에서 name만 복사",
+          "image": "W09-public-contract-v3.png",
+          "checks": [
+            "customer-dto-only-name"
+          ],
+          "sqlPhases": []
+        }
+      ],
+      "evidence": [
+        "docs/design/w09-2026-10-20/source-proof/execution.json",
+        "docs/design/w09-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "query-plan",
+      "question": "수동·MapStruct·projection은 SQL 수가 같을까?",
+      "source": "격리 추가 실험 · Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 / Jackson 3.1.5 / MapStruct 1.6.3 · 추가 3주문 목록 비교",
+      "note": "주문 3개와 서로 다른 고객 3개를 넣고 각 방법을 새 Session에서 실행했습니다. batch fetch=0, 2차 캐시 비활성화 조건입니다. DTO·MapStruct는 조회 계획을 자동으로 만들지 않습니다. 이 수치를 모든 데이터·설정의 결과로 일반화하지 않습니다. 목록 projection은 원문 단건 JPQL의 별도 목록 변형입니다. MySQL·Boot·OSIV 요청·실제 HTTP·Java 25·Spring Data Repository는 미실행입니다.",
+      "stages": [
+        {
+          "id": "query-manual",
+          "title": "수동 매핑도 고객 getter를 읽음",
+          "image": "W09-query-plan-v2.png",
+          "checks": [
+            "list-three-orders",
+            "list-root-one-query",
+            "manual-three-customer-queries"
+          ],
+          "sqlPhases": [
+            "listRootSql[0] · 바인딩값 미기록",
+            "manualMappingSql[0] · 바인딩값 미기록",
+            "manualMappingSql[1] · 바인딩값 미기록",
+            "manualMappingSql[2] · 바인딩값 미기록"
+          ]
+        },
+        {
+          "id": "query-mapstruct",
+          "title": "생성된 mapper도 같은 getter",
+          "image": "W09-query-plan-v2.png",
+          "checks": [
+            "mapstruct-values-equal",
+            "mapstruct-three-customer-queries"
+          ],
+          "sqlPhases": [
+            "mapstructRootSql[0] · 바인딩값 미기록",
+            "mapstructMappingSql[0] · 바인딩값 미기록",
+            "mapstructMappingSql[1] · 바인딩값 미기록",
+            "mapstructMappingSql[2] · 바인딩값 미기록"
+          ]
+        },
+        {
+          "id": "query-projection",
+          "title": "목록 projection은 필요한 값 직접 선택",
+          "image": "W09-query-plan-v2.png",
+          "checks": [
+            "projection-values-equal",
+            "projection-one-query"
+          ],
+          "sqlPhases": [
+            "projectionSql[0] · 바인딩값 미기록"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/w09-2026-10-20/source-proof/execution.json",
+        "docs/design/w09-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "projection",
+      "question": "단건 projection은 무엇을 읽어 DTO로 만들까?",
+      "source": "격리 추가 실험 · Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 / Jackson 3.1.5 / MapStruct 1.6.3 · 원문 단건 JPQL 직접 실행",
+      "note": "원문 생성자 JPQL을 직접 Hibernate에서 실행했습니다. id=1은 추가 fixture 입력이고 선택 스칼라는 네 개입니다. Spring Data Repository 메서드를 실행한 결과가 아닙니다. MySQL·Boot·OSIV 요청·실제 HTTP·Java 25·Spring Data Repository는 미실행입니다.",
+      "stages": [
+        {
+          "id": "projection-query",
+          "title": "원문 단건 JPQL의 네 값",
+          "image": "W09-projection-v4.png",
+          "checks": [
+            "original-single-projection-one-query"
+          ],
+          "sqlPhases": [
+            "originalSingleProjectionSql[0] · 바인딩값 미기록"
+          ]
+        },
+        {
+          "id": "projection-result",
+          "title": "네 값으로 OrderSummary 구성",
+          "image": "W09-projection-v4.png",
+          "checks": [
+            "original-single-projection-values"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "projection-json",
+          "title": "Session 밖에서는 DTO 값만 읽기",
+          "image": "W09-projection-v4.png",
+          "checks": [
+            "dto-values-after-close",
+            "dto-serialization-no-query",
+            "dto-excludes-internal-fields",
+            "projection-serialization-after-close"
+          ],
+          "sqlPhases": []
+        }
+      ],
+      "evidence": [
+        "docs/design/w09-2026-10-20/source-proof/execution.json",
+        "docs/design/w09-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "record",
+      "question": "record 안의 List도 자동으로 불변일까?",
+      "source": "격리 추가 실험 · Hibernate 7.4.5.Final / H2 2.4.240 / JDK 21 / Jackson 3.1.5 / MapStruct 1.6.3 · 별도 ItemList 추가 실험",
+      "note": "ItemList(List<String> items)는 원문 OrderSummary와 별개인 추가 record입니다. record는 참조 필드 재대입을 막지만 참조한 mutable 목록의 내용 변경까지 막지 않습니다. List.copyOf는 구조의 얕은 복사이며 요소 객체까지 복제하지 않습니다. 이 두 상태는 DB·주문항목의 실험이 아닙니다.",
+      "stages": [
+        {
+          "id": "record-shared",
+          "title": "같은 mutable 목록을 공유",
+          "image": "W09-record-v3.png",
+          "checks": [
+            "record-shallow-change"
+          ],
+          "sqlPhases": []
+        },
+        {
+          "id": "record-copied",
+          "title": "복사 뒤 원본만 three 추가",
+          "image": "W09-record-v3.png",
+          "checks": [
+            "record-copy-stays-two"
+          ],
+          "sqlPhases": []
+        }
+      ],
+      "evidence": [
+        "docs/design/w09-2026-10-20/source-proof/execution.json",
+        "docs/design/w09-2026-10-20/browser-all-states.json"
+      ]
+    }
+  ],
+  "remaining": [
+    "요청DTO→Command/소유자권한 검증의 독립 장면",
+    "ModelMapper·interface projection의 개별실행/시안",
+    "Spring Data Repository·Boot OSIV HTTP·MySQL·Java25",
+    "전체시안/실제화면 정밀대조·학습자검증"
+  ]
+}

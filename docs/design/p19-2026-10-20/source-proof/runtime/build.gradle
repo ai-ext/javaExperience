@@ -1,0 +1,45 @@
+plugins { id 'java' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+configurations { originalMain; originalWeb; originalTest; originalMysqlTest; correctedMysqlTest }
+dependencies {
+    implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+    implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'com.h2database:h2'
+    implementation 'com.mysql:mysql-connector-j'
+    implementation 'org.testcontainers:testcontainers-mysql'
+    originalMain platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+    originalMain 'org.springframework.boot:spring-boot-starter-web'
+    originalMain 'org.springframework.boot:spring-boot-starter-data-jpa'
+    originalMain 'com.mysql:mysql-connector-j'
+    originalWeb platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+    originalWeb 'org.springframework.boot:spring-boot-starter-web'
+    originalTest platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+    originalTest 'org.springframework.boot:spring-boot-starter-test'
+    originalMysqlTest platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+    originalMysqlTest 'org.testcontainers:mysql'
+    correctedMysqlTest platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+    correctedMysqlTest 'org.testcontainers:testcontainers-mysql'
+}
+sourceSets.main.java.srcDirs = ['../original', '../probe']
+tasks.register('recordDependencies') {
+    doLast {
+        def rows = configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect {
+            [coordinate:it.moduleVersion.id.toString(),file:it.file.absolutePath,sha256:java.security.MessageDigest.getInstance('SHA-256').digest(it.file.bytes).encodeHex().toString()]
+        }
+        file('../dependencies.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(rows))+'\n'
+        def cases=[:]
+        ['originalMain','originalWeb','originalTest','originalMysqlTest','correctedMysqlTest'].each { name ->
+            try { cases[name]=[resolved:true,artifacts:configurations[name].resolvedConfiguration.resolvedArtifacts.collect{it.moduleVersion.id.toString()}] }
+            catch(Exception error){cases[name]=[resolved:false,error:error.message]}
+        }
+        file('../dependency-cases.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(cases))+'\n'
+    }
+}
+tasks.register('runProof', JavaExec) {
+    dependsOn classes
+    classpath=sourceSets.main.runtimeClasspath
+    mainClass='com.example.p19.P19Proof'
+    args=[file('../').absolutePath]
+}

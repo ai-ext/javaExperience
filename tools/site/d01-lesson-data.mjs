@@ -1,0 +1,1208 @@
+// 실제 로컬 CLI/JAR 관측과 원문·명시적 모델을 구분한다.
+export const d01AssetRoot = '../design/d01-2026-10-20/images/';
+export const D01_RUNS = {
+  "checks": [
+    "local-assemble-is-not-contract-pass",
+    "local-cli-flag-changes-output-same-jar",
+    "local-config-output-does-not-change-git-branch",
+    "local-copies-keep-one-artifact-byte-identity",
+    "local-failed-check-blocks-added-copy-gate",
+    "local-fixed-contract-and-build-pass",
+    "local-jar-manifest-ties-source-revision",
+    "local-project-cache-is-not-archived-artifact",
+    "local-reproducible-fixture-rebuild",
+    "private-fixture-finished-clean",
+    "private-git-branch-pointer-isolated"
+  ],
+  "facts": {
+    "local-assemble-is-not-contract-pass": {
+      "assembleExit": 0,
+      "jarExists": true,
+      "checkExit": 1,
+      "badCliLikeCount": 2,
+      "scope": "additional plain Java CLI/local Gradle; not GitHub CI or source Boot25 app"
+    },
+    "local-failed-check-blocks-added-copy-gate": {
+      "checkPassed": false,
+      "reviewInput": true,
+      "fileCopied": false,
+      "scope": "explicit extra local policy; not actual PR approval or branch protection"
+    },
+    "local-fixed-contract-and-build-pass": {
+      "buildExit": 0,
+      "observedLikes": 1,
+      "contractPassLines": 1,
+      "scope": "one added CLI contract, not JUnit/HTTP/database/concurrency coverage"
+    },
+    "private-git-branch-pointer-isolated": {
+      "baseline": "ad83bab69c2a4a2142fc73af56bbabc9206a913a",
+      "badCommit": "065fee8e02b20313e961b1a68741932a5f49e40e",
+      "fixedCommit": "318b31f2e3688e584a8f18c833ecec05c2f53e4f",
+      "featureCommitsAfterBaseline": 2,
+      "baselinePointerUnchanged": true,
+      "remotes": 0,
+      "scope": "new private Git repository; fixed demo author dates; no user branch or remote commands"
+    },
+    "local-jar-manifest-ties-source-revision": {
+      "manifest": {
+        "Manifest-Version": "1.0",
+        "Main-Class": "example.lifecycle.LikeDemo",
+        "Implementation-Version": "1.0-demo",
+        "Source-Revision": "318b31f2e3688e584a8f18c833ecec05c2f53e4f"
+      },
+      "sha256": "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0",
+      "bytes": 2859,
+      "zipEntries": [
+        "META-INF/",
+        "META-INF/MANIFEST.MF",
+        "example/",
+        "example/lifecycle/",
+        "example/lifecycle/LikeDemo.class",
+        "example/lifecycle/LikeLedger.class"
+      ],
+      "scope": "actual JAR metadata/checksum; not container image digest/registry/attestation"
+    },
+    "local-copies-keep-one-artifact-byte-identity": {
+      "copySha256": {
+        "dev": "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0",
+        "stg": "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0",
+        "prod": "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0"
+      },
+      "allSameValidatedJar": true,
+      "scope": "local files named dev/stg/prod only; no service deployment or registry"
+    },
+    "local-config-output-does-not-change-git-branch": {
+      "cliOutputs": {
+        "dev": {
+          "mode": "ADDITIONAL_CLI_FIXTURE",
+          "java_version": "21.0.6",
+          "profile": "dev",
+          "db_alias_string_only": "d01-demo-dev",
+          "feature_enabled": "true",
+          "like_count": "1"
+        },
+        "stg": {
+          "mode": "ADDITIONAL_CLI_FIXTURE",
+          "java_version": "21.0.6",
+          "profile": "stg",
+          "db_alias_string_only": "d01-demo-stg",
+          "feature_enabled": "true",
+          "like_count": "1"
+        },
+        "prod": {
+          "mode": "ADDITIONAL_CLI_FIXTURE",
+          "java_version": "21.0.6",
+          "profile": "prod",
+          "db_alias_string_only": "d01-demo-prod",
+          "feature_enabled": "true",
+          "like_count": "1"
+        }
+      },
+      "branchStayed": "feat/post-like-demo",
+      "scope": "environment strings/CLI output only; no DB connection or real environment provisioning"
+    },
+    "local-cli-flag-changes-output-same-jar": {
+      "offLikeCount": 0,
+      "onLikeCount": 1,
+      "sameJarSha256": "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0",
+      "scope": "extra CLI flag branch, not actual deployment/release/HTTP or flag provider"
+    },
+    "local-project-cache-is-not-archived-artifact": {
+      "projectCacheMoved": true,
+      "archiveStillExists": true,
+      "archiveSha256": "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0",
+      "scope": "only new fixture project .gradle moved; global Gradle/dependency caches not removed or moved; Gradle may reuse/update its own caches"
+    },
+    "local-reproducible-fixture-rebuild": {
+      "rebuildExit": 0,
+      "rebuiltJarSha256": "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0",
+      "sameAsArchive": true,
+      "scope": "this fixed-input Jar task disables timestamps/sorts entries; not all builds reproducible"
+    },
+    "private-fixture-finished-clean": {
+      "privateGitClean": true,
+      "sourceUnchanged": true,
+      "userWorktreeHeadUnchanged": true,
+      "scope": "no user Git add/commit/pull/push/merge/PR/deployment performed"
+    }
+  },
+  "models": {
+    "review-and-check": {
+      "kind": "added boolean model",
+      "rows": [
+        {
+          "check": false,
+          "review": false,
+          "mayCopy": false
+        },
+        {
+          "check": false,
+          "review": true,
+          "mayCopy": false
+        },
+        {
+          "check": true,
+          "review": false,
+          "mayCopy": false
+        },
+        {
+          "check": true,
+          "review": true,
+          "mayCopy": true
+        }
+      ],
+      "scope": "model inputs only; not actual GitHub review/required checks/protection"
+    },
+    "schema-compatibility": {
+      "kind": "added set comparison model",
+      "oldRequires": [
+        "like_count"
+      ],
+      "beforeColumns": [
+        "like_count"
+      ],
+      "afterRenameColumns": [
+        "like_total"
+      ],
+      "beforeCompatible": true,
+      "afterRenameCompatible": false,
+      "afterAddCompatible": true,
+      "scope": "no actual DB/migration/rollback or production incident executed"
+    },
+    "incident-options": {
+      "kind": "source-derived decision examples; unexecuted",
+      "branches": [
+        "previous version safe and compatible: consider rollback",
+        "feature can be isolated: consider disabling flag",
+        "minimal correction safer: consider hotfix with verification"
+      ],
+      "after": "observe recovery and create owned follow-up action",
+      "scope": "no actual alert/incident/SLA/hotfix/rollout/postmortem"
+    }
+  }
+};
+export const D01_ASSETS = {
+  "D01-flow": {
+    "file": "flow.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "티켓의 완료 조건은 어떤 관찰로 연결할까요?",
+    "focus": {
+      "flow-acceptance": [
+        3,
+        13,
+        46,
+        80
+      ],
+      "flow-feedback": [
+        51,
+        3,
+        47,
+        91
+      ]
+    }
+  },
+  "D01-branch": {
+    "file": "branch-v2.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "브랜치가 바뀌면 어떤 commit을 가리킬까요?",
+    "focus": {
+      "branch-baseline": [
+        16,
+        25,
+        23,
+        43
+      ],
+      "branch-bad": [
+        38,
+        38,
+        25,
+        34
+      ],
+      "branch-fixed": [
+        63,
+        24,
+        26,
+        47
+      ]
+    }
+  },
+  "D01-build": {
+    "file": "build-v2.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "JAR가 만들어졌으면 인수 조건도 통과했을까요?",
+    "focus": {
+      "build-assemble": [
+        1,
+        16,
+        32,
+        82
+      ],
+      "build-check": [
+        34,
+        16,
+        32,
+        82
+      ],
+      "build-fixed": [
+        67,
+        16,
+        32,
+        82
+      ]
+    }
+  },
+  "D01-gate": {
+    "file": "gate-v2.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "리뷰와 자동 검사 조건은 어떻게 다를까요?",
+    "focus": {
+      "gate-review": [
+        62,
+        32,
+        35,
+        54
+      ],
+      "gate-check": [
+        62,
+        32,
+        35,
+        54
+      ],
+      "gate-both": [
+        62,
+        69,
+        35,
+        18
+      ]
+    }
+  },
+  "D01-artifact": {
+    "file": "artifact-v3.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "이 JAR가 어느 소스에서 나왔는지 무엇으로 볼까요?",
+    "focus": {
+      "artifact-identity": [
+        1,
+        21,
+        97,
+        73
+      ],
+      "artifact-manifest": [
+        39,
+        64,
+        31,
+        28
+      ]
+    }
+  },
+  "D01-copy": {
+    "file": "copy.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "같은 산출물을 옮겼다는 것은 무엇을 확인한 걸까요?",
+    "focus": {
+      "copy-local": [
+        0,
+        26,
+        98,
+        58
+      ],
+      "copy-boundary": [
+        46,
+        1,
+        52,
+        26
+      ]
+    }
+  },
+  "D01-config": {
+    "file": "config-v2.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "환경 입력이 바뀌면 브랜치도 바뀔까요?",
+    "focus": {
+      "config-values": [
+        1,
+        29,
+        97,
+        69
+      ],
+      "config-branch": [
+        10,
+        0,
+        79,
+        25
+      ]
+    }
+  },
+  "D01-flag": {
+    "file": "flag-v2.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "같은 JAR에서 플래그만 바꾸면 어떤 값이 달라질까요?",
+    "focus": {
+      "flag-off": [
+        1,
+        19,
+        39,
+        54
+      ],
+      "flag-on": [
+        60,
+        19,
+        38,
+        54
+      ]
+    }
+  },
+  "D01-cache": {
+    "file": "cache-v3.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "project cache와 보관한 JAR는 같은 것일까요?",
+    "focus": {
+      "cache-moved": [
+        0,
+        7,
+        85,
+        35
+      ],
+      "cache-rebuild": [
+        37,
+        41,
+        60,
+        37
+      ],
+      "cache-clean": [
+        0,
+        80,
+        98,
+        18
+      ]
+    }
+  },
+  "D01-recovery": {
+    "file": "recovery.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "앱만 이전 버전으로 돌리면 항상 복구될까요?",
+    "focus": {
+      "recovery-compatible": [
+        0,
+        14,
+        33,
+        51
+      ],
+      "recovery-renamed": [
+        34,
+        14,
+        33,
+        51
+      ],
+      "recovery-options": [
+        0,
+        66,
+        99,
+        31
+      ]
+    }
+  }
+};
+export const D01_LESSONS = [
+  {
+    "id": "flow",
+    "question": "티켓의 완료 조건은 어떤 관찰로 연결할까요?",
+    "source": "원문 생명주기 지도 + 추가 CLI 인수 조건",
+    "sourceNote": "추가 메모리 좋아요 표본입니다. API·DB·동시성 구현은 없고 원문 운영 흐름은 실제 실행하지 않았습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "flow-acceptance",
+        "title": "두 호출에도 좋아요1",
+        "lead": "추가 CLI는 post42·actor7로 두 번 호출한 뒤 count==1을 검사합니다. 원문의 인수 조건을 작은 로컬 사례로 연결했습니다.",
+        "code": "            ledger.like(42, 7);\n            ledger.like(42, 7);\n            System.out.println(\"observed_likes=\" + ledger.count());\n            if (ledger.count() != 1) {\n                throw new AssertionError(\"same actor/post must count once\");\n            }",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "추가 입력",
+            "post42 / actor7 · 순차 두 호출"
+          ],
+          [
+            "CLI 인수 조건",
+            "같은 actor/post는1"
+          ],
+          [
+            "수정 후 observedLikes",
+            "1"
+          ]
+        ],
+        "checks": [
+          "local-fixed-contract-and-build-pass"
+        ],
+        "runKeys": [
+          "facts.local-fixed-contract-and-build-pass"
+        ],
+        "image": "D01-flow"
+      },
+      {
+        "id": "flow-feedback",
+        "title": "운영은 다시 개선 티켓으로",
+        "lead": "원문 지도는 운영 신호·장애 대응·회고를 다음 작업으로 연결합니다. 실제 알림·장애·배포·사후 분석은 없었습니다.",
+        "code": "    J -->|개선 티켓| A",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "근거 구분",
+            "원문 흐름 · 미실행 모델"
+          ],
+          [
+            "후속 동작",
+            "회복 관찰과 담당 있는 후속 작업"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.incident-options"
+        ],
+        "image": "D01-flow"
+      }
+    ]
+  },
+  {
+    "id": "branch",
+    "question": "브랜치가 바뀌면 어떤 commit을 가리킬까요?",
+    "source": "추가 NEW 임시 Git 저장소",
+    "sourceNote": "baseline과 feat/post-like-demo는 새 표본 저장소의 이름입니다. 고정 test date의 commit3개·remote0이며 사용자 브랜치/원격 작업이 아닙니다. B0/F1/F2는 설명용 별칭입니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "branch-baseline",
+        "title": "B0: baseline 기준점",
+        "lead": "새 임시 저장소의 기준 commit은 feature 두 commit 뒤에도 baseline 포인터가 유지했습니다.",
+        "code": "    git('add','README.md','.gitignore');git('commit','-m','docs: initialize private teaching fixture')\n    baseline=git('rev-parse','HEAD')",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "B0 · 실제 commit",
+            "ad83bab69c2a4a2142fc73af56bbabc9206a913a"
+          ],
+          [
+            "baselinePointerUnchanged",
+            "true"
+          ],
+          [
+            "remotes",
+            "0"
+          ]
+        ],
+        "checks": [
+          "private-git-branch-pointer-isolated"
+        ],
+        "runKeys": [
+          "facts.private-git-branch-pointer-isolated"
+        ],
+        "image": "D01-branch"
+      },
+      {
+        "id": "branch-bad",
+        "title": "F1: 중복을 세는 표본",
+        "lead": "feature에 의도적으로 실패하는 LikeLedger를 기록했습니다. B0와 F1은 서로 다른 실제 commit입니다.",
+        "code": "    git('switch','-c','feat/post-like-demo')\n    shutil.copytree(fixture/'common',repo,dirs_exist_ok=True)\n    ledger=repo/'src/main/java/example/lifecycle/LikeLedger.java'\n    shutil.copyfile(fixture/'variants/bad/LikeLedger.java',ledger)\n    git('add','build.gradle','settings.gradle','src/main/java')\n    git('commit','-m','feat: add intentionally failing duplicate-like fixture')\n    bad_revision=git('rev-parse','HEAD')",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "추가 branch",
+            "feat/post-like-demo"
+          ],
+          [
+            "F1 · 실제 commit",
+            "065fee8e02b20313e961b1a68741932a5f49e40e"
+          ]
+        ],
+        "checks": [
+          "private-git-branch-pointer-isolated"
+        ],
+        "runKeys": [
+          "facts.private-git-branch-pointer-isolated"
+        ],
+        "image": "D01-branch"
+      },
+      {
+        "id": "branch-fixed",
+        "title": "F2: 중복 정책 수정",
+        "lead": "수정 뒤 feature는F2를 가리키고 baseline은B0에 남습니다. feature의 기준 뒤 commit 수는2입니다.",
+        "code": "    shutil.copyfile(fixture/'variants/good/LikeLedger.java',ledger)\n    git('diff','--check');git('add','src/main/java/example/lifecycle/LikeLedger.java')\n    git('commit','-m','fix: count one like per actor and post in memory')\n    fixed_revision=git('rev-parse','HEAD')",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "F2 · 실제 commit",
+            "318b31f2e3688e584a8f18c833ecec05c2f53e4f"
+          ],
+          [
+            "featureCommitsAfterBaseline",
+            "2"
+          ],
+          [
+            "원격 push/PR",
+            "미실행"
+          ]
+        ],
+        "checks": [
+          "private-git-branch-pointer-isolated"
+        ],
+        "runKeys": [
+          "facts.private-git-branch-pointer-isolated"
+        ],
+        "image": "D01-branch"
+      }
+    ]
+  },
+  {
+    "id": "build",
+    "question": "JAR가 만들어졌으면 인수 조건도 통과했을까요?",
+    "source": "추가 plain Java21 / Gradle9.8.0 CLI",
+    "sourceNote": "추가 CLI contract1개의 관찰입니다. JUnit·원격 CI·HTTP·DB·동시성 검증으로 확대하지 않습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "build-assemble",
+        "title": "assemble0 · 잘못된 결과2",
+        "lead": "추가 실패 표본도 assemble은 성공해 JAR를 만들었습니다. 그 JAR의 CLI 결과는 중복을 포함한2였습니다.",
+        "code": "    assemble,_=gradle(['assemble'],'bad-assemble',bad_revision)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "assembleExit / jarExists",
+            "0 / true"
+          ],
+          [
+            "bad CLI like_count",
+            "2"
+          ]
+        ],
+        "checks": [
+          "local-assemble-is-not-contract-pass"
+        ],
+        "runKeys": [
+          "facts.local-assemble-is-not-contract-pass"
+        ],
+        "image": "D01-build"
+      },
+      {
+        "id": "build-check",
+        "title": "check1 · 복사 차단",
+        "lead": "추가 contractTest가 관측2를 보고 실패했습니다. review 입력true여도 로컬 추가 gate는 파일을 복사하지 않았습니다.",
+        "code": "tasks.register('contractTest', JavaExec) {\n    dependsOn classes\n    classpath = sourceSets.main.runtimeClasspath\n    mainClass = 'example.lifecycle.LikeDemo'\n    args '--self-test'\n}\ntasks.named('check') { dependsOn 'contractTest' }",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "checkExit / observed_likes",
+            "1 / 2"
+          ],
+          [
+            "추가 gate check / review",
+            "false / true"
+          ],
+          [
+            "fileCopied",
+            "false"
+          ]
+        ],
+        "checks": [
+          "local-assemble-is-not-contract-pass",
+          "local-failed-check-blocks-added-copy-gate"
+        ],
+        "runKeys": [
+          "facts.local-assemble-is-not-contract-pass",
+          "facts.local-failed-check-blocks-added-copy-gate"
+        ],
+        "image": "D01-build"
+      },
+      {
+        "id": "build-fixed",
+        "title": "수정 뒤 build0 · 결과1",
+        "lead": "추가 Set 기반 메모리 정책은 같은 post/actor를 하나로 세었습니다. build가 성공했고 CLI contract PASS는1줄입니다.",
+        "code": "    void like(long postId, long actorId) {\n        likes.add(postId + \":\" + actorId);\n    }",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "buildExit / observedLikes",
+            "0 / 1"
+          ],
+          [
+            "CLI contract PASS lines",
+            "1 · JUnit 아님"
+          ]
+        ],
+        "checks": [
+          "local-fixed-contract-and-build-pass"
+        ],
+        "runKeys": [
+          "facts.local-fixed-contract-and-build-pass"
+        ],
+        "image": "D01-build"
+      }
+    ]
+  },
+  {
+    "id": "gate",
+    "question": "리뷰와 자동 검사 조건은 어떻게 다를까요?",
+    "source": "추가 boolean model · 실제 PR 승인 아님",
+    "sourceNote": "check와 review는 모델 입력입니다. GitHub review·required checks·branch protection의 실제 실행·구성 결과가 아닙니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "gate-review",
+        "title": "review만true이면false",
+        "lead": "명시적 AND 모델은 checkfalse·reviewtrue에서 복사를 허용하지 않습니다.",
+        "code": "def gate(check_passed,reviewed):return check_passed and reviewed",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "check / review",
+            "false / true"
+          ],
+          [
+            "mayCopy · 모델",
+            "false"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.review-and-check"
+        ],
+        "image": "D01-gate"
+      },
+      {
+        "id": "gate-check",
+        "title": "check만true여도false",
+        "lead": "같은 모델은 checktrue·reviewfalse에서도 허용하지 않습니다.",
+        "code": "def gate(check_passed,reviewed):return check_passed and reviewed",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "check / review",
+            "true / false"
+          ],
+          [
+            "mayCopy · 모델",
+            "false"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.review-and-check"
+        ],
+        "image": "D01-gate"
+      },
+      {
+        "id": "gate-both",
+        "title": "둘 다true이면true",
+        "lead": "이 추가 모델에서만 두 입력true가 mayCopytrue를 만듭니다. 실제 사람 승인이나 배포가 아닙니다.",
+        "code": "def gate(check_passed,reviewed):return check_passed and reviewed",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "check / review",
+            "true / true"
+          ],
+          [
+            "mayCopy · 모델",
+            "true"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.review-and-check"
+        ],
+        "image": "D01-gate"
+      }
+    ]
+  },
+  {
+    "id": "artifact",
+    "question": "이 JAR가 어느 소스에서 나왔는지 무엇으로 볼까요?",
+    "source": "추가 실제 JAR bytes / manifest",
+    "sourceNote": "JAR checksum과 metadata입니다. container image digest·registry·서명/attestation 검증은 아닙니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "artifact-identity",
+        "title": "실제 파일의 bytes와 SHA256",
+        "lead": "검증 JAR 사본은2859bytes이며 아래 full SHA256으로 식별했습니다.",
+        "code": "    archived=run/'artifacts/validated-like.jar';shutil.copyfile(jar,archived)\n    artifact_sha=sha(archived)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "JAR bytes",
+            "2859"
+          ],
+          [
+            "JAR SHA256",
+            "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0"
+          ]
+        ],
+        "checks": [
+          "local-jar-manifest-ties-source-revision"
+        ],
+        "runKeys": [
+          "facts.local-jar-manifest-ties-source-revision"
+        ],
+        "image": "D01-artifact"
+      },
+      {
+        "id": "artifact-manifest",
+        "title": "manifest의 Source-Revision은F2",
+        "lead": "실제 manifest는 실행 class·버전과 추가 sourceRevision Gradle 입력을 기록했습니다.",
+        "code": "    manifest {\n        attributes('Main-Class': 'example.lifecycle.LikeDemo',\n                   'Implementation-Version': project.version,\n                   'Source-Revision': providers.gradleProperty('sourceRevision').getOrElse('demo-unset'))\n    }",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "Main-Class",
+            "example.lifecycle.LikeDemo"
+          ],
+          [
+            "Implementation-Version",
+            "1.0-demo"
+          ],
+          [
+            "Source-Revision",
+            "318b31f2e3688e584a8f18c833ecec05c2f53e4f"
+          ]
+        ],
+        "checks": [
+          "local-jar-manifest-ties-source-revision"
+        ],
+        "runKeys": [
+          "facts.local-jar-manifest-ties-source-revision"
+        ],
+        "image": "D01-artifact"
+      }
+    ]
+  },
+  {
+    "id": "copy",
+    "question": "같은 산출물을 옮겼다는 것은 무엇을 확인한 걸까요?",
+    "source": "추가 LOCALCOPY 세 폴더",
+    "sourceNote": "dev/stg/prod는 로컬 파일 사본 이름입니다. service·registry·컨테이너·운영 배포를 실행하지 않았습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "copy-local",
+        "title": "dev/stg/prod 사본의 동일 bytes",
+        "lead": "검증 JAR를 로컬 세 폴더에 복사하고 각 SHA256이 같음을 확인했습니다.",
+        "code": "    for profile in ['dev','stg','prod']:\n        target=run/'environment-copies'/profile/'app.jar';target.parent.mkdir(parents=True)\n        shutil.copyfile(archived,target);hashes[profile]=sha(target)\n        profiles[profile]=java(target,'cli-'+profile,{'D01_DEMO_ENV':profile,\n            'D01_DEMO_DB_ALIAS':'d01-demo-'+profile,'D01_DEMO_FEATURE':'true'})",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "세 사본 이름",
+            "dev / stg / prod · LOCALCOPY"
+          ],
+          [
+            "allSameValidatedJar",
+            "true"
+          ],
+          [
+            "각 사본 SHA256",
+            "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0"
+          ]
+        ],
+        "checks": [
+          "local-copies-keep-one-artifact-byte-identity"
+        ],
+        "runKeys": [
+          "facts.local-copies-keep-one-artifact-byte-identity"
+        ],
+        "image": "D01-copy"
+      },
+      {
+        "id": "copy-boundary",
+        "title": "로컬 복사와 실제 배포는 다름",
+        "lead": "같은 파일을 전달했다는 관찰만 있습니다. 원문 승격은 실제 배포·권한·트래픽 검증과 별도입니다.",
+        "code": "    for profile in ['dev','stg','prod']:\n        target=run/'environment-copies'/profile/'app.jar';target.parent.mkdir(parents=True)\n        shutil.copyfile(archived,target);hashes[profile]=sha(target)\n        profiles[profile]=java(target,'cli-'+profile,{'D01_DEMO_ENV':profile,\n            'D01_DEMO_DB_ALIAS':'d01-demo-'+profile,'D01_DEMO_FEATURE':'true'})",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "검증한 것",
+            "로컬 세 사본 byte identity"
+          ],
+          [
+            "실제 서비스/registry 배포",
+            "미실행"
+          ],
+          [
+            "원문 승격 연결",
+            "검증한 동일 버전을 다음 환경으로"
+          ]
+        ],
+        "checks": [
+          "local-copies-keep-one-artifact-byte-identity"
+        ],
+        "runKeys": [
+          "facts.local-copies-keep-one-artifact-byte-identity"
+        ],
+        "image": "D01-copy"
+      }
+    ]
+  },
+  {
+    "id": "config",
+    "question": "환경 입력이 바뀌면 브랜치도 바뀔까요?",
+    "source": "추가 CLI 환경 문자열 출력",
+    "sourceNote": "D01_DEMO_DB_ALIAS는 출력용 문자열이며 DB 연결이 없습니다. 실제 환경 provisioning·권한·비밀값 분리는 실행하지 않았습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "config-values",
+        "title": "같은 JAR에 서로 다른 입력",
+        "lead": "추가 CLI는 profile/alias를 출력했고 세 입력 모두 like_count1이었습니다.",
+        "code": "        String profile = System.getenv().getOrDefault(\"D01_DEMO_ENV\", \"local\");\n        String dbAlias = System.getenv().getOrDefault(\"D01_DEMO_DB_ALIAS\", \"none\");\n        boolean enabled = Boolean.parseBoolean(System.getenv().getOrDefault(\"D01_DEMO_FEATURE\", \"true\"));",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "profile 값",
+            "dev / stg / prod"
+          ],
+          [
+            "db_alias_string_only",
+            "d01-demo-dev / d01-demo-stg / d01-demo-prod"
+          ],
+          [
+            "각 like_count",
+            "1"
+          ]
+        ],
+        "checks": [
+          "local-config-output-does-not-change-git-branch"
+        ],
+        "runKeys": [
+          "facts.local-config-output-does-not-change-git-branch"
+        ],
+        "image": "D01-config"
+      },
+      {
+        "id": "config-branch",
+        "title": "환경 입력 뒤에도 같은 feature",
+        "lead": "세 로컬 CLI 실행 뒤에도 feature branch와 HEAD는 그대로입니다. 환경이 브랜치라는 뜻은 아닙니다.",
+        "code": "        String profile = System.getenv().getOrDefault(\"D01_DEMO_ENV\", \"local\");\n        String dbAlias = System.getenv().getOrDefault(\"D01_DEMO_DB_ALIAS\", \"none\");\n        boolean enabled = Boolean.parseBoolean(System.getenv().getOrDefault(\"D01_DEMO_FEATURE\", \"true\"));",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "branchStayed",
+            "feat/post-like-demo"
+          ],
+          [
+            "그대로인 HEAD",
+            "318b31f2e3688e584a8f18c833ecec05c2f53e4f"
+          ],
+          [
+            "DB connection",
+            "없음 · alias 문자열만"
+          ]
+        ],
+        "checks": [
+          "local-config-output-does-not-change-git-branch"
+        ],
+        "runKeys": [
+          "facts.local-config-output-does-not-change-git-branch"
+        ],
+        "image": "D01-config"
+      }
+    ]
+  },
+  {
+    "id": "flag",
+    "question": "같은 JAR에서 플래그만 바꾸면 어떤 값이 달라질까요?",
+    "source": "추가 CLI flag 분기",
+    "sourceNote": "실제 공개 rollout·flag provider가 아닙니다. 12-Factor의 release=build+config와 원문의 사용자 기능 공개라는 release 의미를 구분합니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "flag-off",
+        "title": "flag false: 호출하지 않아0",
+        "lead": "enabled=false는 추가 CLI의 like 두 호출을 건너뛰어 count0입니다.",
+        "code": "        if (enabled) {\n            ledger.like(42, 7);\n            ledger.like(42, 7);\n        }",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "feature_enabled / like_count",
+            "false / 0"
+          ],
+          [
+            "sameJarSha256",
+            "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0"
+          ]
+        ],
+        "checks": [
+          "local-cli-flag-changes-output-same-jar"
+        ],
+        "runKeys": [
+          "facts.local-cli-flag-changes-output-same-jar"
+        ],
+        "image": "D01-flag"
+      },
+      {
+        "id": "flag-on",
+        "title": "flag true: 같은 JAR로1",
+        "lead": "enabled=true는 같은 JAR에서 중복 호출을 실행해 count1입니다. 실제 사용자 공개 결과가 아닙니다.",
+        "code": "        if (enabled) {\n            ledger.like(42, 7);\n            ledger.like(42, 7);\n        }",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "feature_enabled / like_count",
+            "true / 1"
+          ],
+          [
+            "sameJarSha256",
+            "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0"
+          ],
+          [
+            "사용자 공개/실제 배포",
+            "미실행"
+          ]
+        ],
+        "checks": [
+          "local-cli-flag-changes-output-same-jar"
+        ],
+        "runKeys": [
+          "facts.local-cli-flag-changes-output-same-jar"
+        ],
+        "image": "D01-flag"
+      }
+    ]
+  },
+  {
+    "id": "cache",
+    "question": "project cache와 보관한 JAR는 같은 것일까요?",
+    "source": "추가 project .gradle 이동 / 고정 입력 rebuild",
+    "sourceNote": "새 표본의 project .gradle만 옮겼습니다. global Gradle/dependency cache는 삭제·이동하지 않았고 Gradle이 정상 재사용·갱신할 수 있습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "cache-moved",
+        "title": "project cache를 옮겨도 archive는 남음",
+        "lead": "새 project .gradle을 옮긴 뒤에도 보관 JAR는 존재하고 checksum이 같습니다.",
+        "code": "    project_cache=repo/'.gradle';assert project_cache.is_dir()\n    shutil.move(project_cache,run/'saved-project-cache')",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "projectCacheMoved",
+            "true"
+          ],
+          [
+            "archiveStillExists",
+            "true"
+          ],
+          [
+            "archive SHA256",
+            "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0"
+          ]
+        ],
+        "checks": [
+          "local-project-cache-is-not-archived-artifact"
+        ],
+        "runKeys": [
+          "facts.local-project-cache-is-not-archived-artifact"
+        ],
+        "image": "D01-cache"
+      },
+      {
+        "id": "cache-rebuild",
+        "title": "이 표본의 rebuild는 같은 SHA",
+        "lead": "이 Jar task는 timestamps를 끄고 파일 순서를 고정했습니다. clean build도 같은 SHA이며 모든 빌드의 재현성을 보장하지 않습니다.",
+        "code": "    rebuild,rebuild_stdout=gradle(['clean','build'],'rebuild-without-project-cache',fixed_revision)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "rebuildExit",
+            "0"
+          ],
+          [
+            "sameAsArchive",
+            "true"
+          ],
+          [
+            "rebuilt JAR SHA256",
+            "6e52d10485e682154f7f1a02a2f898eccab91e89608afb047e3d828f06c4fda0"
+          ]
+        ],
+        "checks": [
+          "local-reproducible-fixture-rebuild"
+        ],
+        "runKeys": [
+          "facts.local-reproducible-fixture-rebuild"
+        ],
+        "image": "D01-cache"
+      },
+      {
+        "id": "cache-clean",
+        "title": "표본 clean · 원문/사용자HEAD 보존",
+        "lead": "끝에 추가 저장소 clean과 원문 hash·사용자 worktree HEAD 불변을 검사했습니다. 사용자 Git add/commit/push는 없었습니다.",
+        "code": "git('status','--porcelain')==''",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "privateGitClean",
+            "true"
+          ],
+          [
+            "sourceUnchanged / userWorktreeHeadUnchanged",
+            "true / true"
+          ]
+        ],
+        "checks": [
+          "private-fixture-finished-clean"
+        ],
+        "runKeys": [
+          "facts.private-fixture-finished-clean"
+        ],
+        "image": "D01-cache"
+      }
+    ]
+  },
+  {
+    "id": "recovery",
+    "question": "앱만 이전 버전으로 돌리면 항상 복구될까요?",
+    "source": "추가 column-name set 모델 / 원문 장애 선택지",
+    "sourceNote": "실제 DB migration·rollback·알림·장애·hotfix·SLA 실험은 없습니다. schema는 열 이름 집합만 비교합니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 실제 로컬 관측과 원문·모델을 구분해 읽습니다.",
+    "stages": [
+      {
+        "id": "recovery-compatible",
+        "title": "기존 열을 유지한 모델은true",
+        "lead": "oldRequires={like_count}이고 before에 그 열이 있으면true입니다. 새 열을 추가해도 기존 열을 남긴 집합은true입니다.",
+        "code": "{'like_count'}.issubset({'like_count','like_total'})",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "oldRequires / beforeColumns",
+            "[like_count] / [like_count]"
+          ],
+          [
+            "beforeCompatible",
+            "true"
+          ],
+          [
+            "afterAddCompatible",
+            "true · 열 이름 집합 모델"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.schema-compatibility"
+        ],
+        "image": "D01-recovery"
+      },
+      {
+        "id": "recovery-renamed",
+        "title": "열 이름을 바꾼 모델은false",
+        "lead": "{like_total}만 남으면 oldRequires={like_count}를 포함하지 않아false입니다. 실제 SQL이나 DB rollback 측정이 아닙니다.",
+        "code": "{'like_count'}.issubset({'like_total'})",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "afterRenameColumns",
+            "[like_total]"
+          ],
+          [
+            "afterRenameCompatible",
+            "false · 열 이름 집합 모델"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.schema-compatibility"
+        ],
+        "image": "D01-recovery"
+      },
+      {
+        "id": "recovery-options",
+        "title": "안전 조건을 보고 복구 경로 선택",
+        "lead": "원문은 호환되는 이전 버전·기능 분리·최소 수정의 위험을 보고 rollback/flag off/hotfix를 검토한 뒤 회복·후속 작업을 확인합니다.",
+        "code": "    D -->|이전 버전 안전| E[\"롤백\"]\n    D -->|기능만 차단 가능| F[\"기능 플래그 끄기\"]\n    D -->|수정이 더 안전| G[\"핫픽스 PR과 긴급 CI\"]",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "원문 선택지 · 미실행",
+            "이전 버전 안전→rollback / 기능 분리→flag off / 수정이 안전→hotfix"
+          ],
+          [
+            "다음",
+            "회복 상태 관찰 · 담당 있는 후속 작업"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.incident-options"
+        ],
+        "image": "D01-recovery"
+      }
+    ]
+  }
+];
+export const d01Run = path => path.split('.').reduce((value, key) => value?.[key], D01_RUNS);

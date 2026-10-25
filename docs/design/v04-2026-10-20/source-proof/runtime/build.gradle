@@ -1,0 +1,45 @@
+plugins { id 'java' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+dependencies {
+ implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+ implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+ compileOnly 'org.projectlombok:lombok'
+ annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+ annotationProcessor 'org.projectlombok:lombok'
+ runtimeOnly 'com.mysql:mysql-connector-j'
+ runtimeOnly 'com.h2database:h2'
+ testImplementation 'org.springframework.boot:spring-boot-starter-test'
+ testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+ testImplementation 'org.springframework.boot:spring-boot-testcontainers'
+ testImplementation 'org.testcontainers:testcontainers-mysql'
+ testImplementation 'org.testcontainers:testcontainers-junit-jupiter'
+ testImplementation 'org.springframework.boot:spring-boot-starter-webmvc'
+ testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+ testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+sourceSets {
+ main.java.srcDirs=['../external/java','../fixture/java']
+ test.java.srcDirs=['../external-test/java','../probe/java']
+ test.resources.srcDirs=['../test-resources']
+ originalTest {
+  java.srcDirs=['../original-test/java']
+  compileClasspath+=sourceSets.main.output+sourceSets.test.compileClasspath
+ }
+}
+tasks.named('compileOriginalTestJava') { dependsOn classes }
+test {
+ useJUnitPlatform()
+ maxParallelForks=1
+ jvmArgs '-Duser.timezone=UTC'
+ systemProperty 'junit.jupiter.execution.parallel.enabled','false'
+ testLogging { events 'passed','failed','skipped';showStandardStreams=true }
+}
+tasks.register('recordDependencies') {
+ doLast {
+  def rows=[configurations.testRuntimeClasspath,configurations.annotationProcessor,configurations.compileClasspath].collectMany { it.resolvedConfiguration.resolvedArtifacts }.unique { it.moduleVersion.id.toString() }.collect {
+   [coordinate:it.moduleVersion.id.toString(),file:it.file.absolutePath,sha256:java.security.MessageDigest.getInstance('SHA-256').digest(it.file.bytes).encodeHex().toString()]
+  }.sort { it.coordinate }
+  file('../dependencies.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(rows))+'\n'
+ }
+}

@@ -1,0 +1,476 @@
+{
+  "source": "docs/knowledge/S08-transactions.md",
+  "sourceSHA256": "364142fe4a16b661ab5fee7ec388bcf1b4dca306d37ae9af521a7d40e6fc4e30",
+  "questions": [
+    {
+      "id": "transfer",
+      "question": "한 번의 이체에서 어느 값이 아직 미커밋일까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 TransferService + 추가 계정 fixture",
+      "sourceNote": "원문 TransferService를 그대로 사용하고 저장소만 추가 fixture로 붙였습니다. 초기 계정 id1=1000·id2=100이며 failDebit는 UPDATE 뒤 원문 checked 예외를 강제 발생시킵니다. 실제 잔액 부족 판정 알고리즘이 아닙니다.",
+      "note": "원문 TransferService를 그대로 사용하고 저장소만 추가 fixture로 붙였습니다. 초기 계정 id1=1000·id2=100이며 failDebit는 UPDATE 뒤 원문 checked 예외를 강제 발생시킵니다. 실제 잔액 부족 판정 알고리즘이 아닙니다. writer와 별도 autocommit READ_COMMITTED observer를 구분합니다. timeout=3은 설정된 초 단위 제한이며 지연시간을 측정한 값이 아닙니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "transfer-debit",
+          "title": "debit 뒤 writer만750",
+          "image": "S08-transfer-v3.png",
+          "checks": [
+            "original-transfer-is-cglib-proxy",
+            "original-transfer-repository-active",
+            "original-transfer-one-bound-connection",
+            "original-transfer-writer-uncommitted-observer-old"
+          ],
+          "runKeys": [
+            "originalTransfer"
+          ]
+        },
+        {
+          "id": "transfer-commit",
+          "title": "credit 후 commit하면750/350",
+          "image": "S08-transfer-v3.png",
+          "checks": [
+            "original-transfer-commits-both",
+            "original-transfer-commit-recorded"
+          ],
+          "runKeys": [
+            "originalTransfer"
+          ]
+        },
+        {
+          "id": "transfer-checked",
+          "title": "별도 checked 실패는 원상태",
+          "image": "S08-transfer-v3.png",
+          "checks": [
+            "original-rollbackFor-checked-restores-both"
+          ],
+          "runKeys": [
+            "originalCheckedRollback"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "rules",
+      "question": "예외를 던지면 언제나 rollback될까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 ExtraRules",
+      "sourceNote": "이 네 메서드는 원문 기본 규칙을 확인한 추가 ExtraRules 변형입니다. 각 run은 독립적으로 ledger를 비우고 시작합니다. 원문 TransferService의 명시 rollbackFor와 섞지 않습니다.",
+      "note": "이 네 메서드는 원문 기본 규칙을 확인한 추가 ExtraRules 변형입니다. 각 run은 독립적으로 ledger를 비우고 시작합니다. 원문 TransferService의 명시 rollbackFor와 섞지 않습니다. 프록시 밖으로 나온 예외와 같은 메서드 안에서 잡은 예외를 구분합니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "rules-checked",
+          "title": "기본 checked 예외는 commit",
+          "image": "S08-rules-v2.png",
+          "checks": [
+            "default-checked-commits"
+          ],
+          "runKeys": [
+            "defaultChecked"
+          ]
+        },
+        {
+          "id": "rules-runtime",
+          "title": "기본 runtime 예외는 rollback",
+          "image": "S08-rules-v2.png",
+          "checks": [
+            "default-runtime-rolls-back"
+          ],
+          "runKeys": [
+            "defaultRuntime"
+          ]
+        },
+        {
+          "id": "rules-no-rollback",
+          "title": "noRollbackFor면 runtime도 commit",
+          "image": "S08-rules-v2.png",
+          "checks": [
+            "noRollbackFor-runtime-commits"
+          ],
+          "runKeys": [
+            "noRollbackFor"
+          ]
+        },
+        {
+          "id": "rules-caught",
+          "title": "같은 메서드가 잡으면 정상 반환",
+          "image": "S08-rules-v2.png",
+          "checks": [
+            "caught-runtime-normal-return-commits"
+          ],
+          "runKeys": [
+            "caughtRuntime"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "proxy",
+      "question": "같은 애노테이션도 호출 경로에 따라 달라질까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 직접 new / 추가 self-invocation / 추가 외부 프록시",
+      "sourceNote": "직접 new한 원문 서비스와 추가 selfInvoke/runtime 변형을 구분합니다. 애노테이션 존재와 실제 프록시 경계 적용은 다른 관측입니다.",
+      "note": "원문 TransferService를 그대로 사용하고 저장소만 추가 fixture로 붙였습니다. 초기 계정 id1=1000·id2=100이며 failDebit는 UPDATE 뒤 원문 checked 예외를 강제 발생시킵니다. 실제 잔액 부족 판정 알고리즘이 아닙니다. ExtraRules.runtime은 추가 변형입니다. JDBC autocommit 결과를 Spring transaction commit과 같다고 표시하지 않습니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "proxy-direct",
+          "title": "직접 new는 transaction 없음",
+          "image": "S08-proxy-v3.png",
+          "checks": [
+            "direct-new-annotation-no-transaction",
+            "direct-new-debit-autocommits"
+          ],
+          "runKeys": [
+            "directOriginal"
+          ]
+        },
+        {
+          "id": "proxy-self",
+          "title": "this.runtime은 advice 우회",
+          "image": "S08-proxy-v3.png",
+          "checks": [
+            "self-invocation-bypasses-advice",
+            "self-invocation-write-autocommits"
+          ],
+          "runKeys": [
+            "selfInvocation"
+          ]
+        },
+        {
+          "id": "proxy-external",
+          "title": "외부 프록시 호출은 rollback",
+          "image": "S08-proxy-v3.png",
+          "checks": [
+            "default-runtime-rolls-back"
+          ],
+          "runKeys": [
+            "defaultRuntime"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "template",
+      "question": "정상 반환하면서 rollbackOnly를 표시할 수 있을까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 ImportService + 추가 저장소 fixture",
+      "sourceNote": "추가 ImportRepository는 의도적으로 INSERT한 뒤 제어 플래그에 따라 false를 반환합니다. 실제 insertIfAbsent·중복 키 구현이 아닙니다.",
+      "note": "원문 TransactionTemplate의 분기를 그대로 실행했습니다. true/false run은 별도 초기화하며 false는 실제 중복을 발견한 결과가 아니라 추가 fixture의 강제 반환입니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "template-true",
+          "title": "true면 행과 반환값 유지",
+          "image": "S08-template-v4.png",
+          "checks": [
+            "original-import-true-result",
+            "original-import-true-commits"
+          ],
+          "runKeys": [
+            "originalImportSuccess"
+          ]
+        },
+        {
+          "id": "template-rollback-only",
+          "title": "false와 setRollbackOnly",
+          "image": "S08-template-v4.png",
+          "checks": [
+            "original-import-false-result",
+            "original-import-setRollbackOnly-removes-insert"
+          ],
+          "runKeys": [
+            "originalImportRollbackOnly"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "required",
+      "question": "안쪽 예외를 잡았는데 왜 바깥 commit도 실패할까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 Outer/Inner REQUIRED",
+      "sourceNote": "추가 Outer와 Inner를 각각 프록시로 호출합니다. 같은 메서드 내부 catch 예제와 달리 안쪽 프록시가 먼저 rollback-only를 표시합니다.",
+      "note": "inner.required 실패를 outer가 잡아도 같은 물리 transaction의 rollback-only가 남았습니다. 최종 UnexpectedRollbackException과 전체 rollback을 구분해 봅니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "required-inner",
+          "title": "두 논리 범위는 같은 연결",
+          "image": "S08-required-v3.png",
+          "checks": [
+            "required-shares-one-bound-connection"
+          ],
+          "runKeys": [
+            "requiredRollbackOnly"
+          ]
+        },
+        {
+          "id": "required-caught",
+          "title": "바깥 catch 뒤에도 rollbackOnly",
+          "image": "S08-required-v3.png",
+          "checks": [
+            "required-caught-is-rollback-only"
+          ],
+          "runKeys": [
+            "requiredRollbackOnly"
+          ]
+        },
+        {
+          "id": "required-final",
+          "title": "최종 UnexpectedRollbackException",
+          "image": "S08-required-v3.png",
+          "checks": [
+            "required-caught-inner-still-rolls-back-all",
+            "required-physical-rollback-recorded"
+          ],
+          "runKeys": [
+            "requiredRollbackOnly"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "new",
+      "question": "REQUIRES_NEW의 안쪽 commit은 바깥 rollback과 같을까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 REQUIRES_NEW 독립 경계",
+      "sourceNote": "추가 run의 tracked connection91(outer)과92(inner)를 비교합니다. 이 번호는 트래킹용 연결 식별자이며 DB 세션 번호나 풀 사용량 계측이 아닙니다.",
+      "note": "보류된 outer와 독립 inner의 물리 경계를 비교한 추가 실험입니다. 이 실행에서 풀 고갈·연결 지연시간을 측정하지 않았습니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "new-outer",
+          "title": "바깥 연결91에서 시작",
+          "image": "S08-new-v2.png",
+          "checks": [],
+          "runKeys": [
+            "requiresNew"
+          ]
+        },
+        {
+          "id": "new-inner",
+          "title": "안쪽은 연결92로 독립 commit",
+          "image": "S08-new-v2.png",
+          "checks": [
+            "requires-new-inner-commit-outer-rollback"
+          ],
+          "runKeys": [
+            "requiresNew"
+          ]
+        },
+        {
+          "id": "new-resumed",
+          "title": "outer 재개·rollback 뒤 inner만 남음",
+          "image": "S08-new-v2.png",
+          "checks": [
+            "requires-new-survives-outer-rollback",
+            "requires-new-different-inner-connection-outer-resumes"
+          ],
+          "runKeys": [
+            "requiresNew"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "nested",
+      "question": "NESTED의 부분 rollback은 독립 commit일까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 JDBC savepoint 실험",
+      "sourceNote": "이 DataSourceTransactionManager/H2 조합의 NESTED 실측입니다. 다른 관리자·JPA·드라이버에서 같은 지원을 보장한 결과가 아닙니다.",
+      "note": "같은 tracked connection98 안에서 savepoint를 만들고 그 지점으로 rollback했습니다. 안쪽의 독립 commit이 아니라 바깥 물리 transaction의 부분 rollback입니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "nested-same",
+          "title": "안팎은 같은 연결98",
+          "image": "S08-nested-v2.png",
+          "checks": [
+            "nested-one-physical-connection"
+          ],
+          "runKeys": [
+            "nested"
+          ]
+        },
+        {
+          "id": "nested-savepoint",
+          "title": "savepoint로 안쪽만 rollback",
+          "image": "S08-nested-v2.png",
+          "checks": [
+            "nested-savepoint-rollback-and-final-commit"
+          ],
+          "runKeys": [
+            "nested"
+          ]
+        },
+        {
+          "id": "nested-commit",
+          "title": "마지막 commit은 outer만 확정",
+          "image": "S08-nested-v2.png",
+          "checks": [
+            "nested-savepoint-keeps-outer-only"
+          ],
+          "runKeys": [
+            "nested"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "contracts",
+      "question": "transaction active와 synchronization은 같은 뜻일까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 SUPPORTS / MANDATORY / NOT_SUPPORTED / NEVER",
+      "sourceNote": "active는 실제 transaction 활성 표시이고 synchronization은 동기화 범위 표시입니다. active=false여도 sync=true일 수 있습니다.",
+      "note": "전파 계약은 이 Spring JDBC 관리자에서 관찰했습니다. 자원 정리 중 남은 thread-local 표시나 synchronization만으로 DB commit 여부를 판단하지 않습니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "contracts-outside",
+          "title": "바깥 transaction 없는 SUPPORTS",
+          "image": "S08-contracts-v2.png",
+          "checks": [
+            "supports-without-transaction-inactive",
+            "supports-can-have-synchronization",
+            "mandatory-without-transaction-rejects"
+          ],
+          "runKeys": [
+            "contractsOutside"
+          ]
+        },
+        {
+          "id": "contracts-inside",
+          "title": "안에서는 SUPPORTS·MANDATORY 참여",
+          "image": "S08-contracts-v2.png",
+          "checks": [],
+          "runKeys": [
+            "contractsInside"
+          ]
+        },
+        {
+          "id": "contracts-suspended",
+          "title": "NOT_SUPPORTED는 보류·NEVER는 거부",
+          "image": "S08-contracts-v2.png",
+          "checks": [
+            "not-supported-suspends-physical-transaction",
+            "never-rejects-existing-transaction"
+          ],
+          "runKeys": [
+            "contractsInside"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "readonly",
+      "question": "readOnly=true면 이 DB의 쓰기를 막았을까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 추가 readOnlyWrite",
+      "sourceNote": "readOnly는 권한 규칙이 아닌 힌트입니다. 여기서는 setReadOnly(true) 호출과 H2의 실제 쓰기 결과를 각각 확인했습니다.",
+      "note": "추가 H2 JDBC 결과를 다른 DB·드라이버·JPA 최적화·보안 권한으로 일반화하지 않습니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "readonly-hint",
+          "title": "readOnly 표시와 JDBC 힌트",
+          "image": "S08-readonly-v2.png",
+          "checks": [],
+          "runKeys": [
+            "readOnlyHint"
+          ]
+        },
+        {
+          "id": "readonly-write",
+          "title": "이 H2 쓰기는 commit됨",
+          "image": "S08-readonly-v2.png",
+          "checks": [
+            "read-only-hint-does-not-block-this-h2-write"
+          ],
+          "runKeys": [
+            "readOnlyHint"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "events",
+      "question": "AFTER_COMMIT 알림 실패가 DB commit을 되돌릴까?",
+      "source": "독립 Spring 7.0.9 CGLIB / DataSourceTransactionManager / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 OrderNotificationListener + 추가 발행자·gateway",
+      "sourceNote": "NotificationGateway는 메모리 호출 기록과 제어 실패를 제공하는 추가 fixture입니다. broker 전달·ack·outbox·CDC를 실행한 결과가 아닙니다.",
+      "note": "원문 AFTER_COMMIT 리스너는 이 버전에서 afterCompletion 경로로 실행됐습니다. callback에서 active=true·sync=false여도 물리 DB가 미커밋이라는 뜻이 아닙니다. 메모리 gateway 호출을 내구성 있는 메시지 전달로 해석하지 않습니다. Boot 앱·JPA·MySQL·Java 25·HTTP·Docker·reactive·broker·CDC·outbox는 실행하지 않았습니다.",
+      "stages": [
+        {
+          "id": "events-commit",
+          "title": "commit 뒤 원문 gateway 호출",
+          "image": "S08-events-v3.png",
+          "checks": [
+            "original-listener-after-commit-notifies",
+            "original-listener-after-publish-return"
+          ],
+          "runKeys": [
+            "afterCommit"
+          ]
+        },
+        {
+          "id": "events-rollback",
+          "title": "rollback이면 원문 리스너 미호출",
+          "image": "S08-events-v3.png",
+          "checks": [
+            "rollback-skips-original-after-commit",
+            "event-rollback-row-absent"
+          ],
+          "runKeys": [
+            "eventRollback"
+          ]
+        },
+        {
+          "id": "events-no-tx",
+          "title": "transaction 밖 이벤트도 기본 미호출",
+          "image": "S08-events-v3.png",
+          "checks": [
+            "no-transaction-skips-original-listener"
+          ],
+          "runKeys": [
+            "eventNoTransaction"
+          ]
+        },
+        {
+          "id": "events-gateway-failure",
+          "title": "실패는 로그로 남고 정상 반환",
+          "image": "S08-events-v3.png",
+          "checks": [
+            "listener-after-completion-failure-not-propagated",
+            "listener-failure-does-not-undo-commit"
+          ],
+          "runKeys": [
+            "afterCommitFailure"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/s08-2026-10-20/source-proof/execution.json",
+        "docs/design/s08-2026-10-20/browser-observations.json"
+      ]
+    }
+  ]
+}

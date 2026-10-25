@@ -4,6 +4,32 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
+import { P09_LESSONS } from './p09-lesson-data.mjs';
+import { P04_LESSONS } from './p04-lesson-data.mjs';
+import { P16_CONTRACT_LESSONS } from './p16-contract-data.mjs';
+import { W09_LESSONS } from './w09-lesson-data.mjs';
+import { P19_LESSONS } from './p19-lesson-data.mjs';
+import { P20_LESSONS } from './p20-lesson-data.mjs';
+import { S09_LESSONS } from './s09-lesson-data.mjs';
+import { S08_LESSONS } from './s08-lesson-data.mjs';
+import { W11_LESSONS } from './w11-lesson-data.mjs';
+import { R03_LESSONS } from './r03-lesson-data.mjs';
+import { R04_LESSONS } from './r04-lesson-data.mjs';
+import { W15_LESSONS } from './w15-lesson-data.mjs';
+import { V04_LESSONS } from './v04-lesson-data.mjs';
+import { B01_LESSONS } from './b01-lesson-data.mjs';
+import { D01_LESSONS } from './d01-lesson-data.mjs';
+import { D02_LESSONS } from './d02-lesson-data.mjs';
+import { D03_LESSONS } from './d03-lesson-data.mjs';
+import { D04_LESSONS } from './d04-lesson-data.mjs';
+import { D05_LESSONS } from './d05-lesson-data.mjs';
+import { D06_LESSONS } from './d06-lesson-data.mjs';
+import { D07_LESSONS } from './d07-lesson-data.mjs';
+import { D08_LESSONS } from './d08-lesson-data.mjs';
+import { D09_LESSONS } from './d09-lesson-data.mjs';
+import { D10_LESSONS } from './d10-lesson-data.mjs';
+import { D11_LESSONS } from './d11-lesson-data.mjs';
+import { D12_LESSONS } from './d12-lesson-data.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const output = path.join(root, 'docs/design/visual-inventory.jsonl');
@@ -163,6 +189,38 @@ function collectHtml(page, html) {
     add(page, '생성 화면', `toggle:${className.split(' ')[0]}`, summary ? clean(summary[1]) : 'summary 구조 확인 필요', 0,
       { className, hasSummary: Boolean(summary) });
   }
+  const attr = (attributes, name) => attributes.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1]
+    ?.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;/g, "'") ?? '';
+  const reader = html.match(/<div\b([^>]*\bdata-knowledge-reader\b[^>]*)>/);
+  if (reader) {
+    add(page, '개념 읽기', 'reader_shell', `${page.replace(/^docs\/knowledge\//, '').replace(/\.md$/, '')} 개념 읽기 화면`, 0,
+      { className: 'kr-reader', route: page.replace(/\.md$/, '.html') });
+    const controlsTag = html.match(/<div\b([^>]*\bclass="kr-controls"[^>]*)>/)?.[1] || '';
+    const sceneAvailable = !/\bhidden(?:\s|=|$)/.test(controlsTag);
+    for (const match of html.matchAll(/<button\b([^>]*\bdata-kr-mode="([^"]+)"[^>]*)>([\s\S]*?)<\/button>/g)) {
+      const [, attributes, mode, label] = match;
+      add(page, '개념 읽기', 'reader_mode_button', clean(label), 0,
+        { mode, displayCondition: sceneAvailable ? '실제 장면이 있는 문서' : '실제 장면이 있는 문서에서만 표시', controls: attr(attributes, 'aria-controls') });
+    }
+    for (const match of html.matchAll(/<a\b([^>]*\bdata-kr-toc-link\b[^>]*)>([\s\S]*?)<\/a>/g)) {
+      const [, attributes, label] = match;
+      const href = attr(attributes, 'href');
+      add(page, '개념 읽기 · 원문 목차', 'reader_toc_link', clean(label), 0,
+        { href, targetId: href.replace(/^#/, ''), displayCondition: '설명 읽기 모드' });
+    }
+  }
+  for (const match of html.matchAll(/<a\b([^>]*\bclass="[^"]*\bhome-concept-direct\b[^"]*"[^>]*)>([\s\S]*?)<\/a>/g)) {
+    add(page, '홈 intro', 'home_concept_direct_link', clean(match[2]), 0,
+      { href: attr(match[1], 'href'), route: attr(match[1], 'href') });
+  }
+  for (const match of html.matchAll(/<a\b([^>]*\bclass="[^"]*\bkc-result-open\b[^"]*"[^>]*)>([\s\S]*?)<\/a>/g)) {
+    const [, attributes, label] = match;
+    const documentId = attr(attributes, 'data-kc-open');
+    const href = attr(attributes, 'href');
+    const route = href.split('?')[0];
+    add(page, '개념 목록 · 설명 읽기', 'catalog_read_link', `${documentId} ${clean(label)}`, 0,
+      { documentId, href, route, query: new URLSearchParams(href.split('?')[1] || '').toString() });
+  }
   // 새 시각 교구도 접기 UI와 별도 항목으로 남긴다. 같은 공통 구현이라도 페이지별 검증 상태는 독립적이다.
   const visualClasses = new Set(['jpa-journey', 'jpa-journey-step', 'jpa-journey-panel', 'jpa-journey-outcomes',
     'p20-entity-map', 'p20-field-link', 'p20-runtime', 'p20-stage-button',
@@ -210,6 +268,39 @@ for (const file of sourceFiles) {
   const before = rows.length;
   collectMarkdown(file, fs.readFileSync(path.join(root, file), 'utf8'));
   const maxToggleDepth = collectHtml(file, fs.readFileSync(path.join(root, htmlFile), 'utf8'));
+  for (const [source, kind, lessons] of [
+    ['docs/knowledge/P09-java-syntax-basics.md', 'p09_learning_state', P09_LESSONS],
+    ['docs/knowledge/P04-constructors-builder.md', 'p04_learning_state', P04_LESSONS],
+    ['docs/knowledge/P16-json-jackson-practical.md', 'p16_contract_state', P16_CONTRACT_LESSONS],
+    ['docs/knowledge/W09-why-dto.md', 'w09_learning_state', W09_LESSONS],
+    ['docs/knowledge/P19-mysql-jpa-setup.md', 'p19_learning_state', P19_LESSONS],
+    ['docs/knowledge/P20-jpa-entity-mapping.md', 'p20_learning_state', P20_LESSONS],
+    ['docs/knowledge/S09-jpa-hibernate.md', 's09_learning_state', S09_LESSONS],
+    ['docs/knowledge/S08-transactions.md', 's08_learning_state', S08_LESSONS],
+    ['docs/knowledge/W11-why-tx-in-service.md', 'w11_learning_state', W11_LESSONS],
+    ['docs/knowledge/R03-schema-types-constraints.md', 'r03_learning_state', R03_LESSONS],
+    ['docs/knowledge/R04-sql-crud-join.md', 'r04_learning_state', R04_LESSONS],
+    ['docs/knowledge/W15-paging-offset-vs-cursor.md', 'w15_learning_state', W15_LESSONS],
+    ['docs/knowledge/V04-test-db-strategy.md', 'v04_learning_state', V04_LESSONS],
+    ['docs/knowledge/B01-account-lifecycle.md', 'b01_learning_state', B01_LESSONS],
+    ['docs/knowledge/D01-dev-lifecycle-overview.md', 'd01_learning_state', D01_LESSONS],
+    ['docs/knowledge/D02-server-network-basics.md', 'd02_learning_state', D02_LESSONS],
+    ['docs/knowledge/D03-rest-api-dev-process.md', 'd03_learning_state', D03_LESSONS],
+    ['docs/knowledge/D04-build-pipeline-explained.md', 'd04_learning_state', D04_LESSONS],
+    ['docs/knowledge/D05-debugging-methodology.md', 'd05_learning_state', D05_LESSONS],
+    ['docs/knowledge/D06-deployment-concepts.md', 'd06_learning_state', D06_LESSONS],
+    ['docs/knowledge/D07-onprem-vs-cloud.md', 'd07_learning_state', D07_LESSONS],
+    ['docs/knowledge/D08-cicd-collaboration.md', 'd08_learning_state', D08_LESSONS],
+    ['docs/knowledge/D09-operations-observability.md', 'd09_learning_state', D09_LESSONS],
+    ['docs/knowledge/D10-database-basics.md', 'd10_learning_state', D10_LESSONS],
+    ['docs/knowledge/D11-web-security-basics.md', 'd11_learning_state', D11_LESSONS],
+    ['docs/knowledge/D12-linux-terminal-basics.md', 'd12_learning_state', D12_LESSONS],
+  ]) if (file === source) {
+    for (const lesson of lessons) for (const stage of lesson.stages) {
+      add(file, lesson.question, kind, stage.title, stage.lead.length,
+        { topicId: lesson.id, stageId: stage.id, imageId: stage.image });
+    }
+  }
   const units = rows.slice(before);
   pages.push({ source: file, html: htmlFile, units: units.length, longProse: units.filter((unit) => unit.kind === 'prose' && unit.chars >= 280).length,
     toggles: units.filter((unit) => unit.kind.startsWith('toggle:')).length, maxToggleDepth,

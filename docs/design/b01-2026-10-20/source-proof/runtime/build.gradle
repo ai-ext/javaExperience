@@ -1,0 +1,31 @@
+plugins { id 'java' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+dependencies {
+ implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+ implementation 'org.springframework:spring-context'
+ implementation 'org.springframework.security:spring-security-crypto'
+ implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+ implementation 'tools.jackson.core:jackson-databind'
+}
+sourceSets.main.java.srcDirs=['../java','../probe']
+tasks.register('recordDependencies') {
+ doLast {
+  def rows=configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect {
+   [coordinate:it.moduleVersion.id.toString(),file:it.file.absolutePath,sha256:java.security.MessageDigest.getInstance('SHA-256').digest(it.file.bytes).encodeHex().toString()]
+  }.sort { it.coordinate }
+  file('../dependencies.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(rows))+'\n'
+ }
+}
+tasks.register('runProof',JavaExec) {
+ dependsOn classes
+ classpath=sourceSets.main.runtimeClasspath
+ mainClass='example.account.B01Proof'
+ jvmArgs '-Duser.timezone=UTC'
+}
+tasks.register('runRedisProof',JavaExec) {
+ dependsOn classes
+ classpath=sourceSets.main.runtimeClasspath
+ mainClass='example.account.B01RedisProof'
+ jvmArgs '-Duser.timezone=UTC'
+}

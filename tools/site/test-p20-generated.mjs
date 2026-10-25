@@ -1,0 +1,30 @@
+import {rasterDimensions} from './raster-size.mjs';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import crypto from 'node:crypto';
+import {JSDOM}from'jsdom';
+import {P20_ASSETS,P20_LESSONS,P20_SQL_PHASES}from'./p20-lesson-data.mjs';
+const root=new URL('../../',import.meta.url),read=p=>fs.readFileSync(new URL(p,root),'utf8');
+const baseline=JSON.parse(read('docs/design/p20-2026-10-20/html-baseline.json'));
+assert.equal(crypto.createHash('sha256').update(read('docs/knowledge/P20-jpa-entity-mapping.md')).digest('hex'),baseline.sourceSHA256);
+const page=new JSDOM(read('docs/knowledge/P20-jpa-entity-mapping.html'),{runScripts:'outside-only',url:'https://learn.example/docs/knowledge/P20-jpa-entity-mapping.html'}),d=page.window.document;
+const original=d.querySelector('#p20-original'),clone=original.cloneNode(true);clone.querySelector(':scope>summary').remove();clone.querySelectorAll('script').forEach(n=>n.remove());
+const h1=d.querySelector('main>h1, h1.kr-source-title');
+assert.equal((h1.textContent+' '+clone.textContent).replace(/\s+/g,' ').trim(),baseline.wholeSourceText);
+assert.deepEqual([...original.querySelectorAll('pre code')].map(n=>n.textContent),baseline.code);
+for(const id of baseline.ids)assert.ok(d.getElementById(id));
+assert.equal(d.querySelector('.p20-entity-map').outerHTML,baseline.oldMap);
+assert.equal(d.querySelector('.jpa-concept').outerHTML,baseline.oldGeneric);
+const ids=[...d.querySelectorAll('[id]')].map(n=>n.id);assert.equal(ids.length,new Set(ids).size);
+for(const asset of Object.values(P20_ASSETS)){assert.equal(asset.ready,true);const b=fs.readFileSync(new URL('docs/design/p20-2026-10-20/images/'+asset.file,root));assert.equal(asset.width,rasterDimensions(b).width);assert.equal(asset.height,rasterDimensions(b).height);}
+assert.ok(d.querySelector('script[src*="p20-learning.bundle.js"]'));
+page.window.eval(read('tools/site/p20-learning.bundle.js'));
+const ui=d.querySelector('[data-p20-learning]');
+for(const lesson of P20_LESSONS){const t=ui.querySelector('[data-p20-topic]');t.value=lesson.id;t.dispatchEvent(new page.window.Event('change'));for(const stage of lesson.stages){ui.querySelector(`[data-p20-stage="${stage.id}"]`).click();assert.equal(ui.querySelector('[data-p20-code]').textContent,stage.code);assert.equal(ui.querySelector('[data-p20-title]').textContent,stage.title);assert.equal(ui.querySelector('[data-p20-output]').open,false);}}
+assert.match(d.querySelector('.p20-source-correction').textContent,/public\/protected 무인자/);
+const proof=JSON.parse(read('docs/design/p20-2026-10-20/source-proof/execution.json'));
+assert.deepEqual(P20_SQL_PHASES,proof.sqlPhases);
+const covered=new Set(P20_LESSONS.flatMap(l=>l.stages.flatMap(s=>s.checks)));
+const actual=[...read('docs/design/p20-2026-10-20/source-proof/gradle-run.txt').matchAll(/^PASS (.+)$/gm)].map(m=>m[1]);
+assert.equal(actual.length,27);assert.deepEqual([...covered].sort(),[...new Set(actual)].sort());
+page.window.close();console.log(`P20 생성 HTML: 원문${baseline.wholeSourceText.length}자/code${baseline.code.length}/id${baseline.ids.length}·기존map/generic·실제bundle21상태·8JPG·27PASS/SQL 일치 통과`);

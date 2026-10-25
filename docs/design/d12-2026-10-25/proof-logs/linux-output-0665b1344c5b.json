@@ -1,0 +1,689 @@
+{
+  "cases": [
+    {
+      "assertions": {
+        "default_pipeline_status": true,
+        "pipefail_pipeline_status": true,
+        "pipefail_removal_mutant_rejected": true,
+        "redirection_order": true
+      },
+      "case": "streams",
+      "condition": {
+        "files": "/tmp/d12-proof/streams",
+        "producer": "stdout out\\n, stderr err\\n, exit 7"
+      },
+      "observations": {
+        "a_after_append": "out\nerr\nappend\n",
+        "a_bytes": "out\nerr\n",
+        "append": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "printf 'append\\n' >>/tmp/d12-proof/streams/a.log"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "b_after_overwrite": "replace\n",
+        "b_bytes": "out\n",
+        "overwrite": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "printf 'replace\\n' >/tmp/d12-proof/streams/b.log"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "pipeline_default": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "set +e; (printf 'out\\n'; printf 'err\\n' >&2; exit 7) | cat; snapshot=(\"$?\" \"${PIPESTATUS[@]}\"); printf 'STATUS=%s PIPESTATUS=%s\\n' \"${snapshot[0]}\" \"${snapshot[*]:1}\"; exit \"${snapshot[0]}\""
+          ],
+          "exit": 0,
+          "stderr": "err\n",
+          "stdout": "out\nSTATUS=0 PIPESTATUS=7 0\n"
+        },
+        "pipeline_pipefail": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "set -o pipefail; (printf 'out\\n'; printf 'err\\n' >&2; exit 7) | cat; snapshot=(\"$?\" \"${PIPESTATUS[@]}\"); printf 'STATUS=%s PIPESTATUS=%s\\n' \"${snapshot[0]}\" \"${snapshot[*]:1}\"; exit \"${snapshot[0]}\""
+          ],
+          "exit": 7,
+          "stderr": "err\n",
+          "stdout": "out\nSTATUS=7 PIPESTATUS=7 0\n"
+        },
+        "pipeline_pipefail_removed_mutant": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "(printf 'out\\n'; printf 'err\\n' >&2; exit 7) | cat; snapshot=(\"$?\" \"${PIPESTATUS[@]}\"); printf 'STATUS=%s PIPESTATUS=%s\\n' \"${snapshot[0]}\" \"${snapshot[*]:1}\"; exit \"${snapshot[0]}\""
+          ],
+          "exit": 0,
+          "stderr": "err\n",
+          "stdout": "out\nSTATUS=0 PIPESTATUS=7 0\n"
+        },
+        "redirect_stderr_then_stdout": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "set +e; { printf 'out\\n'; printf 'err\\n' >&2; exit 7; } 2>&1 >/tmp/d12-proof/streams/b.log"
+          ],
+          "exit": 7,
+          "stderr": "",
+          "stdout": "err\n"
+        },
+        "redirect_stdout_then_stderr": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "set +e; { printf 'out\\n'; printf 'err\\n' >&2; exit 7; } >/tmp/d12-proof/streams/a.log 2>&1"
+          ],
+          "exit": 7,
+          "stderr": "",
+          "stdout": ""
+        }
+      }
+    },
+    {
+      "assertions": {
+        "cd_changes_current_shell": true,
+        "export_inheritance": true,
+        "path_order": true
+      },
+      "case": "environment_path_cd",
+      "condition": {
+        "host_environment_not_inherited": true,
+        "synthetic_paths": [
+          "/tmp/d12-proof/path-first",
+          "/tmp/d12-proof/path-second"
+        ]
+      },
+      "observations": {
+        "cd_builtin": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "pwd; type cd; cd /tmp; pwd"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "/proof\ncd is a shell builtin\n/tmp\n"
+        },
+        "controlled_environment": {
+          "DEMO_HOME": "/tmp/d12-proof",
+          "LC_ALL": "C",
+          "PATH": "/usr/bin:/bin"
+        },
+        "exported_child": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "export DEMO_ONLY=synthetic; bash -c 'printf \"child=%s\\n\" \"${DEMO_ONLY-unset}\"'"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "child=synthetic\n"
+        },
+        "path_first_then_second": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "PATH=/tmp/d12-proof/path-first:/tmp/d12-proof/path-second command -v demo; PATH=/tmp/d12-proof/path-first:/tmp/d12-proof/path-second demo"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "/tmp/d12-proof/path-first/demo\nfirst\n"
+        },
+        "path_second_then_first": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "PATH=/tmp/d12-proof/path-second:/tmp/d12-proof/path-first command -v demo; PATH=/tmp/d12-proof/path-second:/tmp/d12-proof/path-first demo"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "/tmp/d12-proof/path-second/demo\nsecond\n"
+        },
+        "unexported_child": {
+          "argv": [
+            "bash",
+            "--noprofile",
+            "--norc",
+            "-c",
+            "DEMO_ONLY=synthetic; bash -c 'printf \"child=%s\\n\" \"${DEMO_ONLY-unset}\"'"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "child=unset\n"
+        }
+      }
+    },
+    {
+      "assertions": {
+        "640_matrix": true,
+        "directory_entry_delete_vs_file_mode": true,
+        "directory_search_vs_listing": true
+      },
+      "case": "permissions",
+      "condition": {
+        "fixture_scope": "/tmp/d12-proof/permissions",
+        "nonroot_ids": [
+          [
+            1000,
+            2000,
+            []
+          ],
+          [
+            1001,
+            2000,
+            []
+          ],
+          [
+            1002,
+            3000,
+            []
+          ]
+        ],
+        "root_separate": true
+      },
+      "observations": {
+        "640_matrix": {
+          "group_uid1001_gid2000": {
+            "argv": [
+              "/usr/local/bin/python3",
+              "-c",
+              "import os,json,errno; p='/tmp/d12-proof/permissions/owned-640'; out={}; \nfor name,flags in [('read',os.O_RDONLY),('write',os.O_WRONLY)]:\n try:\n  fd=os.open(p,flags); os.close(fd); out[name]={'ok':True}\n except OSError as e: out[name]={'ok':False,'errno':e.errno,'error':e.strerror}\nprint(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'groups':os.getgroups(),'checks':out},sort_keys=True))"
+            ],
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"checks\": {\"read\": {\"ok\": true}, \"write\": {\"errno\": 13, \"error\": \"Permission denied\", \"ok\": false}}, \"gid\": 2000, \"groups\": [], \"uid\": 1001}\n"
+          },
+          "other_uid1002_gid3000": {
+            "argv": [
+              "/usr/local/bin/python3",
+              "-c",
+              "import os,json,errno; p='/tmp/d12-proof/permissions/owned-640'; out={}; \nfor name,flags in [('read',os.O_RDONLY),('write',os.O_WRONLY)]:\n try:\n  fd=os.open(p,flags); os.close(fd); out[name]={'ok':True}\n except OSError as e: out[name]={'ok':False,'errno':e.errno,'error':e.strerror}\nprint(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'groups':os.getgroups(),'checks':out},sort_keys=True))"
+            ],
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"checks\": {\"read\": {\"errno\": 13, \"error\": \"Permission denied\", \"ok\": false}, \"write\": {\"errno\": 13, \"error\": \"Permission denied\", \"ok\": false}}, \"gid\": 3000, \"groups\": [], \"uid\": 1002}\n"
+          },
+          "owner_uid1000_gid2000": {
+            "argv": [
+              "/usr/local/bin/python3",
+              "-c",
+              "import os,json,errno; p='/tmp/d12-proof/permissions/owned-640'; out={}; \nfor name,flags in [('read',os.O_RDONLY),('write',os.O_WRONLY)]:\n try:\n  fd=os.open(p,flags); os.close(fd); out[name]={'ok':True}\n except OSError as e: out[name]={'ok':False,'errno':e.errno,'error':e.strerror}\nprint(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'groups':os.getgroups(),'checks':out},sort_keys=True))"
+            ],
+            "exit": 0,
+            "stderr": "",
+            "stdout": "{\"checks\": {\"read\": {\"ok\": true}, \"write\": {\"ok\": true}}, \"gid\": 2000, \"groups\": [], \"uid\": 1000}\n"
+          }
+        },
+        "dir_wx_unlink_file_444": {
+          "argv": [
+            "rm",
+            "/tmp/d12-proof/permissions/entry-delete/readonly-entry"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "entry_exists_after_unlink": false,
+        "file_stat": {
+          "gid": 2000,
+          "mode": "0o640",
+          "uid": 1000
+        },
+        "parent_without_x_known_file_644": {
+          "argv": [
+            "cat",
+            "/tmp/d12-proof/permissions/no-x/known"
+          ],
+          "exit": 1,
+          "stderr": "cat: /tmp/d12-proof/permissions/no-x/known: Permission denied\n",
+          "stdout": ""
+        },
+        "parent_x_without_r_listing": {
+          "argv": [
+            "ls",
+            "/tmp/d12-proof/permissions/x-no-read"
+          ],
+          "exit": 2,
+          "stderr": "ls: cannot open directory '/tmp/d12-proof/permissions/x-no-read': Permission denied\n",
+          "stdout": ""
+        },
+        "parent_x_without_r_read_known_path": {
+          "argv": [
+            "cat",
+            "/tmp/d12-proof/permissions/x-no-read/known"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "known\n"
+        },
+        "root_uid0_separate": {
+          "argv": [
+            "/usr/local/bin/python3",
+            "-c",
+            "import os,json,errno; p='/tmp/d12-proof/permissions/owned-640'; out={}; \nfor name,flags in [('read',os.O_RDONLY),('write',os.O_WRONLY)]:\n try:\n  fd=os.open(p,flags); os.close(fd); out[name]={'ok':True}\n except OSError as e: out[name]={'ok':False,'errno':e.errno,'error':e.strerror}\nprint(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'groups':os.getgroups(),'checks':out},sort_keys=True))"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "{\"checks\": {\"read\": {\"ok\": true}, \"write\": {\"ok\": true}}, \"gid\": 0, \"groups\": [], \"uid\": 0}\n"
+        }
+      }
+    },
+    {
+      "assertions": {
+        "kill_cleanup_unavailable": true,
+        "term_request_not_exit": true
+      },
+      "case": "signals",
+      "condition": {
+        "TERM_child_waits_for_release_file": true,
+        "only_self_started_children": true,
+        "pid_starttime_checked_before_signal": true
+      },
+      "observations": {
+        "alive_after_ack_before_release": true,
+        "child_stderr": "",
+        "child_stdout_after_ready": "",
+        "handler_ack": "ack\n",
+        "kill_kill": {
+          "identity_match_before_signal": true,
+          "kill_command": {
+            "argv": [
+              "kill",
+              "-KILL",
+              "44"
+            ],
+            "exit": 0,
+            "stderr": "",
+            "stdout": ""
+          },
+          "pid": 44,
+          "proc_starttime": "16038750",
+          "python_negative_nine_means_signal_9": true,
+          "python_popen_returncode": -9,
+          "stderr": ""
+        },
+        "kill_term": {
+          "argv": [
+            "kill",
+            "-TERM",
+            "40"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": ""
+        },
+        "parent_returncode": 0,
+        "pid": 40,
+        "pre_signal_identity_match": true,
+        "proc_starttime": "16038742",
+        "ps_after_ack": {
+          "argv": [
+            "ps",
+            "-o",
+            "pid=,ppid=,stat=,comm=",
+            "-p",
+            "40"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "     40       1 S    python3\n"
+        },
+        "ps_before": {
+          "argv": [
+            "ps",
+            "-o",
+            "pid=,ppid=,stat=,comm=",
+            "-p",
+            "40"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "     40       1 S    python3\n"
+        },
+        "release_file": "/tmp/d12-proof/signals/release"
+      }
+    },
+    {
+      "assertions": {
+        "503_to_200_controlled_transition": true,
+        "process_socket_tcp_http_observed_separately": true
+      },
+      "case": "network_readiness",
+      "condition": {
+        "bind": "127.0.0.1",
+        "external_network": "disabled",
+        "not_systemd": true,
+        "server": "self-started Python HTTP fixture"
+      },
+      "observations": {
+        "curl_after_ready": {
+          "argv": [
+            "curl",
+            "--silent",
+            "--show-error",
+            "--max-time",
+            "2",
+            "-w",
+            "\\nHTTP_STATUS=%{http_code}\\n",
+            "http://127.0.0.1:44397/"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "ready\n\nHTTP_STATUS=200\n"
+        },
+        "curl_before_ready": {
+          "argv": [
+            "curl",
+            "--silent",
+            "--show-error",
+            "--max-time",
+            "2",
+            "-w",
+            "\\nHTTP_STATUS=%{http_code}\\n",
+            "http://127.0.0.1:44397/"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "warming\n\nHTTP_STATUS=503\n"
+        },
+        "ephemeral_port": 44397,
+        "loopback_address": "127.0.0.1",
+        "nc_tcp": {
+          "argv": [
+            "nc",
+            "-z",
+            "-v",
+            "-w",
+            "2",
+            "127.0.0.1",
+            "44397"
+          ],
+          "exit": 0,
+          "stderr": "Connection to 127.0.0.1 44397 port [tcp/*] succeeded!\n",
+          "stdout": ""
+        },
+        "pid": 46,
+        "proc_alive_before_probes": true,
+        "proc_starttime": "16038750",
+        "ready_flag": "controlled-ready\n",
+        "ss_listen": {
+          "argv": [
+            "ss",
+            "-lnt",
+            "sport",
+            "= :44397"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "State  Recv-Q Send-Q Local Address:Port  Peer Address:Port\nLISTEN 0      5          127.0.0.1:44397      0.0.0.0:*   \n"
+        }
+      }
+    },
+    {
+      "assertions": {
+        "close_releases_or_preserves_no_more_blocks": true,
+        "unlinked_open_fd_retains_blocks": true,
+        "write_consumed_blocks": true
+      },
+      "case": "disk_df_du_deleted_open",
+      "condition": {
+        "filesystem": "container /tmp tmpfs",
+        "payload": "8 MiB actual writes; no truncate/sparse allocation",
+        "scope_limit": "not host APFS or production disk"
+      },
+      "observations": {
+        "df_after_close": {
+          "argv": [
+            "df",
+            "-B1",
+            "/tmp/d12-proof/disk"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "Filesystem     1B-blocks  Used Available Use% Mounted on\ntmpfs          134217728 40960 134176768   1% /tmp\n"
+        },
+        "df_after_unlink_open_fd": {
+          "argv": [
+            "df",
+            "-B1",
+            "/tmp/d12-proof/disk"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "Filesystem     1B-blocks    Used Available Use% Mounted on\ntmpfs          134217728 8429568 125788160   7% /tmp\n"
+        },
+        "df_after_write": {
+          "argv": [
+            "df",
+            "-B1",
+            "/tmp/d12-proof/disk"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "Filesystem     1B-blocks    Used Available Use% Mounted on\ntmpfs          134217728 8429568 125788160   7% /tmp\n"
+        },
+        "df_before_write": {
+          "argv": [
+            "df",
+            "-B1",
+            "/tmp/d12-proof/disk"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "Filesystem     1B-blocks  Used Available Use% Mounted on\ntmpfs          134217728 40960 134176768   1% /tmp\n"
+        },
+        "du_file_before_unlink": {
+          "argv": [
+            "du",
+            "-B1",
+            "/tmp/d12-proof/disk/8m.bin"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "8388608\t/tmp/d12-proof/disk/8m.bin\n"
+        },
+        "du_path_after_unlink": {
+          "argv": [
+            "du",
+            "-B1",
+            "/tmp/d12-proof/disk/8m.bin"
+          ],
+          "exit": 1,
+          "stderr": "du: cannot access '/tmp/d12-proof/disk/8m.bin': No such file or directory\n",
+          "stdout": ""
+        },
+        "stat_blocks_512b_units": 16384,
+        "statvfs_after_close": {
+          "bavail": 32758,
+          "bfree": 32758
+        },
+        "statvfs_after_unlink_open_fd": {
+          "bavail": 30710,
+          "bfree": 30710
+        },
+        "statvfs_after_write": {
+          "bavail": 30710,
+          "bfree": 30710,
+          "blocks": 32768
+        },
+        "statvfs_before_write": {
+          "bavail": 32758,
+          "bfree": 32758,
+          "blocks": 32768
+        },
+        "unlink_while_fd_open": true,
+        "written_bytes": 8388608
+      }
+    },
+    {
+      "assertions": {
+        "destination_bytes_unchanged": true,
+        "new_file_listed": true
+      },
+      "case": "local_rsync_dry_run",
+      "condition": {
+        "destination": "/tmp/d12-proof/rsync/dst",
+        "remote_transfer_performed": false,
+        "source": "/tmp/d12-proof/rsync/src",
+        "ssh_or_remote": false
+      },
+      "observations": {
+        "destination_sha256_after": {
+          "old.txt": "01d09d19c2139a46aebfb577780d123d7396e97201bc7ead210a2ebff8239dee",
+          "same.txt": "a6328afc76e9db71da297ebff4b0d3e7a7eb3b01d917c05a6573fef121b6ecb6"
+        },
+        "destination_sha256_before": {
+          "old.txt": "01d09d19c2139a46aebfb577780d123d7396e97201bc7ead210a2ebff8239dee",
+          "same.txt": "a6328afc76e9db71da297ebff4b0d3e7a7eb3b01d917c05a6573fef121b6ecb6"
+        },
+        "dry_run": {
+          "argv": [
+            "rsync",
+            "-av",
+            "--dry-run",
+            "/tmp/d12-proof/rsync/src/",
+            "/tmp/d12-proof/rsync/dst/"
+          ],
+          "exit": 0,
+          "stderr": "",
+          "stdout": "sending incremental file list\nnew.txt\n\nsent 99 bytes  received 19 bytes  236.00 bytes/sec\ntotal size is 27  speedup is 0.23 (DRY RUN)\n"
+        }
+      }
+    }
+  ],
+  "finishedAtUTC": "2026-10-24T19:26:58.812076+00:00",
+  "labMarker": "D12_LINUX_PROOF_20261025",
+  "schema": "d12-linux-proof-v1",
+  "scope": {
+    "host_environment_dumped": false,
+    "linux_container_only": true,
+    "network_none": true,
+    "source_command_fixtures_distinguished": true,
+    "ssh_not_run": true,
+    "systemd_not_run": true
+  },
+  "startedAtUTC": "2026-10-24T19:26:58.359314+00:00",
+  "system": {
+    "allowlisted_environment": {
+      "D12_LAB_MARKER": "D12_LINUX_PROOF_20261025",
+      "LANG": "C.UTF-8",
+      "PATH": "/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    },
+    "bash": {
+      "argv": [
+        "bash",
+        "--version"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "GNU bash, version 5.2.37(1)-release (aarch64-unknown-linux-gnu)\nCopyright (C) 2022 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\n\nThis is free software; you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n"
+    },
+    "container_pid1": {
+      "argv": [
+        "ps",
+        "-p",
+        "1",
+        "-o",
+        "pid=,comm=,args="
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "      1 python3         python3 /proof/proof.py\n"
+    },
+    "kernel": {
+      "argv": [
+        "uname",
+        "-a"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "Linux 26f7c441d68f 7.0.14-linuxkit #1 SMP PREEMPT Fri Oct 16 11:55:50 UTC 2026 aarch64 GNU/Linux\n"
+    },
+    "mount_tmp": {
+      "argv": [
+        "findmnt",
+        "-T",
+        "/tmp",
+        "-o",
+        "TARGET,FSTYPE,OPTIONS"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "TARGET FSTYPE OPTIONS\n/tmp   tmpfs  rw,nosuid,nodev,relatime,size=131072k\n"
+    },
+    "os_release": "PRETTY_NAME=\"Debian GNU/Linux 13 (trixie)\"\nNAME=\"Debian GNU/Linux\"\nVERSION_ID=\"13\"\nVERSION=\"13 (trixie)\"\nVERSION_CODENAME=trixie\nDEBIAN_VERSION_FULL=13.7\nID=debian\nHOME_URL=\"https://www.debian.org/\"\nSUPPORT_URL=\"https://www.debian.org/support\"\nBUG_REPORT_URL=\"https://bugs.debian.org/\"\n",
+    "package_versions": {
+      "argv": [
+        "dpkg-query",
+        "-W",
+        "-f=${Package}=${Version}\\n",
+        "bash",
+        "coreutils",
+        "findutils",
+        "grep",
+        "sed",
+        "procps",
+        "iproute2",
+        "curl",
+        "netcat-openbsd",
+        "rsync",
+        "util-linux"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "bash=5.2.37-2+b10\ncoreutils=9.7-3\ncurl=8.14.1-2+deb13u7\nfindutils=4.10.0-3\ngrep=3.11-4+b1\niproute2=6.15.0-1\nnetcat-openbsd=1.229-1\nprocps=2:4.0.4-9\nrsync=3.5.0+ds1-0+deb13u1\nsed=4.9-2+deb13u1\nutil-linux=2.41.5-0+deb13u1\n"
+    },
+    "python": {
+      "argv": [
+        "python3",
+        "--version"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "Python 3.12.15\n"
+    },
+    "timezone": "UTC",
+    "uid_gid_groups": {
+      "argv": [
+        "id"
+      ],
+      "exit": 0,
+      "stderr": "",
+      "stdout": "uid=0(root) gid=0(root) groups=0(root)\n"
+    },
+    "working_directory": "/proof"
+  }
+}
+

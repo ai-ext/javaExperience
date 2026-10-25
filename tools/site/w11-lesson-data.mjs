@@ -1,0 +1,1808 @@
+// 원문 B/C 동명 대안은 별도 source set/JVM의 관측이다. 원문 코드는 수정하지 않는다.
+export const w11AssetRoot = '../design/w11-2026-10-20/images/';
+export const W11_RUNS = {
+  "variantB": {
+    "observerConnection": {
+      "autoCommit": true,
+      "jdbcIsolation": 2
+    },
+    "variant": "B",
+    "versions": {
+      "spring": "7.0.9",
+      "h2": "2.4.240",
+      "java": 21
+    },
+    "sourceBeans": {
+      "useCaseCglib": false,
+      "controllerCglib": true,
+      "ordersCglib": true,
+      "inventoryCglib": true
+    },
+    "sourceInventoryFailure": "재고가 부족하거나 상품이 없습니다",
+    "repositoryFailure": {
+      "callResult": "IllegalStateException",
+      "timeline": [
+        {
+          "sequence": 1,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 6
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "connection",
+          "connection": 1,
+          "action": "commit",
+          "argument": null
+        },
+        {
+          "sequence": 4,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 5,
+          "kind": "connection",
+          "connection": 1,
+          "action": "close",
+          "argument": null
+        },
+        {
+          "sequence": 6,
+          "kind": "connection",
+          "connection": 2,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 7,
+          "kind": "source-sql",
+          "connection": 2,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 6,
+            "2": 7,
+            "3": 6
+          },
+          "affectedRows": 0,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 2
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 8,
+          "kind": "connection",
+          "connection": 2,
+          "action": "rollback",
+          "argument": null
+        },
+        {
+          "sequence": 9,
+          "kind": "connection",
+          "connection": 2,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 10,
+          "kind": "connection",
+          "connection": 2,
+          "action": "close",
+          "argument": null
+        }
+      ],
+      "sourceSql": [
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 6
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 7,
+          "kind": "source-sql",
+          "connection": 2,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 6,
+            "2": 7,
+            "3": 6
+          },
+          "affectedRows": 0,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 2
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          }
+        }
+      ],
+      "listenerObservations": [],
+      "riskObservations": [],
+      "finalObserver": {
+        "orders": [
+          {
+            "productId": 7,
+            "quantity": 6
+          }
+        ],
+        "stock": 5
+      },
+      "trackedConnectionsOpened": 2
+    },
+    "repositorySuccess": {
+      "callResult": "normal return",
+      "timeline": [
+        {
+          "sequence": 1,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "connection",
+          "connection": 1,
+          "action": "commit",
+          "argument": null
+        },
+        {
+          "sequence": 4,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 5,
+          "kind": "connection",
+          "connection": 1,
+          "action": "close",
+          "argument": null
+        },
+        {
+          "sequence": 6,
+          "kind": "connection",
+          "connection": 2,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 7,
+          "kind": "source-sql",
+          "connection": 2,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 2,
+            "2": 7,
+            "3": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 2
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "independentObserverAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 8,
+          "kind": "connection",
+          "connection": 2,
+          "action": "commit",
+          "argument": null
+        },
+        {
+          "sequence": 9,
+          "kind": "connection",
+          "connection": 2,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 10,
+          "kind": "connection",
+          "connection": 2,
+          "action": "close",
+          "argument": null
+        }
+      ],
+      "sourceSql": [
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 7,
+          "kind": "source-sql",
+          "connection": 2,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 2,
+            "2": 7,
+            "3": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 2
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "independentObserverAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          }
+        }
+      ],
+      "listenerObservations": [],
+      "riskObservations": [],
+      "finalObserver": {
+        "orders": [
+          {
+            "productId": 7,
+            "quantity": 2
+          }
+        ],
+        "stock": 3
+      },
+      "trackedConnectionsOpened": 2
+    },
+    "controllerFailure": {
+      "callResult": "IllegalStateException",
+      "timeline": [
+        {
+          "sequence": 1,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 6
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 6,
+            "2": 7,
+            "3": 6
+          },
+          "affectedRows": 0,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 4,
+          "kind": "connection",
+          "connection": 1,
+          "action": "rollback",
+          "argument": null
+        },
+        {
+          "sequence": 5,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 6,
+          "kind": "connection",
+          "connection": 1,
+          "action": "close",
+          "argument": null
+        }
+      ],
+      "sourceSql": [
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 6
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 6,
+            "2": 7,
+            "3": 6
+          },
+          "affectedRows": 0,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        }
+      ],
+      "listenerObservations": [],
+      "riskObservations": [],
+      "finalObserver": {
+        "orders": [],
+        "stock": 5
+      },
+      "trackedConnectionsOpened": 1
+    },
+    "controllerSuccess": {
+      "callResult": "normal Java return; HTTP not invoked",
+      "timeline": [
+        {
+          "sequence": 1,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 2,
+            "2": 7,
+            "3": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 4,
+          "kind": "connection",
+          "connection": 1,
+          "action": "commit",
+          "argument": null
+        },
+        {
+          "sequence": 5,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 6,
+          "kind": "connection",
+          "connection": 1,
+          "action": "close",
+          "argument": null
+        }
+      ],
+      "sourceSql": [
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 2,
+            "2": 7,
+            "3": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        }
+      ],
+      "listenerObservations": [],
+      "riskObservations": [],
+      "finalObserver": {
+        "orders": [
+          {
+            "productId": 7,
+            "quantity": 2
+          }
+        ],
+        "stock": 3
+      },
+      "trackedConnectionsOpened": 1
+    },
+    "templateRejected": {
+      "callResult": "IllegalArgumentException",
+      "timeline": [
+        {
+          "sequence": 1,
+          "kind": "additional-risk-stub",
+          "productId": 7,
+          "quantity": 2,
+          "springFlags": {
+            "active": false,
+            "synchronization": false,
+            "connection": null
+          },
+          "allowed": false,
+          "scope": "Controlled memory stub, no network/side effect."
+        }
+      ],
+      "sourceSql": [],
+      "listenerObservations": [],
+      "riskObservations": [
+        {
+          "sequence": 1,
+          "kind": "additional-risk-stub",
+          "productId": 7,
+          "quantity": 2,
+          "springFlags": {
+            "active": false,
+            "synchronization": false,
+            "connection": null
+          },
+          "allowed": false,
+          "scope": "Controlled memory stub, no network/side effect."
+        }
+      ],
+      "finalObserver": {
+        "orders": [],
+        "stock": 5
+      },
+      "trackedConnectionsOpened": 0
+    },
+    "templateSuccess": {
+      "callResult": "normal return",
+      "timeline": [
+        {
+          "sequence": 1,
+          "kind": "additional-risk-stub",
+          "productId": 7,
+          "quantity": 2,
+          "springFlags": {
+            "active": false,
+            "synchronization": false,
+            "connection": null
+          },
+          "allowed": true,
+          "scope": "Controlled memory stub, no network/side effect."
+        },
+        {
+          "sequence": 2,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 4,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 2,
+            "2": 7,
+            "3": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 5,
+          "kind": "connection",
+          "connection": 1,
+          "action": "commit",
+          "argument": null
+        },
+        {
+          "sequence": 6,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 7,
+          "kind": "connection",
+          "connection": 1,
+          "action": "close",
+          "argument": null
+        }
+      ],
+      "sourceSql": [
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 4,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 2,
+            "2": 7,
+            "3": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        }
+      ],
+      "listenerObservations": [],
+      "riskObservations": [
+        {
+          "sequence": 1,
+          "kind": "additional-risk-stub",
+          "productId": 7,
+          "quantity": 2,
+          "springFlags": {
+            "active": false,
+            "synchronization": false,
+            "connection": null
+          },
+          "allowed": true,
+          "scope": "Controlled memory stub, no network/side effect."
+        }
+      ],
+      "finalObserver": {
+        "orders": [
+          {
+            "productId": 7,
+            "quantity": 2
+          }
+        ],
+        "stock": 3
+      },
+      "trackedConnectionsOpened": 1
+    },
+    "templateFailure": {
+      "callResult": "IllegalStateException",
+      "timeline": [
+        {
+          "sequence": 1,
+          "kind": "additional-risk-stub",
+          "productId": 7,
+          "quantity": 6,
+          "springFlags": {
+            "active": false,
+            "synchronization": false,
+            "connection": null
+          },
+          "allowed": true,
+          "scope": "Controlled memory stub, no network/side effect."
+        },
+        {
+          "sequence": 2,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 6
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 4,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 6,
+            "2": 7,
+            "3": 6
+          },
+          "affectedRows": 0,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 5,
+          "kind": "connection",
+          "connection": 1,
+          "action": "rollback",
+          "argument": null
+        },
+        {
+          "sequence": 6,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 7,
+          "kind": "connection",
+          "connection": 1,
+          "action": "close",
+          "argument": null
+        }
+      ],
+      "sourceSql": [
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 6
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 4,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 6,
+            "2": 7,
+            "3": 6
+          },
+          "affectedRows": 0,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        }
+      ],
+      "listenerObservations": [],
+      "riskObservations": [
+        {
+          "sequence": 1,
+          "kind": "additional-risk-stub",
+          "productId": 7,
+          "quantity": 6,
+          "springFlags": {
+            "active": false,
+            "synchronization": false,
+            "connection": null
+          },
+          "allowed": true,
+          "scope": "Controlled memory stub, no network/side effect."
+        }
+      ],
+      "finalObserver": {
+        "orders": [],
+        "stock": 5
+      },
+      "trackedConnectionsOpened": 1
+    },
+    "scope": "Exact original5Java blocks compiled in separate B/C source sets/JVMs because OrderUseCase is an alternative same-named class. Common original repositories/Controller/CheckedOrderUseCase run with additional H2 schema(product7 stock5), Spring7.0.9 CGLIB/DataSourceTransactionManager/JDK21/Boot4.1.1 BOM only. Controller is a proxied Java call, no HTTP/MVC/serialization. RiskClient is a controlled memory stub; C listener is an additional subclass calling the original empty handler, no notification/broker. Source SQL events record actual prepared SQL/setter bindings/affected rows and writer/independent READ_COMMITTED autocommit observer snapshots. Observation SELECTs/setup/assert queries excluded from source SQL. Connection IDs are run-local wrapper IDs, not DB sessions/pool counts. No Boot app/JPA/MySQL/Java25/Docker/network/payment/broker/outbox/CDC/OSIV/pool/latency/reactive runtime.",
+    "checks": 22,
+    "checkNames": [
+      "B-repositories-are-proxies",
+      "B-usecase-has-no-transaction-proxy",
+      "B-partial-order-commit-survives-stock-failure",
+      "B-repositories-use-two-connections",
+      "B-inventory-guard-affects-zero",
+      "B-one-commit-one-rollback",
+      "B-success-final-order-stock3",
+      "B-success-two-independent-commits",
+      "A-controller-is-cglib-proxy",
+      "A-controller-java-proxy-rolls-back-both",
+      "A-controller-repositories-share-one-connection",
+      "A-controller-one-rollback-no-commit",
+      "A-controller-java-proxy-success",
+      "A-controller-one-commit",
+      "D-risk-rejection-message",
+      "D-rejected-risk-opens-no-tracked-connection",
+      "D-risk-outside-transaction",
+      "D-template-allowed-order-stock3",
+      "D-template-repositories-share-one-connection",
+      "D-risk-precedes-first-source-sql",
+      "D-template-stock-failure-rolls-back-both",
+      "D-template-one-rollback"
+    ]
+  },
+  "variantC": {
+    "observerConnection": {
+      "autoCommit": true,
+      "jdbcIsolation": 2
+    },
+    "variant": "C",
+    "versions": {
+      "spring": "7.0.9",
+      "h2": "2.4.240",
+      "java": 21
+    },
+    "sourceBeans": {
+      "useCaseCglib": true,
+      "controllerCglib": true,
+      "ordersCglib": true,
+      "inventoryCglib": true
+    },
+    "serviceSuccess": {
+      "callResult": "normal return",
+      "timeline": [
+        {
+          "sequence": 1,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 2,
+            "2": 7,
+            "3": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 4,
+          "kind": "connection",
+          "connection": 1,
+          "action": "commit",
+          "argument": null
+        },
+        {
+          "sequence": 5,
+          "kind": "additional-listener-observer",
+          "productId": 7,
+          "quantity": 2,
+          "springFlags": {
+            "active": true,
+            "synchronization": false,
+            "connection": 1
+          },
+          "independentObserver": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "scope": "Additional subclass invoked original empty listener via super; no notification/broker call."
+        },
+        {
+          "sequence": 6,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 7,
+          "kind": "connection",
+          "connection": 1,
+          "action": "close",
+          "argument": null
+        }
+      ],
+      "sourceSql": [
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 2,
+            "2": 7,
+            "3": 2
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        }
+      ],
+      "listenerObservations": [
+        {
+          "sequence": 5,
+          "kind": "additional-listener-observer",
+          "productId": 7,
+          "quantity": 2,
+          "springFlags": {
+            "active": true,
+            "synchronization": false,
+            "connection": 1
+          },
+          "independentObserver": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 2
+              }
+            ],
+            "stock": 3
+          },
+          "scope": "Additional subclass invoked original empty listener via super; no notification/broker call."
+        }
+      ],
+      "riskObservations": [],
+      "finalObserver": {
+        "orders": [
+          {
+            "productId": 7,
+            "quantity": 2
+          }
+        ],
+        "stock": 3
+      },
+      "trackedConnectionsOpened": 1
+    },
+    "serviceFailure": {
+      "callResult": "IllegalStateException",
+      "timeline": [
+        {
+          "sequence": 1,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": false
+        },
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 6
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 6,
+            "2": 7,
+            "3": 6
+          },
+          "affectedRows": 0,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 4,
+          "kind": "connection",
+          "connection": 1,
+          "action": "rollback",
+          "argument": null
+        },
+        {
+          "sequence": 5,
+          "kind": "connection",
+          "connection": 1,
+          "action": "setAutoCommit",
+          "argument": true
+        },
+        {
+          "sequence": 6,
+          "kind": "connection",
+          "connection": 1,
+          "action": "close",
+          "argument": null
+        }
+      ],
+      "sourceSql": [
+        {
+          "sequence": 2,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "insert into orders(product_id, quantity) values (?, ?)",
+          "parameters": {
+            "1": 7,
+            "2": 6
+          },
+          "affectedRows": 1,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        },
+        {
+          "sequence": 3,
+          "kind": "source-sql",
+          "connection": 1,
+          "sql": "update inventory set quantity = quantity - ? where product_id = ? and quantity >= ?",
+          "parameters": {
+            "1": 6,
+            "2": 7,
+            "3": 6
+          },
+          "affectedRows": 0,
+          "springFlags": {
+            "active": true,
+            "synchronization": true,
+            "connection": 1
+          },
+          "writerAfterStatement": {
+            "orders": [
+              {
+                "productId": 7,
+                "quantity": 6
+              }
+            ],
+            "stock": 5
+          },
+          "independentObserverAfterStatement": {
+            "orders": [],
+            "stock": 5
+          }
+        }
+      ],
+      "listenerObservations": [],
+      "riskObservations": [],
+      "finalObserver": {
+        "orders": [],
+        "stock": 5
+      },
+      "trackedConnectionsOpened": 1
+    },
+    "scope": "Exact original5Java blocks compiled in separate B/C source sets/JVMs because OrderUseCase is an alternative same-named class. Common original repositories/Controller/CheckedOrderUseCase run with additional H2 schema(product7 stock5), Spring7.0.9 CGLIB/DataSourceTransactionManager/JDK21/Boot4.1.1 BOM only. Controller is a proxied Java call, no HTTP/MVC/serialization. RiskClient is a controlled memory stub; C listener is an additional subclass calling the original empty handler, no notification/broker. Source SQL events record actual prepared SQL/setter bindings/affected rows and writer/independent READ_COMMITTED autocommit observer snapshots. Observation SELECTs/setup/assert queries excluded from source SQL. Connection IDs are run-local wrapper IDs, not DB sessions/pool counts. No Boot app/JPA/MySQL/Java25/Docker/network/payment/broker/outbox/CDC/OSIV/pool/latency/reactive runtime.",
+    "checks": 9,
+    "checkNames": [
+      "C-repositories-are-proxies",
+      "C-service-is-cglib-proxy",
+      "C-service-success-order-stock3",
+      "C-service-one-connection-one-commit",
+      "C-additional-observer-invokes-original-empty-listener",
+      "C-listener-sees-committed-state",
+      "C-service-stock-failure-rolls-back-both",
+      "C-failure-no-listener-observation",
+      "C-service-failure-one-connection-one-rollback"
+    ]
+  }
+};
+export const w11Run = path => path.split('.').reduce((object,key)=>object?.[key],W11_RUNS);
+const stage=(topic,id,title,lead,code,values,checks=[],runKeys=[],extra={})=>({id:topic+'-'+id,title,lead,code,values,checks,runKeys,active:[0],image:'W11-'+topic,...extra});
+const scope='원문 코드 그대로 · 추가 standalone Spring 7.0.9 CGLIB / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용';
+const limits='Boot 앱·JPA·MySQL·Java 25·HTTP/MVC·응답 직렬화·Docker·broker·outbox·CDC·OSIV·pool/지연시간은 실행·계측하지 않았습니다.';
+const context='추가 schema는 orders(product_id,quantity)·inventory(product_id,quantity)이며 매 run product7·재고5로 초기화했습니다. 연결 번호1/2는 run-local wrapper ID이며 DB session 번호나 pool 개수가 아닙니다. 관찰 SELECT·setup·assert 쿼리는 sourceSql 집계 밖이며 wire 계측이 아닙니다.';
+const insertCode='jdbc.update("insert into orders(product_id, quantity) values (?, ?)",\n        command.productId(), command.quantity());';
+const inventoryCode='int changed = jdbc.update(\n    "update inventory set quantity = quantity - ? " +\n        "where product_id = ? and quantity >= ?",\n    command.quantity(), command.productId(), command.quantity());\nif (changed != 1) {\n    throw new IllegalStateException("재고가 부족하거나 상품이 없습니다");\n}';
+export const W11_LESSONS=[
+  {id:'repository',question:'재고가 부족한데 주문은 왜 남았을까?',source:scope+' · 원문 B: Repository별 경계',sourceNote:'B의 OrderUseCase에는 transaction 경계가 없습니다. 원문 Repository 두 메서드의 @Transactional은 그대로입니다. B/C 동명 대안은 별도 JVM에서 실행했습니다.',note:context+' '+limits,stages:[
+    stage('repository','insert','첫 INSERT는 아직 writer에만','원문 B에 product7·quantity6을 요청했습니다. 첫 Repository의 INSERT가1행을 만들었지만, 그 문장 직후 독립 observer에는 아직 주문이 없고 재고는5입니다.',insertCode,[['원문 요청','productId=7 / quantity=6'],['첫 INSERT 바인딩','1=7 / 2=6'],['affectedRows','1'],['문장 직후 writer','orders=[7/6] / stock=5'],['같은 시점 observer','orders=[] / stock=5'],['tracked connection','1 · 첫 Repository']],[],['variantB.repositoryFailure']),
+    stage('repository','guard','첫 commit 뒤 두 번째 guard0','첫 Repository는 이미 commit됐습니다. 두 번째 연결2에서 재고6 차감을 시도하지만 stock5라 affectedRows=0입니다. 이 시점 observer는 앞서 commit한 주문7/6을 읽습니다.',inventoryCode,[['guard 바인딩','1=6 / 2=7 / 3=6'],['affectedRows','0'],['문장 직후 writer','orders=[7/6] / stock=5'],['같은 시점 observer','orders=[7/6] / stock=5'],['tracked connection','2 · 두 번째 Repository']],['B-inventory-guard-affects-zero'],['variantB.repositoryFailure'],{active:[0,3,4,5]}),
+    stage('repository','partial','실패 뒤에도 주문7/6이 남음','두 번째 Repository는 예외로 rollback됐지만 첫 commit을 되돌리지 못했습니다. 최종 observer는 주문7/6 한 건과 재고5를 읽습니다.', 'orders.insert(command);\ninventory.decrease(command); // 원문 B: 예외가 앞 commit을 취소하지 못함',[['호출 결과','IllegalStateException'],['최종 observer','orders=[7/6] / stock=5'],['자원 동작','connection1 commit / connection2 rollback']],['B-partial-order-commit-survives-stock-failure','B-one-commit-one-rollback'],['variantB.repositoryFailure'],{active:[0,1]}),
+    stage('repository','success','별도 성공은 두 번 commit','독립 초기화 뒤 quantity2로 요청했습니다. 최종 주문7/2 한 건·재고3이지만 저장소마다 연결1/2를 열어 두 번 독립 commit한 결과입니다.','useCase.place(new PlaceOrder(7, 2));',[['별도 성공 요청','productId=7 / quantity=2'],['최종 observer','orders=[7/2] / stock=3'],['자원 동작','두 독립 commit · tracked connections=2']],['B-success-final-order-stock3','B-success-two-independent-commits'],['variantB.repositorySuccess']),
+  ]},
+  {id:'controller',question:'Controller에 경계가 있으면 두 저장은 함께 rollback될까?',source:scope+' · 원문 A Controller',sourceNote:'Controller CGLIB 빈의 Java 메서드를 직접 호출했습니다. HTTP/MVC 처리·201 응답·직렬화를 실행한 결과가 아닙니다.',note:context+' 원문 A는 두 저장 호출을 감쌉니다. 이 실행은 DB 원자성 범위만 비교하며 HTTP 수명이나 다른 진입점 재사용을 실측하지 않았습니다. '+limits,stages:[
+    stage('controller','insert','A의 두 Repository는 연결1 공유','원문 Controller.place의 @Transactional 아래 첫 INSERT를 실행했습니다. writer에는 주문7/6이 있지만 observer에는 주문이 없고 재고5가 보입니다.', '@Transactional\npublic void place(@RequestBody PlaceOrder command) {\n    orders.insert(command);\n    inventory.decrease(command);\n}',[['tracked connection','첫 INSERT와 guard 모두1'],['첫 INSERT 뒤 writer','orders=[7/6] / stock=5'],['첫 INSERT 뒤 observer','orders=[] / stock=5'],['호출 범위','CGLIB Java 호출 · HTTP 아님']],['A-controller-is-cglib-proxy','A-controller-repositories-share-one-connection'],['variantB.controllerFailure'],{active:[0,2,3]}),
+    stage('controller','failure','quantity6 실패는 두 작업 rollback','같은 연결1에서 guard UPDATE가0행이 되어 원문 예외가 발생했습니다. Controller 경계에서 한 번 rollback돼 주문은0건·재고는5입니다.','controller.place(new PlaceOrder(7, 6));\n// 원문 inventory.decrease가 IllegalStateException',[['guard affectedRows','0'],['최종 observer','orders=[] / stock=5'],['자원 동작','rollback1 / commit0'],['호출자 관찰','IllegalStateException']],['A-controller-java-proxy-rolls-back-both','A-controller-one-rollback-no-commit'],['variantB.controllerFailure']),
+    stage('controller','success','별도 quantity2는 한 번 commit','별도 성공 요청의 두 저장은 같은 연결1에 참여했습니다. 최종 주문7/2 한 건·재고3이며 commit은 한 번입니다.','controller.place(new PlaceOrder(7, 2));',[['최종 observer','orders=[7/2] / stock=3'],['자원 동작','같은 연결1 · commit1'],['주의','실제 HTTP 응답 상태는 미실행']],['A-controller-java-proxy-success','A-controller-one-commit'],['variantB.controllerSuccess']),
+  ]},
+  {id:'service',question:'서비스 경계에서 주문과 재고의 중간값은 어떻게 보일까?',source:scope+' · 별도 variantC 원문 서비스 경계',sourceNote:'원문 C의 @Transactional OrderUseCase를 별도 JVM에서 실행했습니다. Repository 코드는 B와 같으며 기존 @Transactional을 제거하지 않았습니다.',note:context+' C의 원문 listener는 빈 no-op body입니다. 추가 ObservedListener가 원문 super handler 뒤 관찰만 기록했으며 알림·broker 전송은 하지 않았습니다. '+limits,stages:[
+    stage('service','insert','C의 INSERT 뒤에도 observer는 이전 상태', '원문 C에 quantity2를 요청했습니다. 같은 transaction의 첫 INSERT 뒤 writer는 주문7/2·재고5이며 observer는 주문0·재고5입니다.',insertCode,[['INSERT 바인딩','1=7 / 2=2'],['affectedRows','1'],['문장 직후 writer','orders=[7/2] / stock=5'],['같은 시점 observer','orders=[] / stock=5'],['tracked connection','1 · C 서비스 transaction']],[],['variantC.serviceSuccess']),
+    stage('service','decrease','차감 뒤 writer stock3·observer stock5','이어진 원문 guard UPDATE는1행을 바꿨습니다. writer 재고는3이지만 독립 observer는 아직 주문0·재고5를 읽습니다.',inventoryCode,[['UPDATE 바인딩','1=2 / 2=7 / 3=2'],['affectedRows','1'],['문장 직후 writer','orders=[7/2] / stock=3'],['같은 시점 observer','orders=[] / stock=5'],['tracked connection','같은1']],[],['variantC.serviceSuccess'],{active:[0,3,4]}),
+    stage('service','commit','서비스 commit 뒤 observer도 새 상태','원문 C가 두 저장과 이벤트 발행을 마친 뒤 한 번 commit했습니다. 최종 observer는 주문7/2·재고3이며 추가 listener 관찰도 commit 뒤에 기록됐습니다.','@Transactional\npublic void place(PlaceOrder command) {\n    orders.insert(command);\n    inventory.decrease(command);\n    events.publishEvent(new OrderPlaced(command.productId(), command.quantity()));\n}',[['최종 observer','orders=[7/2] / stock=3'],['자원 동작','connection1 commit1'],['추가 listener 관찰','commit 뒤1회 · 실제 알림 아님']],['C-service-success-order-stock3','C-service-one-connection-one-commit'],['variantC.serviceSuccess'],{active:[0,2,3,4]}),
+    stage('service','failure','별도 quantity6은 모두 rollback','다른 초기화 run의 quantity6에서는 guard가0행으로 실패했습니다. 같은 연결의 한 rollback으로 주문0·재고5가 됐고 이벤트 발행 줄에 도달하지 않아 추가 listener 관찰도 없습니다.','useCase.place(new PlaceOrder(7, 6));\n// inventory 예외 → publishEvent 줄 미도달',[['최종 observer','orders=[] / stock=5'],['호출자 결과','IllegalStateException'],['자원 동작','같은 연결1 · rollback1 / commit0'],['추가 listener 관찰','0']],['C-service-stock-failure-rolls-back-both','C-failure-no-listener-observation','C-service-failure-one-connection-one-rollback'],['variantC.serviceFailure']),
+  ]},
+  {id:'required',question:'Repository 애노테이션이 같아도 왜 연결 수가 달라질까?',source:scope+' · B/C sourceBeans와 실제 sourceSql 연결',sourceNote:'B/C는 동명 OrderUseCase의 원문 대안이라 별도 source set/JVM입니다. 번호1/2는 각 run 안의 wrapper 식별자이며 같은 DB 세션 번호를 비교한 것이 아닙니다.',note:'원문 저장소의 @Transactional 기본 REQUIRED는 상위 transaction이 없으면 시작하고 있으면 참여합니다. C에서도 저장소 애노테이션을 보존했습니다. '+context+' '+limits,stages:[
+    stage('required','separate','B는 상위 경계 없이1→2','B useCase는 transaction 프록시가 아니고 Repository 둘은 CGLIB 프록시였습니다. B 실패 run의 INSERT·UPDATE는 각각 연결1·2에 기록됐습니다.','// 원문 B: place에는 @Transactional 없음\npublic void place(PlaceOrder command) {\n    orders.insert(command);\n    inventory.decrease(command);\n}',[['B sourceBeans','useCaseCglib=false / ordersCglib=true / inventoryCglib=true'],['sourceSql 연결','INSERT1 / UPDATE2'],['경계','상위 transaction 없음 · Repository별 시작']],['B-repositories-are-proxies','B-usecase-has-no-transaction-proxy','B-repositories-use-two-connections'],['variantB.sourceBeans','variantB.repositoryFailure'],{active:[0,2,3]}),
+    stage('required','shared','C는 보존한 Repository가1→1 참여','C useCase와 Repository 둘은 모두 CGLIB 프록시였습니다. 상위 서비스 경계가 있으므로 같은 원문 Repository 애노테이션이 연결1에 참여합니다.','// 원문 C의 상위 경계\n@Transactional\npublic void place(PlaceOrder command) {\n    orders.insert(command);\n    inventory.decrease(command);\n    events.publishEvent(new OrderPlaced(command.productId(), command.quantity()));\n}',[['C sourceBeans','useCaseCglib=true / ordersCglib=true / inventoryCglib=true'],['sourceSql 연결','INSERT1 / UPDATE1'],['Repository 애노테이션','원문 @Transactional 그대로 유지']],['C-repositories-are-proxies','C-service-is-cglib-proxy'],['variantC.sourceBeans','variantC.serviceSuccess'],{active:[1,3,4]}),
+  ]},
+  {id:'template',question:'추가 Risk 확인은 어느 transaction 밖에서 실행됐을까?',source:scope+' · 원문 D CheckedOrderUseCase + 추가 메모리 RiskClient',sourceNote:'RiskClient는 allowed를 제어하는 추가 메모리 stub입니다. 네트워크 위험도 API·결제·성능을 실행한 결과가 아닙니다.',note:context+' trackedConnectionsOpened는 setup/raw observer/assert 연결을 제외한 wrapper 개수입니다. 0이어도 전체 DB 연결0이라는 뜻이 아닙니다. '+limits,stages:[
+    stage('template','risk','허용 확인은 transaction 시작 전','추가 riskAllowed=true인 성공 run에서 원문 D는 먼저 isAllowed를 호출했습니다. 그 관찰은 active=false·sync=false·bound connection 없음이며 첫 sourceSql보다 앞입니다.','if (!riskClient.isAllowed(command)) {\n    throw new IllegalArgumentException("주문할 수 없습니다");\n}\n// 이 확인 뒤 transactions.executeWithoutResult(...)',[['추가 risk stub','allowed=true / product7 / quantity2'],['risk active / sync','false / false'],['bound connection','없음'],['관측 순서','risk sequence1 < 첫 sourceSql sequence3']],['D-risk-precedes-first-source-sql'],['variantB.templateSuccess'],{active:[0,3]}),
+    stage('template','rejected','별도 거부는 sourceSql 없음','별도 run에서 stub이 false를 반환했습니다. 원문은 주문할 수 없습니다 예외를 던졌고 추적된 wrapper 연결0·sourceSql0이며 최종 주문0·재고5입니다.','if (!riskClient.isAllowed(command)) {\n    throw new IllegalArgumentException("주문할 수 없습니다");\n}',[['호출자 결과','IllegalArgumentException: 주문할 수 없습니다'],['trackedConnectionsOpened','0 · setup/raw observer/assert 연결 제외'],['sourceSql 기록','0'],['최종 observer','orders=[] / stock=5']],['D-risk-rejection-message','D-rejected-risk-opens-no-tracked-connection','D-risk-outside-transaction'],['variantB.templateRejected'],{active:[0,1]}),
+    stage('template','success','허용 quantity2는 같은 연결 commit','원문 TransactionTemplate 콜백이 두 저장을 같은 연결1에 묶었습니다. 최종 주문7/2·재고3이며 commit은 한 번입니다.','transactions.executeWithoutResult(status -> {\n    orders.insert(command);\n    inventory.decrease(command);\n});',[['요청','productId=7 / quantity=2 · allowed=true'],['sourceSql 연결','INSERT1 / UPDATE1'],['최종 observer','orders=[7/2] / stock=3'],['자원 동작','connection1 commit1']],['D-template-allowed-order-stock3','D-template-repositories-share-one-connection'],['variantB.templateSuccess'],{active:[0,1,2]}),
+    stage('template','failure','허용 quantity6도 DB 실패는 rollback','추가 stub이 허용해도 재고 guard는 별개입니다. quantity6 UPDATE가0행으로 실패하면 템플릿 안의 두 저장이 한 rollback으로 취소됩니다.','template.place(new PlaceOrder(7, 6));\n// allowed=true 뒤 inventory 실패',[['risk stub','allowed=true'],['guard affectedRows','0'],['최종 observer','orders=[] / stock=5'],['자원 동작','rollback1 / commit0']],['D-template-stock-failure-rolls-back-both','D-template-one-rollback'],['variantB.templateFailure']),
+  ]},
+  {id:'events',question:'commit 뒤 관찰은 원문에서 실제 알림을 보낸 것일까?',source:scope+' · 원문 C empty handler + 추가 ObservedListener',sourceNote:'원문 OrderNotificationListener.afterCommit 본문은 주석뿐인 no-op입니다. 추가 subclass가 super.afterCommit 뒤 DB 관찰을 기록했으며 실제 알림·broker 호출은 없습니다.',note:'listenerObservations는 추가 관측입니다. sequence는 같은 run의 로컬 사건 순서이며 지연시간이 아닙니다. callback active=true·sync=false는 물리 DB가 미커밋이라는 뜻이 아닙니다. '+context+' '+limits,stages:[
+    stage('events','observed','commit sequence4 뒤 추가 관찰5','성공 C run의 commit은 sequence4, 추가 ObservedListener 기록은5였습니다. 원문 super handler는 빈 본문이고 관찰자는 독립 연결에서 이미 주문7/2·재고3을 읽었습니다.','// 추가 ObservedListener subclass 발췌\nsuper.afterCommit(event);\nW11Proof.observeListener(event.productId(), event.quantity());',[['실제 로컬 사건 순서','commit sequence4 < 추가 observer sequence5'],['관찰자의 독립 DB','orders=[7/2] / stock=3'],['callback active / sync','true / false'],['원문 handler','empty no-op · super 호출'],['실제 알림 / broker','호출하지 않음']],['C-additional-observer-invokes-original-empty-listener','C-listener-sees-committed-state'],['variantC.serviceSuccess'],{active:[1,2]}),
+    stage('events','failure','재고 예외면 발행 줄 미도달','별도 실패 C run에서는 inventory.decrease가 예외를 던져 publishEvent에 도달하지 못했습니다. 최종 주문0·재고5이며 추가 listener 기록은0입니다.','inventory.decrease(command);\nevents.publishEvent(new OrderPlaced(command.productId(), command.quantity()));',[['예외 위치','원문 inventory.decrease · guard affectedRows0'],['publishEvent','줄 미도달'],['추가 listenerObservations','[]'],['최종 observer','orders=[] / stock=5']],['C-failure-no-listener-observation'],['variantC.serviceFailure'],{active:[0]}),
+  ]},
+];
+export const W11_ASSETS={
+  "W11-repository": {
+    "file": "W11-repository-v3.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "재고가 부족한데 주문은 왜 남았을까? 원문 A/B/C/D와 추가 H2 관찰·stub의 범위를 구분한다.",
+    "focus": {
+      "repository-insert": [
+        0.5,
+        26.7,
+        23.8,
+        60.5
+      ],
+      "repository-guard": [
+        50.8,
+        26.7,
+        24.1,
+        60.5
+      ],
+      "repository-partial": [
+        50.8,
+        55.3,
+        24.1,
+        31.9
+      ],
+      "repository-success": [
+        75.8,
+        26.7,
+        23.9,
+        60.5
+      ]
+    }
+  },
+  "W11-controller": {
+    "file": "W11-controller-v3.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "Controller에 경계가 있으면 두 저장은 함께 rollback될까? 원문 A/B/C/D와 추가 H2 관찰·stub의 범위를 구분한다.",
+    "focus": {
+      "controller-insert": [
+        0.5,
+        13.4,
+        33.3,
+        60.8
+      ],
+      "controller-failure": [
+        34.6,
+        13.4,
+        32.3,
+        60.8
+      ],
+      "controller-success": [
+        67.6,
+        13.4,
+        31.9,
+        60.8
+      ]
+    }
+  },
+  "W11-service": {
+    "file": "W11-service.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "서비스 경계에서 주문과 재고의 중간값은 어떻게 보일까? 원문 A/B/C/D와 추가 H2 관찰·stub의 범위를 구분한다.",
+    "focus": {
+      "service-insert": [
+        0.3,
+        12.7,
+        23,
+        75.8
+      ],
+      "service-decrease": [
+        25.2,
+        12.7,
+        23.5,
+        75.8
+      ],
+      "service-commit": [
+        50.7,
+        12.7,
+        23.5,
+        75.8
+      ],
+      "service-failure": [
+        76.2,
+        12.7,
+        23.5,
+        75.8
+      ]
+    }
+  },
+  "W11-required": {
+    "file": "W11-required.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "Repository 애노테이션이 같아도 왜 연결 수가 달라질까? 원문 A/B/C/D와 추가 H2 관찰·stub의 범위를 구분한다.",
+    "focus": {
+      "required-separate": [
+        0.4,
+        12.4,
+        49.3,
+        82.6
+      ],
+      "required-shared": [
+        50.3,
+        12.4,
+        49.3,
+        82.6
+      ]
+    }
+  },
+  "W11-template": {
+    "file": "W11-template-v2.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "추가 Risk 확인은 어느 transaction 밖에서 실행됐을까? 원문 A/B/C/D와 추가 H2 관찰·stub의 범위를 구분한다.",
+    "focus": {
+      "template-risk": [
+        0.2,
+        8,
+        49.3,
+        45.1
+      ],
+      "template-rejected": [
+        50.4,
+        8,
+        49.3,
+        45.1
+      ],
+      "template-success": [
+        0.2,
+        54.3,
+        49.3,
+        40.8
+      ],
+      "template-failure": [
+        50.4,
+        54.3,
+        49.3,
+        40.8
+      ]
+    }
+  },
+  "W11-events": {
+    "file": "W11-events-v3.jpg",
+    "width": 1672,
+    "height": 941,
+    "ready": true,
+    "alt": "commit 뒤 관찰은 원문에서 실제 알림을 보낸 것일까? 원문 A/B/C/D와 추가 H2 관찰·stub의 범위를 구분한다.",
+    "focus": {
+      "events-observed": [
+        0.4,
+        9.5,
+        49.2,
+        84.7
+      ],
+      "events-failure": [
+        50.3,
+        9.5,
+        49.3,
+        84.7
+      ]
+    }
+  }
+};

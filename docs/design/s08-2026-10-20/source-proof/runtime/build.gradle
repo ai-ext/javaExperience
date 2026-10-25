@@ -1,0 +1,26 @@
+plugins { id 'java' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+dependencies {
+ implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+ implementation 'org.springframework:spring-context'
+ implementation 'org.springframework:spring-jdbc'
+ implementation 'org.springframework:spring-tx'
+ implementation 'com.h2database:h2'
+ implementation 'tools.jackson.core:jackson-databind'
+}
+sourceSets.main.java.srcDirs=['../original','../probe']
+tasks.register('recordDependencies') {
+ doLast {
+  def rows=configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect {
+   [coordinate:it.moduleVersion.id.toString(),file:it.file.absolutePath,sha256:java.security.MessageDigest.getInstance('SHA-256').digest(it.file.bytes).encodeHex().toString()]
+  }
+  file('../dependencies.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(rows))+'\n'
+ }
+}
+tasks.register('runProof',JavaExec) {
+ dependsOn classes
+ classpath=sourceSets.main.runtimeClasspath
+ mainClass='S08Proof'
+ args=[file('../').absolutePath]
+}

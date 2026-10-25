@@ -1,0 +1,279 @@
+{
+  "schema": "d12-independent-sol-review-v1",
+  "reviewedAtUTC": "2026-10-24T19:26:59.564543+00:00",
+  "reviewScope": "독립 Linux proof 명세 검수. UI·공식문서리서치·학습자코드는 대상 아님.",
+  "specVerdict": "FAIL",
+  "qualityReview": "NOT_RUN: 명세 검수에서 Important 결함을 확인했으므로 품질 합격 단계로 진행하지 않음",
+  "counts": {
+    "Critical": 0,
+    "Important": 3,
+    "Minor": 4
+  },
+  "reviewedAttempt": "attempt-865a083d60ba.json",
+  "reviewedSourceSha256": {
+    "D12-linux-terminal-basics.md": "bcdd88b289812a79e82d1a705d38c0f11477afaadfc76985b2eb50b231d79b0c",
+    "Dockerfile": "1dc3b7235acc0cf2bc9ee7560ee60d974304dd7084acf9e6bea632db95fa0b91",
+    "proof.py": "b20a6b16db28eedd87ed0aa287f15ba8f6ffffd60fcf40b49d105a0fde37b9c5",
+    "run_proof.py": "983be6c2902b549ba2532d082646bdb5876c3de70879d8889b8415d4815c3eb2",
+    "source-manifest.json": "76e8f29f00b757d6f2a5593166ee2faa8ef61284bca72160ecacee49439f70ea"
+  },
+  "currentSourceSha256AfterMainFixStarted": {
+    "proof.py": "68db36173308d620a1baa12cd2d097c62fca11c3ed59084fda183c302b8c21a9",
+    "run_proof.py": "e2a87cc5aeffebc4b39b53d1db5e8b8c26c7cbf2be6829e427a6e19f17f682ac"
+  },
+  "currentSourceNotCoveredByThisVerdict": true,
+  "findings": [
+    {
+      "id": "I1",
+      "severity": "Important",
+      "location": "source-proof/proof.py:75-83 (reviewed SHA b20a6b16)",
+      "title": "pipefail의 실제 aggregate status를 측정하지 않아 비활성 mutant가 통과",
+      "evidence": "기존 script는 PIPESTATUS[1]/[0]를 수동 exit한다. set -o pipefail를 set +o pipefail로 바꾼 temp mutant도 exit0 및 pipefail_status=true. 별도 동시 캡처 captured=(\"$?\" \"${PIPESTATUS[@]}\")는 default aggregate0, pipefail aggregate7을 관측했다.",
+      "required": "pipeline 직후 aggregate $?와 PIPESTATUS를 같은 assignment로 캡처하고 aggregate를 검증한다. 원본기록 보존 후 새 attempt를 추가한다."
+    },
+    {
+      "id": "I2",
+      "severity": "Important",
+      "location": "source-proof/proof.py:19-21, main:273-277 (reviewed SHA b20a6b16)",
+      "title": "container guard 전에 /tmp 디렉터리를 변경",
+      "evidence": "module top-level ROOT.mkdir/chmod가 main의 /.dockerenv/platform/lab marker 검증보다 먼저 실행된다. guard 뒤에만 만든다는 구현 문서와 불일치한다. 호스트 직접호출은 실행하지 않고 source에서 확인했다.",
+      "required": "mkdir/chmod를 container guard 뒤로 이동하고 import/direct refusal 경로의 무변경을 검증한다."
+    },
+    {
+      "id": "I3",
+      "severity": "Important",
+      "location": "source-proof/run_proof.py:37-39, Docker 호출 전체 (reviewed SHA 983be6c2)",
+      "title": "검사한 context endpoint와 실제 Docker 호출 endpoint를 고정하지 않음",
+      "evidence": "docker context inspect 결과만 Unix인지 검사한 뒤 환경을 상속한 bare docker 명령을 호출한다. DOCKER_HOST 등 override에 대한 고정/거부가 없다. 이 리뷰 당시 override 변수는 없고 실제 desktop-linux Unix socket이므로 기존 실행이 원격이었다는 증거는 없다.",
+      "required": "Docker override를 제거하거나 거부하고 검증한 로컬 Desktop Unix endpoint를 모든 명령의 --host에 고정한다."
+    },
+    {
+      "id": "M1",
+      "severity": "Minor",
+      "location": "source-proof/proof.py:233-250 (reviewed SHA b20a6b16)",
+      "title": "df_before_write 필드가 실제로는 write 후 측정",
+      "evidence": "8MiB write/fsync 후 df를 실행한다. 성공raw Used8429568은 write후이며 statvfs_before_write만 실제 이전 값이다. 독립 측정 df Used는 0→8388608→8388608→0으로 재현했다.",
+      "required": "진짜 write전 df와 write후 df를 각각 실행하고 올바른 필드명으로 새 증거를 추가한다."
+    },
+    {
+      "id": "M2",
+      "severity": "Minor",
+      "location": "source-proof/run_proof.py:118-129 (reviewed SHA 983be6c2)",
+      "title": "소유 ID 확인 후 삭제 대상은 이름으로 다시 지정",
+      "evidence": "검증은 ID+nonce로 수행하므로 기존 성공의 자기컨테이너 정리는 확인된다. 단 검사와 삭제 사이 이름 재사용에 대해 동일 ID 삭제를 강제하지 않는다. 실제 교체/오삭제는 관측하지 않았다.",
+      "required": "이름/ID/nonce 일치 확인 후 docker rm --force에는 검증한 container ID를 넘긴다."
+    },
+    {
+      "id": "M3",
+      "severity": "Minor",
+      "location": "proof-logs/attempt-*.json 및 PROOF-IMPLEMENTATION.md",
+      "title": "초기 실패 소스 fingerprint 누락으로 전 revision의 assertion 보존은 확정 불가",
+      "evidence": "전체15건은 failure13건+success2건이다. 최신성공 이전14건을 실패14건으로 부르면 cd0c883a506e 성공1건을 잘못 센다. 초기13개 attempt에는 sourceSha256이 없어 원출력 오류원인은 분류 가능하지만 revision별 기대값 비약화를 완전 입증할 수 없다. PIPESTATUS의 최종 workaround는 I1 반례에 취약하다.",
+      "required": "실패13/선행성공1/최신성공1을 구분하며, 보존된 오류로그로 확인한 원인과 미확정한 수정이력을 분리한다."
+    },
+    {
+      "id": "M4",
+      "severity": "Minor",
+      "location": "source-proof/proof.py do_signals 및 PROOF-IMPLEMENTATION.md",
+      "title": "TERM/KILL 실측과 일반적인 정리기회 개념을 구분해야 함",
+      "evidence": "실측은 TERM handler ack 뒤 생존→release 이후 exit0, 별도 sleep child의 KILL Popen -9이다. 실제 cleanup marker를 생성/비교하는 fixture는 없다. kill_cleanup_unavailable assertion 이름을 정리작업 비교실험으로 읽으면 과장이다.",
+      "required": "UI/native 근거는 TERM요청후생존·release후종료와 KILL -9까지만 표시하고 정리기회는 일반 개념 설명으로 둔다."
+    }
+  ],
+  "reproduction": {
+    "raw": "proof-sol-logs/independent-656fa995a4406df1.json",
+    "runner": "proof-sol-logs/independent_runner.py",
+    "imageId": "sha256:bda54dd776225e4db264a541fcc492a4f922a5377dcd4e5a88a6c45c4228751c",
+    "baseDigest": "python@sha256:a0f57064cbdcd6285fa45f51237ab0b35ea8ebaed06a1f5973e89e19dfb86704",
+    "endpoint": "unix:///Users/ds/.docker/run/docker.sock",
+    "runs": [
+      {
+        "case": "baseline",
+        "exit": 0,
+        "cleanupExit": 0,
+        "absentAfterCleanup": true,
+        "scriptSha256": "b20a6b16db28eedd87ed0aa287f15ba8f6ffffd60fcf40b49d105a0fde37b9c5"
+      },
+      {
+        "case": "pipefail-disabled-mutant",
+        "exit": 0,
+        "cleanupExit": 0,
+        "absentAfterCleanup": true,
+        "scriptSha256": "3eff8e0fec8c69ea947320be8da2e93ee8467f0bf7f58f32d9424e6ed554d135"
+      },
+      {
+        "case": "independent",
+        "exit": 0,
+        "cleanupExit": 0,
+        "absentAfterCleanup": true,
+        "scriptSha256": "7f3ad6801eb16ee3831f3d52f88a7237594e383b840a381eb72f7e57289f4ac2"
+      },
+      {
+        "case": "pid1",
+        "exit": 0,
+        "cleanupExit": 0,
+        "absentAfterCleanup": true,
+        "scriptSha256": "b20a6b16db28eedd87ed0aa287f15ba8f6ffffd60fcf40b49d105a0fde37b9c5"
+      }
+    ],
+    "reviewerInfrastructureFailures": [
+      {
+        "file": "proof-sol-logs/independent-5e76ffda72ea6b55.json",
+        "cause": "macOS temp bind path is not present in Docker Desktop daemon namespace; docker create rejected before container creation"
+      },
+      {
+        "file": "proof-sol-logs/independent-c7e5bcd65c3cda20.json",
+        "cause": "resolved /private/var/folders temp path also unavailable; moved only reviewer temp copies under review logs, later removed them"
+      }
+    ]
+  },
+  "originalAttemptAudit": {
+    "attempts": 15,
+    "failed": 13,
+    "succeeded": 2,
+    "precedingSuccess": "attempt-cd0c883a506e.json",
+    "latestSuccess": "attempt-865a083d60ba.json",
+    "raw": "proof-sol-logs/original-attempt-audit.json",
+    "failures": [
+      {
+        "file": "attempt-1e44730db1c0.json",
+        "failure": {
+          "message": "0",
+          "type": "KeyError"
+        },
+        "lastError": ""
+      },
+      {
+        "file": "attempt-1e780cbf917e.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "Traceback (most recent call last):\n  File \"/proof/proof.py\", line 285, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 275, in main\n    fn()\n  File \"/proof/proof.py\", line 119, in do_permissions\n    matrix = {\"owner_uid1000_gid2000\": probes(f,1000,2000), \"group_uid1001_gid2000\": probes(f,1001,2000),\n                                       ^^^^^^^^^^^^^^^^^^^\n  File \"/proof/proof.py\", line 118, in probes\n    return run([\"python3\", \"-c\", code], env={\"PATH\":\"/usr/bin:/bin\", \"LC_ALL\":\"C\"}, preexec_fn=identity(uid,gid))\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/proof/proof.py\", line 26, in run\n    p = subprocess.run(argv, input=input, stdout=subprocess.PIPE, stderr=subprocess.PIPE,\n        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/subprocess.py\", line 548, in run\n    with Popen(*popenargs, **kwargs) as process:\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/subprocess.py\", line 1026, in __init__\n    self._execute_child(args, executable, preexec_fn, close_fds,\n  File \"/usr/local/lib/python3.12/subprocess.py\", line 1955, in _execute_child\n    raise child_exception_type(errno_num, err_msg, err_filename)\nFileNotFoundError: [Errno 2] No such file or directory: 'python3'\n"
+      },
+      {
+        "file": "attempt-362777127a18.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "Traceback (most recent call last):\n  File \"/proof/proof.py\", line 285, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 275, in main\n    fn()\n  File \"/proof/proof.py\", line 138, in do_permissions\n    assert owner[\"checks\"][\"read\"][\"ok\"] and owner[\"checks\"][\"write\"][\"ok\"]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      {
+        "file": "attempt-3a9b2a5067fb.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "12-proof/permissions/entry-delete/readonly-entry\"], \"exit\": 1, \"stderr\": \"rm: cannot remove '/tmp/d12-proof/permissions/entry-delete/readonly-entry': Permission denied\\n\", \"stdout\": \"\"}, \"entry_exists_after_unlink\": true, \"file_stat\": {\"gid\": 2000, \"mode\": \"0o640\", \"uid\": 1000}, \"parent_without_x_known_file_644\": {\"argv\": [\"cat\", \"/tmp/d12-proof/permissions/no-x/known\"], \"exit\": 1, \"stderr\": \"cat: /tmp/d12-proof/permissions/no-x/known: Permission denied\\n\", \"stdout\": \"\"}, \"parent_x_without_r_listing\": {\"argv\": [\"ls\", \"/tmp/d12-proof/permissions/x-no-read\"], \"exit\": 2, \"stderr\": \"ls: cannot access '/tmp/d12-proof/permissions/x-no-read': Permission denied\\n\", \"stdout\": \"\"}, \"parent_x_without_r_read_known_path\": {\"argv\": [\"cat\", \"/tmp/d12-proof/permissions/x-no-read/known\"], \"exit\": 1, \"stderr\": \"cat: /tmp/d12-proof/permissions/x-no-read/known: Permission denied\\n\", \"stdout\": \"\"}, \"root_uid0_separate\": {\"argv\": [\"/usr/local/bin/python3\", \"-c\", \"import os,json,errno; p='/tmp/d12-proof/permissions/owned-640'; out={}; \\nfor name,flags in [('read',os.O_RDONLY),('write',os.O_WRONLY)]:\\n try:\\n  fd=os.open(p,flags); os.close(fd); out[name]={'ok':True}\\n except OSError as e: out[name]={'ok':False,'errno':e.errno,'error':e.strerror}\\nprint(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'groups':os.getgroups(),'checks':out},sort_keys=True))\"], \"exit\": 0, \"stderr\": \"\", \"stdout\": \"{\\\"checks\\\": {\\\"read\\\": {\\\"ok\\\": true}, \\\"write\\\": {\\\"ok\\\": true}}, \\\"gid\\\": 0, \\\"groups\\\": [], \\\"uid\\\": 0}\\n\"}}, \"partial_case\": \"permissions\"}\nTraceback (most recent call last):\n  File \"/proof/proof.py\", line 286, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 276, in main\n    fn()\n  File \"/proof/proof.py\", line 139, in do_permissions\n    assert owner[\"checks\"][\"read\"][\"ok\"] and owner[\"checks\"][\"write\"][\"ok\"], f\"640 owner probe: {owner!r}\"\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: 640 owner probe: {'checks': {'read': {'errno': 13, 'error': 'Permission denied', 'ok': False}, 'write': {'errno': 13, 'error': 'Permission denied', 'ok': False}}, 'gid': 2000, 'groups': [], 'uid': 1000}\n"
+      },
+      {
+        "file": "attempt-3e6859386c20.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "delete/readonly-entry\"], \"exit\": 0, \"stderr\": \"\", \"stdout\": \"\"}, \"entry_exists_after_unlink\": false, \"file_stat\": {\"gid\": 2000, \"mode\": \"0o640\", \"uid\": 1000}, \"parent_without_x_known_file_644\": {\"argv\": [\"cat\", \"/tmp/d12-proof/permissions/no-x/known\"], \"exit\": 1, \"stderr\": \"cat: /tmp/d12-proof/permissions/no-x/known: Permission denied\\n\", \"stdout\": \"\"}, \"parent_x_without_r_listing\": {\"argv\": [\"ls\", \"/tmp/d12-proof/permissions/x-no-read\"], \"exit\": 2, \"stderr\": \"ls: cannot open directory '/tmp/d12-proof/permissions/x-no-read': Permission denied\\n\", \"stdout\": \"\"}, \"parent_x_without_r_read_known_path\": {\"argv\": [\"cat\", \"/tmp/d12-proof/permissions/x-no-read/known\"], \"exit\": 0, \"stderr\": \"\", \"stdout\": \"known\\n\"}, \"root_uid0_separate\": {\"argv\": [\"/usr/local/bin/python3\", \"-c\", \"import os,json,errno; p='/tmp/d12-proof/permissions/owned-640'; out={}; \\nfor name,flags in [('read',os.O_RDONLY),('write',os.O_WRONLY)]:\\n try:\\n  fd=os.open(p,flags); os.close(fd); out[name]={'ok':True}\\n except OSError as e: out[name]={'ok':False,'errno':e.errno,'error':e.strerror}\\nprint(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'groups':os.getgroups(),'checks':out},sort_keys=True))\"], \"exit\": 0, \"stderr\": \"\", \"stdout\": \"{\\\"checks\\\": {\\\"read\\\": {\\\"ok\\\": true}, \\\"write\\\": {\\\"ok\\\": true}}, \\\"gid\\\": 0, \\\"groups\\\": [], \\\"uid\\\": 0}\\n\"}}, \"partial_case\": \"permissions\"}\nTraceback (most recent call last):\n  File \"/proof/proof.py\", line 287, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 277, in main\n    fn()\n  File \"/proof/proof.py\", line 153, in do_signals\n    p=subprocess.Popen([\"python3\",\"-c\",child_code],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env)\n      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/local/lib/python3.12/subprocess.py\", line 1026, in __init__\n    self._execute_child(args, executable, preexec_fn, close_fds,\n  File \"/usr/local/lib/python3.12/subprocess.py\", line 1955, in _execute_child\n    raise child_exception_type(errno_num, err_msg, err_filename)\nFileNotFoundError: [Errno 2] No such file or directory: 'python3'\n"
+      },
+      {
+        "file": "attempt-53a98e280343.json",
+        "failure": {
+          "message": "",
+          "type": "StopIteration"
+        },
+        "lastError": ""
+      },
+      {
+        "file": "attempt-5bc89920c82d.json",
+        "failure": {
+          "message": "0",
+          "type": "KeyError"
+        },
+        "lastError": ""
+      },
+      {
+        "file": "attempt-6f6ebbb1a97e.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "Traceback (most recent call last):\n  File \"/proof/proof.py\", line 285, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 275, in main\n    fn()\n  File \"/proof/proof.py\", line 102, in do_environment\n    assert path1[\"stdout\"].endswith(\"first\\n\") and path2[\"stdout\"].endswith(\"second\\n\"), f\"PATH observations first={path1!r}, second={path2!r}\"\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: PATH observations first={'argv': ['bash', '--noprofile', '--norc', '-c', 'PATH=/tmp/d12-proof/path-first:/tmp/d12-proof/path-second command -v demo; PATH=/tmp/d12-proof/path-first:/tmp/d12-proof/path-second demo'], 'stdout': '/tmp/d12-proof/path-first/demo\\n', 'stderr': 'bash: line 1: /tmp/d12-proof/path-first/demo: Permission denied\\n', 'exit': 126}, second={'argv': ['bash', '--noprofile', '--norc', '-c', 'PATH=/tmp/d12-proof/path-second:/tmp/d12-proof/path-first command -v demo; PATH=/tmp/d12-proof/path-second:/tmp/d12-proof/path-first demo'], 'stdout': '/tmp/d12-proof/path-second/demo\\n', 'stderr': 'bash: line 1: /tmp/d12-proof/path-second/demo: Permission denied\\n', 'exit': 126}\n"
+      },
+      {
+        "file": "attempt-a695f089f982.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "Traceback (most recent call last):\n  File \"/proof/proof.py\", line 285, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 275, in main\n    fn()\n  File \"/proof/proof.py\", line 69, in do_streams\n    assert first[\"a_bytes\"] == \"out\\nerr\\n\" and first[\"b_bytes\"] == \"out\\n\"\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      {
+        "file": "attempt-b502826fafa4.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "Traceback (most recent call last):\n  File \"/proof/proof.py\", line 284, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 274, in main\n    fn()\n  File \"/proof/proof.py\", line 69, in do_streams\n    assert first[\"a_bytes\"] == \"out\\nerr\\n\" and first[\"b_bytes\"] == \"stale-b\\n\"\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      {
+        "file": "attempt-ca1a93b16a9d.json",
+        "failure": {
+          "message": "command failed (1): docker pull",
+          "type": "RuntimeError"
+        },
+        "lastError": "Cannot connect to the Docker daemon at tcp://localhost:2375/Users/ds/.docker/run/docker.sock. Is the docker daemon running?\n"
+      },
+      {
+        "file": "attempt-d08ab23d1264.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "Traceback (most recent call last):\n  File \"/proof/proof.py\", line 285, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 275, in main\n    fn()\n  File \"/proof/proof.py\", line 69, in do_streams\n    assert first[\"a_bytes\"] == \"out\\nerr\\n\" and first[\"b_bytes\"] == \"out\\n\", f\"redirection file bytes: a={first['a_bytes']!r}, b={first['b_bytes']!r}, two_stdout={two['stdout']!r}, two_stderr={two['stderr']!r}\"\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError: redirection file bytes: a='', b='', two_stdout='out\\n', two_stderr='err\\n'\n"
+      },
+      {
+        "file": "attempt-ddb9cda6aad2.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "Traceback (most recent call last):\n  File \"/proof/proof.py\", line 285, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 275, in main\n    fn()\n  File \"/proof/proof.py\", line 80, in do_streams\n    assert basic[\"exit\"] == 0 and \"PIPESTATUS=7 0\\n\" in basic[\"stdout\"]\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      {
+        "file": "attempt-f17cd2674edc.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "Traceback (most recent call last):\n  File \"/proof/proof.py\", line 285, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 275, in main\n    fn()\n  File \"/proof/proof.py\", line 103, in do_environment\n    assert \"builtin cd\" in cd[\"stdout\"] and cd[\"stdout\"].endswith(\"/tmp\\n\")\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      },
+      {
+        "file": "attempt-fa0ab1f5d46b.json",
+        "failure": {
+          "message": "command failed (1): docker start",
+          "type": "RuntimeError"
+        },
+        "lastError": "Traceback (most recent call last):\n  File \"/proof/proof.py\", line 285, in <module>\n    if __name__==\"__main__\": main()\n                             ^^^^^^\n  File \"/proof/proof.py\", line 275, in main\n    fn()\n  File \"/proof/proof.py\", line 102, in do_environment\n    assert path1[\"stdout\"].endswith(\"first\\n\") and path2[\"stdout\"].endswith(\"second\\n\")\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nAssertionError\n"
+      }
+    ]
+  },
+  "verifiedObservations": [
+    "stdout/stderr redirection order and overwrite/append raw bytes",
+    "export child inheritance, PATH first executable, cd builtin/current shell",
+    "640 owner [read/write]=[true,true], group=[true,false], other=[false,false]; UID0 separate; directory x versus r; directory-entry unlink",
+    "self-created child PID/starttime check, TERM ack/alive/release/exit0, KILL Popen -9",
+    "network=none container internal 127.0.0.1 ephemeral listener, TCP success and controlled HTTP503→200",
+    "tmpfs actual8MiB allocation, unlink-open retained blocks, close freed blocks",
+    "local rsync --dry-run destination hashes unchanged",
+    "own idle container PID1 sleep; logs synthetic bootline; docker exec additional PID; PID1 unchanged"
+  ],
+  "boundaries": [
+    "network none is externally isolated but supports container loopback; not evidence of external connectivity or a production readiness path",
+    "ip link also exposes DOWN tunnel devices; observed no eth0/default route, not literally a namespace containing only lo",
+    "root orchestrates chown/setuid; permission conclusions come from numeric nonroot UID/GID with empty supplementary groups; root probe separate",
+    "no SSH/scp/systemd/systemctl/journalctl/Spring Boot/Java jar/host service/DB/production logs execution",
+    "no cleanup-marker comparison between TERM and KILL; generic signal semantics must remain conceptual",
+    "original runner successful raw does not prove its effective-endpoint guard against environment overrides",
+    "historical reviewed hashes differ from currently edited source; new source needs independent rerun and new verdict"
+  ]
+}

@@ -1,0 +1,30 @@
+plugins { id 'java' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+dependencies {
+    implementation 'org.hibernate.orm:hibernate-core:7.4.5.Final'
+    implementation 'com.h2database:h2:2.4.240'
+    implementation 'tools.jackson.core:jackson-databind:3.1.5'
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    implementation 'org.springframework:spring-context:7.0.9'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+}
+sourceSets.main.java.srcDirs = ['../original', '../probe']
+tasks.withType(JavaCompile).configureEach { options.compilerArgs += ['-Amapstruct.suppressGeneratorTimestamp=true'] }
+tasks.register('runProof', JavaExec) {
+    dependsOn classes
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'example.order.W09Proof'
+    args = [file('../').absolutePath]
+}
+tasks.register('recordDependencies') {
+    doLast {
+        def entries = [runtimeClasspath: 'runtime', annotationProcessor: 'processor'].collectMany { configurationName, role ->
+            configurations[configurationName].resolvedConfiguration.resolvedArtifacts.collect {
+                [coordinate: it.moduleVersion.id.toString(), file: it.file.absolutePath, role: role,
+                 sha256: java.security.MessageDigest.getInstance('SHA-256').digest(it.file.bytes).encodeHex().toString()]
+            }
+        }
+        file('../dependencies.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(entries)) + '\n'
+    }
+}
