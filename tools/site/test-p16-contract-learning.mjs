@@ -1,0 +1,112 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { JSDOM } from 'jsdom';
+import { P16_CONTRACT_ASSETS, P16_CONTRACT_LESSONS } from './p16-contract-data.mjs';
+import { renderP16ContractLearning, p16ContractAvailableLessons } from './p16-contract-learning.mjs';
+import { initP16ContractLearning } from './p16-contract-learning.js';
+
+assert.equal(P16_CONTRACT_LESSONS.length, 8);
+assert.equal(P16_CONTRACT_LESSONS.flatMap(lesson => lesson.stages).length, 20);
+assert.equal(new Set(P16_CONTRACT_LESSONS.flatMap(lesson => lesson.stages.map(state => state.id))).size, 20);
+const activeValid = state => Array.isArray(state.active) && state.active.length > 0 && state.active.every(index => Number.isInteger(index) && index >= 0 && index < state.code.split('\n').length);
+for (const state of P16_CONTRACT_LESSONS.flatMap(lesson => lesson.stages)) assert.ok(activeValid(state), state.id + ' active는 비어 있지 않은 유효한 코드 줄');
+const validActive = P16_CONTRACT_LESSONS[0].stages[0].active;
+P16_CONTRACT_LESSONS[0].stages[0].active = [999]; assert.equal(activeValid(P16_CONTRACT_LESSONS[0].stages[0]), false, '범위 밖 active 변이 감지');
+P16_CONTRACT_LESSONS[0].stages[0].active = []; assert.equal(activeValid(P16_CONTRACT_LESSONS[0].stages[0]), false, '빈 active 변이 감지');
+P16_CONTRACT_LESSONS[0].stages[0].active = validActive;
+const proofRoot = new URL('../../docs/design/p16-2026-10-20/source-proof/', import.meta.url);
+const mapperLog = readFileSync(new URL('P16MapperProof.stdout.txt', proofRoot), 'utf8');
+const originalLog = readFileSync(new URL('MapperExample.stdout.txt', proofRoot), 'utf8');
+assert.equal(mapperLog.split('\n').filter(line => line.startsWith('PASS ')).length, 24);
+assert.equal(originalLog, '{"name":"Kim","age":29}\nKim:29\n');
+for (const lesson of P16_CONTRACT_LESSONS) for (const state of lesson.stages) {
+  for (const check of state.checks) assert.ok(mapperLog.split('\n').includes('PASS ' + check), state.id + ' 실제 추가 실험 확인');
+  assert.ok(state.values.length > 1);
+  assert.ok(P16_CONTRACT_ASSETS[state.image]);
+}
+assert.deepEqual(new Set(P16_CONTRACT_LESSONS.flatMap(lesson => lesson.stages.flatMap(state => state.checks))), new Set(mapperLog.split('\n').filter(line => line.startsWith('PASS ')).map(line => line.slice(5))), '20상태가 mapper의 실제24개 검증을 모두 포함');
+const saved = structuredClone(P16_CONTRACT_ASSETS);
+Object.values(P16_CONTRACT_ASSETS).forEach(asset => { asset.ready = false; });
+assert.equal(p16ContractAvailableLessons().length, 0);
+assert.match(renderP16ContractLearning(), /준비 중/);
+Object.values(P16_CONTRACT_ASSETS).forEach(asset => { asset.ready = true; });
+P16_CONTRACT_ASSETS['P16-property'].ready = false;
+assert.equal(p16ContractAvailableLessons().length, 7);
+assert.doesNotMatch(renderP16ContractLearning(), /<option value="property">/, '준비 안 된 이미지를 완료된 질문으로 노출하지 않는다');
+P16_CONTRACT_ASSETS['P16-property'].ready = true;
+const foreign = { __javaExperienceP16: { sceneId: 'response-json', inputVariant: 'invalid-quantity' }, catalog: { query: 'JSON' }, foreign: { preserved: true } };
+function setup(matches = false) {
+  const page = new JSDOM('<section data-p16-visual><h1>기존 화면</h1><button data-original-read>읽음</button></section>' + renderP16ContractLearning() + '<details id="p16-original"><summary>원문</summary><a id="source-anchor" href="#existing">링크</a></details>', { url: 'https://learn.example/P16.html#source-anchor' });
+  const win = page.window, doc = win.document;
+  const listeners = []; const media = { matches, addEventListener(name, callback) { assert.equal(name, 'change'); listeners.push(callback); } };
+  win.matchMedia = () => media;
+  for (const name of ['localStorage', 'sessionStorage']) Object.defineProperty(win, name, { get() { throw Error('읽음·진도·이어보기 저장 접근 금지'); } });
+  win.fetch = () => { throw Error('network 금지'); };
+  const copied = []; Object.defineProperty(win.navigator, 'clipboard', { value: { async writeText(code) { copied.push(code); } } });
+  win.history.replaceState(structuredClone(foreign), '');
+  const originalHTML = doc.getElementById('p16-original').outerHTML, originalUI = doc.querySelector('[data-p16-visual]').outerHTML;
+  initP16ContractLearning(doc, win);
+  const $ = selector => doc.querySelector(selector);
+  const topic = id => { $('[data-p16-contract-topic]').value = id; $('[data-p16-contract-topic]').dispatchEvent(new win.Event('change')); };
+  const stage = id => $(`[data-p16-contract-stage="${id}"]`).click();
+  const resize = value => { media.matches = value; listeners.forEach(fn => fn({ matches: value })); };
+  return { win, doc, $, topic, stage, resize, copied, originalHTML, originalUI };
+}
+const { win, doc, $, topic, stage, resize, copied, originalHTML, originalUI } = setup();
+assert.equal(doc.querySelectorAll('h1').length, 1, 'supplement가 H1을 추가하지 않는다');
+assert.equal($('[data-p16-contract-question]').tagName, 'H2');
+assert.equal(doc.getElementById('p16-original').outerHTML, originalHTML, '기존 원문 details·링크를 조작하지 않는다');
+assert.equal($('[data-p16-visual]').outerHTML, originalUI, '기존 P16 정상/실패/읽음 영역은 건드리지 않는다');
+const valueOf = label => { const dt = [...$('[data-p16-contract-state]').querySelectorAll('dt')].find(node => node.textContent === label); assert.ok(dt, label); return dt.nextElementSibling.textContent; };
+for (const lesson of P16_CONTRACT_LESSONS) {
+  topic(lesson.id);
+  for (const [i, state] of lesson.stages.entries()) {
+    stage(state.id);
+    assert.equal($('[data-p16-contract-question]').textContent, lesson.question);
+    assert.equal($('[data-p16-contract-code]').textContent, state.code);
+    assert.deepEqual([...$('[data-p16-contract-code]').querySelectorAll('mark')].map(mark => mark.textContent), state.code.split('\n').filter((_, line) => state.active.includes(line)).map(line => line || ' '), state.id + ' DOM 강조 줄 일치');
+    assert.equal($('[data-p16-contract-lead]').textContent, state.lead);
+    for (const [label, value] of state.values) assert.equal(valueOf(label), value);
+    assert.equal($('[data-p16-contract-position]').textContent, `${i + 1} / ${lesson.stages.length}`);
+    assert.equal($('[data-p16-contract-output]').open, false, 'PASS 로그는 보조 접기 영역');
+    assert.equal($('[data-p16-contract-output]').hidden, !state.checks.length);
+    assert.equal($('[data-p16-contract-stdout]').textContent, state.checks.map(check => 'PASS ' + check).join('\n'));
+    assert.equal($('[data-p16-contract-image]').getAttribute('src'), '../design/p16-2026-10-20/images/' + P16_CONTRACT_ASSETS[state.image].file);
+    $('[data-p16-contract-copy]').click(); await Promise.resolve(); await Promise.resolve();
+    assert.equal(copied.at(-1), state.code, state.id + ' 코드 원문 그대로 복사');
+  }
+}
+topic('property'); stage('property-out'); assert.equal(valueOf('JSON 프로퍼티'), '{"user_id":7,"display_name":"Mina"}'); assert.deepEqual([...doc.querySelectorAll('[data-p16-contract-code] mark')].map(node=>node.textContent), ['record UserResponse(@JsonProperty("user_id") Long id,','                    @JsonProperty("display_name") String name) {}','String renamed = mapper.writeValueAsString(new UserResponse(7L, "Mina"));']); stage('property-in'); assert.match(valueOf('Java 결과'), /id=7.*name=Mina/);
+topic('inclusion'); stage('inclusion-null'); assert.equal(valueOf('nickname 프로퍼티'), '없음 · null 생략'); stage('inclusion-empty'); assert.equal(valueOf('nickname 프로퍼티'), '있음 · "" 유지'); stage('inclusion-ignore'); assert.equal(valueOf('읽은 passwordHash'), 'null'); assert.match($('[data-p16-contract-note]').textContent, /NON_NULL.*입력 null 검증.*아닙니다/);
+topic('time'); stage('time-instant'); assert.match(valueOf('JSON occurredAt'), /00:00:00Z/); stage('time-local'); assert.match(valueOf('offset·시간대'), /없음/); stage('time-offset'); assert.match(valueOf('순간 비교'), /true/);
+topic('enum'); stage('enum-default'); assert.equal(valueOf('JSON status'), '"PAID"'); assert.match($('[data-p16-contract-note]').textContent, /toString.*기본.*재정의.*없/); stage('enum-contract'); assert.equal(valueOf('읽은 Java 상수'), 'PaymentStatus.PAID'); stage('enum-unknown'); assert.match(valueOf('결과'), /JacksonException.*거부/);
+topic('unknown'); stage('unknown-default'); assert.equal(valueOf('FAIL_ON_UNKNOWN_PROPERTIES'), 'false · 이 mapper의 기본값'); assert.equal(valueOf('EmailCommand.email'), 'null'); stage('unknown-strict'); assert.match($('[data-p16-contract-code]').textContent, /enable\(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES\)/); stage('unknown-webhook'); assert.equal(valueOf('eventId / type'), 'evt-1 / paid');
+topic('creator'); stage('creator-record'); assert.equal(valueOf('원문 출력'), '{"name":"Kim","age":29}\nKim:29'); stage('creator-explicit'); assert.equal(valueOf('getName()'), 'Mina'); assert.doesNotMatch($('[data-p16-contract-code]').textContent, /Kim|Profile/);
+topic('shape'); stage('shape-object'); assert.equal(valueOf('JsonNode.equals'), 'true'); stage('shape-array'); assert.equal(valueOf('JsonNode.equals'), 'false');
+topic('null'); stage('null-primitive'); assert.match(valueOf('결과'), /JacksonException.*거부/); stage('null-wrapper'); assert.equal(valueOf('Java quantity'), 'null');
+win.navigator.clipboard.writeText = async () => { throw Error('clipboard unavailable'); };
+$('[data-p16-contract-copy]').click(); await Promise.resolve(); await Promise.resolve();
+assert.equal(win.getSelection().toString(), $('[data-p16-contract-code]').textContent, 'clipboard를 쓸 수 없으면 현재 전체 코드 선택');
+assert.match($('[data-p16-contract-copy-status]').textContent, /복사 키/);
+assert.deepEqual({ __javaExperienceP16: win.history.state.__javaExperienceP16, catalog: win.history.state.catalog, foreign: win.history.state.foreign }, foreign);
+assert.equal(win.history.length, 1);
+assert.deepEqual(Object.keys(win.history.state).sort(), [...Object.keys(foreign), '__javaExperienceP16Contract'].sort());
+assert.equal(doc.getElementById('p16-original').outerHTML, originalHTML);
+assert.equal($('[data-p16-visual]').outerHTML, originalUI);
+topic('time'); const buttons = [...doc.querySelectorAll('[data-p16-contract-stage]')]; buttons[0].focus();
+for (const [key, expected] of [['End', 2], ['ArrowLeft', 1], ['Home', 0], ['ArrowRight', 1]]) { doc.activeElement.dispatchEvent(new win.KeyboardEvent('keydown', { key, bubbles: true })); assert.equal(doc.activeElement, buttons[expected]); }
+stage('time-local'); $('[data-p16-contract-next]').focus(); $('[data-p16-contract-next]').click(); assert.equal(doc.activeElement, buttons[2]); assert.equal($('[data-p16-contract-next]').disabled, true);
+stage('time-local'); $('[data-p16-contract-prev]').focus(); $('[data-p16-contract-prev]').click(); assert.equal(doc.activeElement, buttons[0]); assert.equal($('[data-p16-contract-prev]').disabled, true);
+assert.equal($('[data-p16-contract-zoom]').getAttribute('aria-pressed'), 'false');
+resize(true); assert.equal($('[data-p16-contract-zoom]').getAttribute('aria-pressed'), 'true'); assert.equal($('.p16-contract-image-frame').tabIndex, 0);
+stage('time-local'); const localFocus = P16_CONTRACT_ASSETS['P16-time'].focus['time-local']; assert.equal($('[data-p16-contract-image]').style.transform, `translate(-${localFocus[0]}%, -${localFocus[1]}%)`, '다음 상태의 검수 좌표로 확대도 동기화');
+$('[data-p16-contract-zoom]').click(); assert.equal($('[data-p16-contract-zoom]').getAttribute('aria-pressed'), 'false'); resize(false); resize(true); assert.equal($('[data-p16-contract-zoom]').getAttribute('aria-pressed'), 'false', '수동 전체 그림 선택은 resize에도 유지');
+win.history.replaceState({ ...win.history.state, __javaExperienceP16Contract: { topic: 'shape', stage: 'shape-array' } }, ''); win.dispatchEvent(new win.PopStateEvent('popstate')); assert.equal(valueOf('JsonNode.equals'), 'false');
+initP16ContractLearning(doc, win); assert.equal($('[data-p16-contract-topic]').value, 'shape');
+win.close();
+const mobile = setup(true); mobile.topic('time'); mobile.$('[data-p16-contract-stage-select]').value = 'time-local'; mobile.$('[data-p16-contract-stage-select]').dispatchEvent(new mobile.win.Event('change'));
+mobile.$('[data-p16-contract-mobile-next]').focus(); mobile.$('[data-p16-contract-mobile-next]').click(); assert.equal(mobile.doc.activeElement, mobile.$('[data-p16-contract-stage-select]'));
+mobile.stage('time-local'); mobile.$('[data-p16-contract-mobile-prev]').focus(); mobile.$('[data-p16-contract-mobile-prev]').click(); assert.equal(mobile.doc.activeElement, mobile.$('[data-p16-contract-stage-select]'));
+mobile.win.close();
+for (const [key, asset] of Object.entries(saved)) Object.assign(P16_CONTRACT_ASSETS[key], asset);
+console.log('P16 supplement: 8질문·20상태, 실제 proof24개·원문 MapperExample 대조, 기존화면/원문/history 보존, exact copy·키보드·포커스·확대/resize·모바일 통과');

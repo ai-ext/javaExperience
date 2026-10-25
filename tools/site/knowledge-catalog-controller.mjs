@@ -4,7 +4,9 @@ import { readProgress, TASKS } from './home-state.mjs';
 export const CATALOG_RETURN_KEY = 'javaexperience.knowledge.return.v1';
 export const CATALOG_HISTORY_KEY = '__javaExperienceKnowledge';
 const ENTRY_PREFIX = 'javaexperience:knowledge:v8:entry:';
-const categories = ['all', 'java', 'request', 'data', 'delivery'];
+const categories = ['all', 'java', 'spring', 'request', 'data', 'testing', 'delivery'];
+const priorities = ['all', 'required', 'optional'];
+const depths = ['all', 'foundation', 'applied', 'advanced'];
 const hashCategory = (hash) => {
   let id; try { id = decodeURIComponent(hash).match(/^#kc-category-(.+)$/)?.[1]; } catch { return null; }
   return categories.includes(id) ? id : null;
@@ -101,10 +103,25 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   }
   function fromUrl() {
     const url = new URL(win.location.href); const query = clip(url.searchParams.get('q'));
-    return { schema: 1, entryId: uid(), route: url.pathname, queryRaw: query, inputDraft: query, categoryId: hashCategory(url.hash) || (categories.includes(url.searchParams.get('category')) ? url.searchParams.get('category') : query ? 'all' : 'java'), sort: url.searchParams.get('sort') === 'title' ? 'title' : 'relevance', expanded: url.searchParams.get('all') === '1', view: query ? 'results' : 'browse', selectedDocId: null, focusKey: null, scroll: url.hash ? {} : { absoluteY: 0 } };
+    const categoryId = hashCategory(url.hash) || (categories.includes(url.searchParams.get('category')) ? url.searchParams.get('category') : 'all');
+    const priorityId = priorities.includes(url.searchParams.get('priority')) ? url.searchParams.get('priority') : query ? 'all' : 'required';
+    const depthId = depths.includes(url.searchParams.get('depth')) ? url.searchParams.get('depth') : query ? 'all' : 'foundation';
+    return { schema: 1, entryId: uid(), route: url.pathname, queryRaw: query, inputDraft: query, categoryId, priorityId, depthId,
+      explicitFilters: { category: Boolean(hashCategory(url.hash)) || url.searchParams.has('category'), priority: url.searchParams.has('priority'), depth: url.searchParams.has('depth') },
+      sort: url.searchParams.get('sort') === 'title' ? 'title' : 'relevance', expanded: url.searchParams.get('all') === '1', view: query ? 'results' : 'browse', selectedDocId: null, focusKey: null, scroll: url.hash ? {} : { absoluteY: 0 } };
   }
   function validEntry(value) {
-    return value?.schema === 1 && typeof value.entryId === 'string' && value.route === win.location.pathname && ['browse','results'].includes(value.view) && typeof value.queryRaw === 'string' && typeof value.inputDraft === 'string' && categories.includes(value.categoryId) && ['title','relevance'].includes(value.sort);
+    return value?.schema === 1 && typeof value.entryId === 'string' && value.route === win.location.pathname && ['browse','results'].includes(value.view) && typeof value.queryRaw === 'string' && typeof value.inputDraft === 'string' && ['all','java','request','data','delivery','spring','testing'].includes(value.categoryId) && ['title','relevance'].includes(value.sort);
+  }
+  function normalizeEntry(value) {
+    const queryRaw = value.queryRaw || '';
+    const explicit = value.explicitFilters || {};
+    return { ...value,
+      categoryId: categories.includes(value.categoryId) ? value.categoryId : 'all',
+      priorityId: priorities.includes(value.priorityId) ? value.priorityId : queryRaw ? 'all' : 'required',
+      depthId: depths.includes(value.depthId) ? value.depthId : queryRaw ? 'all' : 'foundation',
+      explicitFilters: { category: Boolean(explicit.category), priority: Boolean(explicit.priority), depth: Boolean(explicit.depth) },
+    };
   }
   function currentEntry() {
     const value = foreignState()[CATALOG_HISTORY_KEY];
@@ -112,11 +129,11 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
       // 원문 anchor의 native history는 건드리지 않고 명시 목록 복귀 때만 snapshot을 받는다.
       const url = new URL(win.location.href);const returnId = url.searchParams.get('kcReturn');url.searchParams.delete('kcReturn');
       const returned = returnId && safeRead(session, ENTRY_PREFIX + returnId);
-      if (validEntry(returned) && returned.entryId === returnId && returned.href === url.href) return { ...returned, entryId: uid(), parentEntryId: returnId };
+      if (validEntry(returned) && returned.entryId === returnId && returned.href === url.href) return normalizeEntry({ ...returned, entryId: uid(), parentEntryId: returnId });
       return fromUrl();
     }
     const cached = safeRead(session, ENTRY_PREFIX + value.entryId);
-    return validEntry(cached) && cached.entryId === value.entryId && cached.href === win.location.href ? cached : value;
+    return normalizeEntry(validEntry(cached) && cached.entryId === value.entryId && cached.href === win.location.href ? cached : value);
   }
   let entry = currentEntry();
   let composing = false; let matches = [];
@@ -126,6 +143,8 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     for (const key of ['q','category','all','sort','kcReturn']) value.delete(key);
     if (entry.queryRaw) value.set('q', entry.queryRaw);
     value.set('category', entry.categoryId);
+    value.set('priority', entry.priorityId);
+    value.set('depth', entry.depthId);
     if (entry.expanded) value.set('all', '1');
     if (entry.sort === 'title') value.set('sort', 'title');
     return value;
@@ -140,6 +159,8 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     if (current?.closest('[data-kc-open]')) return 'document:' + current.closest('[data-kc-open]').dataset.kcOpen;
     if (current?.matches('button[data-kc-category]')) return 'category:' + current.dataset.kcCategory;
     if (current === $('[data-kc-sort]')) return 'sort';
+    if (current === $('[data-kc-priority]')) return 'priority';
+    if (current === $('[data-kc-depth]')) return 'depth';
     if (current === $('[data-kc-results-title]')) return 'results';
     return entry.focusKey;
   }
@@ -155,12 +176,17 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     if (note) { note.hidden = input.value === entry.queryRaw; note.textContent = note.hidden ? '' : '입력 중인 질문입니다. 검색을 누르면 결과에 반영됩니다.'; }
     $('[data-kc-search-clear]').hidden = !input.value && !entry.queryRaw;
   }
+  const matchesQuestion = (row, raw) => [row.dataset.kcQuestion, row.querySelector('.kc-result-question')?.textContent, row.querySelector('h3 a')?.textContent]
+    .some(question => normalize(question) === raw);
   function render() {
     input.value = entry.inputDraft;
     const raw = normalize(entry.queryRaw); const literal = aliases.get(raw) || raw;
     const words = literal.split(/\s+/).filter(Boolean);
-    matches = rows.filter((row) => (raw && [row.dataset.kcQuestion, row.querySelector('h3 a')?.textContent].some((question) => normalize(question) === raw)) || words.every((word) => normalize(row.dataset.kcSearch).includes(word)));
-    const filtered = matches.filter((row) => entry.categoryId === 'all' || row.dataset.kcCategory === entry.categoryId);
+    matches = rows.filter((row) => (raw && matchesQuestion(row, raw)) || words.every((word) => normalize(row.dataset.kcSearch).includes(word)));
+    const filtered = matches.filter((row) =>
+      (entry.categoryId === 'all' || row.dataset.kcCategory === entry.categoryId) &&
+      (entry.priorityId === 'all' || row.dataset.kcPriority === entry.priorityId) &&
+      (entry.depthId === 'all' || row.dataset.kcDepths.split(/\s+/).includes(entry.depthId)));
     const dtoOrder = ['P16', 'W09', 'P06', 'P02', 'P03', 'P25', 'W10'];
     const priority = (row) => {
       if (!raw) return Number(row.dataset.kcBrowseRank ?? row.dataset.kcRank ?? 100);
@@ -170,14 +196,14 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     };
     const title = (row) => (row.dataset.kcTitle || row.querySelector('.kc-source')?.textContent || row.dataset.kcDocument).replace(/^[A-Z]\d+\.\s*/, '');
     filtered.sort((a, b) => (entry.sort === 'title' ? title(a).localeCompare(title(b), 'ko') : priority(a) - priority(b)) || a.dataset.kcDocument.localeCompare(b.dataset.kcDocument));
-    const show = entry.queryRaw || entry.expanded || entry.categoryId === 'all' ? filtered : filtered.slice(0, 3);
+    const show = entry.queryRaw || entry.expanded ? filtered : filtered.slice(0, 12);
     rows.forEach((row) => { row.hidden = true; const badge = row.querySelector('[data-kc-badge]'); if (badge) badge.hidden = row.dataset.kcDocument !== contextId; });
     for (const row of show) {
       row.hidden = false; $('[data-kc-results]').append(row);
       const reason = row.querySelector('[data-kc-match-reason]');
       if (reason) {
         reason.hidden = !raw;
-        reason.textContent = aliases.has(raw) || [row.dataset.kcQuestion, row.querySelector('h3 a')?.textContent].some((question) => normalize(question) === raw) ? '등록된 질문과 일치' : words.every((word) => normalize(row.dataset.kcTitle || row.querySelector('.kc-source')?.textContent).includes(word)) ? '문서 제목과 일치' : '소제목과 일치';
+        reason.textContent = aliases.has(raw) || matchesQuestion(row, raw) ? '등록된 질문과 일치' : words.every((word) => normalize(row.dataset.kcTitle || row.querySelector('.kc-source')?.textContent).includes(word)) ? '문서 제목과 일치' : '소제목과 일치';
       }
     }
     for (const button of doc.querySelectorAll('button[data-kc-category]')) {
@@ -185,17 +211,24 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
       button.setAttribute('aria-pressed', String(selected)); button.tabIndex = selected ? 0 : -1;
     }
     $('[data-kc-category-select]').value = entry.categoryId;
+    $('[data-kc-priority]').value = entry.priorityId;
+    $('[data-kc-depth]').value = entry.depthId;
     $('[data-kc-sort]').value = entry.sort;
     $('[data-kc-hero-title]').textContent = entry.queryRaw ? '개념 검색' : '막힌 개념을, 값의 변화로 이해하세요.';
     for (const part of root.querySelectorAll('[data-kc-discovery]')) part.hidden = Boolean(entry.queryRaw);
     $('[data-kc-context]').hidden = Boolean(entry.queryRaw) || !context;
     const label = $(`button[data-kc-category="${entry.categoryId}"]`)?.dataset.kcLabel || '전체';
-    $('[data-kc-results-title]').textContent = entry.queryRaw ? `${entry.queryRaw} 검색 결과 ${filtered.length}개` : `${label} · ${filtered.length}개 문서`;
-    $('[data-kc-results-basis]').textContent = entry.queryRaw ? '문서 제목·소제목에서 찾았습니다.' : show.length < filtered.length ? `먼저 살펴볼 질문 ${show.length}개입니다.` : '문서를 선택해 개념을 살펴보세요.';
+    const priorityLabel = { required: '필수', optional: '선택', all: '전체 우선순위' }[entry.priorityId];
+    const depthLabel = { foundation: '기초', applied: '응용', advanced: '심화', all: '전체 깊이' }[entry.depthId];
+    $('[data-kc-results-title]').textContent = entry.queryRaw ? `${entry.queryRaw} 검색 결과 ${filtered.length}개` : `${label} · ${priorityLabel} · ${depthLabel} ${filtered.length}개 문서`;
+    $('[data-kc-results-basis]').textContent = entry.queryRaw ? '문서 제목·소제목에서 찾았습니다.' : show.length < filtered.length ? `기본 API 입문 분류에서 먼저 볼 ${show.length}개입니다.` : '문서를 선택해 개념을 살펴보세요.';
     $('[data-kc-empty]').hidden = filtered.length > 0;
     $('[data-kc-empty-title]').textContent = entry.queryRaw ? entry.categoryId === 'all' ? `‘${entry.queryRaw}’에 맞는 문서를 찾지 못했어요.` : `선택한 분야에는 ‘${entry.queryRaw}’ 관련 문서가 없어요.` : '이 분야에 표시할 문서가 없습니다.';
     $('[data-kc-empty-description]').textContent = matches.length ? `다른 분야에는 ${matches.length}개 문서가 있습니다. 검색어는 그대로 두고 분야만 해제해 보세요.` : '짧은 기술명이나 문서 번호로 질문을 수정해 보세요. 검색 범위는 제목과 소제목입니다.';
-    const recover = $('[data-kc-filter-reset]');recover.hidden = false;recover.textContent = matches.length && entry.categoryId !== 'all' ? `필터 해제하고 ${matches.length}개 보기` : '검색어 수정';
+    for (const recover of root.querySelectorAll('[data-kc-filter-reset]')) {
+      recover.hidden = false;
+      recover.textContent = matches.length && (entry.categoryId !== 'all' || entry.priorityId !== 'all' || entry.depthId !== 'all') ? `모든 필터 해제하고 ${matches.length}개 보기` : '검색어 유지하고 필터 초기화';
+    }
     $('[data-kc-more]').hidden = Boolean(entry.queryRaw) || show.length >= filtered.length;
     $('[data-kc-more]').textContent = `${label} ${filtered.length}개 모두 보기`;
     draftNotice();
@@ -203,7 +236,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   function restore() {
     render();
     const key = entry.focusKey || '';
-    const focus = key.startsWith('document:') ? resultLink(key.slice(9)) : key.startsWith('category:') ? $(`button[data-kc-category="${key.slice(9)}"]`) : key === 'sort' ? $('[data-kc-sort]') : key === 'results' ? $('[data-kc-results-title]') : null;
+    const focus = key.startsWith('document:') ? resultLink(key.slice(9)) : key.startsWith('category:') ? $(`button[data-kc-category="${key.slice(9)}"]`) : key === 'sort' ? $('[data-kc-sort]') : key === 'priority' ? $('[data-kc-priority]') : key === 'depth' ? $('[data-kc-depth]') : key === 'results' ? $('[data-kc-results-title]') : null;
     if (focus && !focus.closest('[hidden]')) focus.focus({ preventScroll: true });
     const saved = entry.scroll;
     if (Number.isFinite(saved?.absoluteY)) {
@@ -214,9 +247,9 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   }
   function commit(changes, focusResults = false) {
     remember(true);
-    const before = [entry.queryRaw, entry.categoryId, entry.sort, entry.expanded].join('\u0000');
+    const before = [entry.queryRaw, entry.categoryId, entry.priorityId, entry.depthId, entry.sort, entry.expanded].join('\u0000');
     const next = { ...entry, ...changes };next.view = next.queryRaw ? 'results' : 'browse';
-    const after = [next.queryRaw, next.categoryId, next.sort, next.expanded].join('\u0000');
+    const after = [next.queryRaw, next.categoryId, next.priorityId, next.depthId, next.sort, next.expanded].join('\u0000');
     if (before !== after) {
       next.entryId = uid();next.parentEntryId = entry.entryId;next.scroll = { absoluteY: win.scrollY };next.selectedDocId = null;next.focusKey = null;
     }
@@ -228,7 +261,15 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     safeWrite(session, ENTRY_PREFIX + entry.entryId, entry);render();
     if (focusResults) $('[data-kc-results-title]').focus({ preventScroll: true });
   }
-  function search(value) { const query = clip(value);commit({ queryRaw: query, inputDraft: query, categoryId: entry.queryRaw ? entry.categoryId : 'all', expanded: false }, true); }
+  function search(value) {
+    const query = clip(value);
+    const initial = !entry.queryRaw;
+    const explicit = entry.explicitFilters || {};
+    commit({ queryRaw: query, inputDraft: query,
+      categoryId: initial && !explicit.category ? 'all' : entry.categoryId,
+      priorityId: initial && !explicit.priority ? 'all' : entry.priorityId,
+      depthId: initial && !explicit.depth ? 'all' : entry.depthId, expanded: false }, true);
+  }
   $('.kc-search').addEventListener('submit', (event) => { event.preventDefault(); if (!composing && !event.isComposing) search(input.value); });
   input.addEventListener('compositionstart', () => { composing = true; });
   input.addEventListener('compositionend', () => { composing = false; });
@@ -237,7 +278,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   const clear = (focusInput = false) => { commit({ queryRaw: '', inputDraft: '', expanded: !focusInput }, !focusInput);if (focusInput) input.focus(); };
   $('[data-kc-search-clear]').addEventListener('click', () => clear(true));
   for (const button of root.querySelectorAll('[data-kc-query]')) button.addEventListener('click', () => search(button.dataset.kcQuery));
-  const filter = (category) => { if (!categories.includes(category)) return; commit({ categoryId: category, expanded: false }); };
+  const filter = (category) => { if (!categories.includes(category)) return; commit({ categoryId: category, explicitFilters: { ...entry.explicitFilters, category: true }, expanded: false }); };
   for (const button of doc.querySelectorAll('button[data-kc-category]')) button.addEventListener('click', () => filter(button.dataset.kcCategory));
   const fieldButtons = [...doc.querySelectorAll('button[data-kc-category]')];
   for (const button of fieldButtons) button.addEventListener('keydown', (event) => {
@@ -246,11 +287,13 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     if (next !== undefined) { event.preventDefault();fieldButtons[next].focus({preventScroll:true});filter(fieldButtons[next].dataset.kcCategory); }
   });
   $('[data-kc-category-select]').addEventListener('change', (event) => filter(event.target.value));
+  $('[data-kc-priority]').addEventListener('change', (event) => { if (priorities.includes(event.target.value)) commit({ priorityId: event.target.value, explicitFilters: { ...entry.explicitFilters, priority: true }, expanded: false }); });
+  $('[data-kc-depth]').addEventListener('change', (event) => { if (depths.includes(event.target.value)) commit({ depthId: event.target.value, explicitFilters: { ...entry.explicitFilters, depth: true }, expanded: false }); });
   $('[data-kc-sort]').addEventListener('change', (event) => { if (['title','relevance'].includes(event.target.value)) commit({ sort: event.target.value }); });
-  $('[data-kc-filter-reset]').addEventListener('click', () => {
-    if (matches.length && entry.categoryId !== 'all') commit({ categoryId: 'all' }, true);
-    else { input.focus();input.select(); }
-  });
+  for (const reset of root.querySelectorAll('[data-kc-filter-reset]')) reset.addEventListener('click', () => commit({
+    categoryId: 'all', priorityId: 'all', depthId: 'all',
+    explicitFilters: { category: true, priority: true, depth: true }, expanded: false,
+  }, true));
   $('[data-kc-reset]').addEventListener('click', () => clear());
   $('[data-kc-more]').addEventListener('click', () => commit({ expanded: true }));
   root.addEventListener('click', (event) => {
@@ -277,7 +320,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   win.addEventListener('pageshow', (event) => { if (event.persisted) { entry = currentEntry();restore(); } });
   win.addEventListener('pagehide', () => remember(false));
   win.addEventListener('scroll', () => remember(false), { passive: true });
-  entry.href ||= win.location.href;
+  entry.href = entryHref();
   writeHistory('replaceState', entry, entry.href);
   safeWrite(session, ENTRY_PREFIX + entry.entryId, entry);
   restore();

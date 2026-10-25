@@ -1,0 +1,38 @@
+plugins { id 'java'; id 'org.springframework.boot' version '4.1.1' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+version = providers.gradleProperty('proofVersion').getOrElse('1.0.0')
+springBoot { mainClass = 'example.deploy.DeployApplication' }
+sourceSets.main.java.srcDirs = ['java']
+sourceSets.main.resources.srcDirs = ['resources']
+configurations { proofRuntime }
+dependencies {
+ implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+ implementation 'org.springframework.boot:spring-boot-starter-webmvc'
+ proofRuntime 'com.h2database:h2:2.4.240'
+}
+dependencies {
+    implementation("org.springframework.boot:spring-boot-starter-actuator")
+}
+
+tasks.withType(JavaCompile).configureEach { options.compilerArgs += '-parameters' }
+tasks.named('processResources') {
+ inputs.property('proofVersion', project.version)
+ filesMatching('application.properties') {
+  expand(artifactVersion: project.version.toString(), businessOk: project.version.toString() == '1.0.0' ? 'true' : 'false')
+ }
+}
+tasks.register('recordRuntime') {
+ dependsOn classes
+ doLast {
+  def rows = []
+  [runtimeClasspath: configurations.runtimeClasspath, proofRuntime: configurations.proofRuntime].each { scope, conf ->
+   conf.resolvedConfiguration.resolvedArtifacts.each {
+    rows.add([scope:scope, coordinate:it.moduleVersion.id.toString(), file:it.file.absolutePath, sha256:java.security.MessageDigest.getInstance('SHA-256').digest(it.file.bytes).encodeHex().toString()])
+   }
+  }
+  rows.sort { a,b -> (a.scope+':'+a.coordinate) <=> (b.scope+':'+b.coordinate) }
+  file('dependencies.json').text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(rows))+'\n'
+  file('proof-classpath.txt').text = sourceSets.main.runtimeClasspath.asPath + File.pathSeparator + configurations.proofRuntime.asPath
+ }
+}

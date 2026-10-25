@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>B07. 선착순 쿠폰을 동시에 받을 때 가끔 실패한다</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
+
 <link rel="stylesheet" href="../../tools/site/course-exercise.css?v=8eda63e0ec25">
 <link rel="stylesheet" href="../../tools/site/course.css?v=8e71bc7f78e2">
 <link rel="stylesheet" href="../../tools/site/course-stepper.css?v=1124522a27dd">
@@ -14,7 +15,6 @@
 
 
 
-<link rel="stylesheet" href="../../tools/site/course-stepper.css?v=1124522a27dd">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=7d70b43e3c66">
 <link rel="stylesheet" href="../../tools/site/course-content.css?v=35f34c292222">
 <link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="../../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../../tools/site/course-flow-layout.css?v=b33e13ca0173">
 <link rel="stylesheet" href="../../tools/site/section-switcher.css?v=975a56e01be7">
-<link rel="stylesheet" href="../../tools/site/site-frame.css?v=bf75cf02827a">
+<link rel="stylesheet" href="../../tools/site/site-frame.css?v=836815f322de">
 <script>(function prepareFirstPaint({panelMap,dayPanels}) {
   const root=document.documentElement;
   root.classList.add('js');
@@ -66,7 +66,7 @@
 
 <section class="exercise-section exercise-submission" aria-labelledby="제출물" data-content-kind="check" data-section-original-hidden="false" data-section-panel="" id="section-panel-3"><span class="content-kind " data-kind-label="check"><span aria-hidden="true">✓</span> 확인<small>끝났는지 판단</small></span><h2 id="제출물"><a class="anchor" href="#제출물" aria-hidden="true">#</a>제출물</h2><ul class="visual-rules" data-visual-pattern="rules" data-content-kind="check">
 <li>원인 서술: 데드락의 두 트랜잭션이 각각 무엇을 쥐고 무엇을 기다렸는가(락 종류·인덱스까지)</li>
-<li>재현 테스트: 수량이 충분한 쿠폰을 여러 회원이 동시에 받을 때 모두 <span data-http-status="201" class="semantic-http-status">201</span>이고, 수량이 모자라면 나머지는 정해진 <span data-http-status="409" class="semantic-http-status">409</span>(<code>/errors/coupon-exhausted</code>)인지 보는 테스트(결함 상태에서 실패 → 수정 후 통과). 예: <code>src/test/java/com/example/board/coupon/CouponUseDeadlockTest.java</code></li>
+<li>재현 테스트: 수량이 충분한 쿠폰을 여러 회원이 동시에 받을 때 모두 201이고, 수량이 모자라면 나머지는 정해진 <span data-http-status="409" class="semantic-http-status">409</span>(<code>/errors/coupon-exhausted</code>)인지 보는 테스트(결함 상태에서 실패 → 수정 후 통과). 예: <code>src/test/java/com/example/board/coupon/CouponUseDeadlockTest.java</code></li>
 <li>수정 diff</li>
 </ul></section>
 <section class="ticket-flow flow" data-flow="B07" data-flow-kind="ticket" id="flow-b07" aria-labelledby="flow-b07-title" data-content-kind="practice" data-section-original-hidden="false" data-section-panel=""><span class="content-kind " data-kind-label="practice"><span aria-hidden="true">▷</span> 실습<small>실행하고 관찰</small></span>
@@ -96,7 +96,7 @@
 
 
 <p data-content-kind="guide">서버 로그에서 <span data-http-status="500" class="semantic-http-status">500</span> 요청의 원인 예외를 찾는다. <code>CannotAcquireLockException</code>/<code>DeadlockLoserDataAccessException</code>과 SQL 상태 <code>40001</code>, 오류 코드 <code>1213</code>이면 데드락이다. 락 대기 시간 초과(<code>1205</code>)와도 다르다.
-UNIQUE 위반(<code>1062 Duplicate entry</code>)이면 이미 <span data-http-status="409" class="semantic-http-status">409</span>로 바뀌므로 <span data-http-status="500" class="semantic-http-status">500</span>이 되지 않는다. 둘을 구분한다.</p>
+UNIQUE 위반(<code>1062 Duplicate entry</code>)이면 이미 409로 바뀌므로 500이 되지 않는다. 둘을 구분한다.</p>
 </div></details><details data-content-kind="guide"><summary>2. 데드락 기록을 읽는다<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body">
 
 
@@ -119,14 +119,14 @@ UNIQUE 위반(<code>1062 Duplicate entry</code>)이면 이미 <span data-http-st
 
 
 <p data-content-kind="example"><strong>원인.</strong> <code>CouponService.issueInDb</code>가 "연타 방지"를 위해 <code>MemberCouponRepository.findByCouponIdAndMemberIdForUpdate</code>(<code>SELECT ... FOR UPDATE</code>)로 아직 없는 발급 행을 잠그고 확인한 뒤 <code>increaseIssued</code>(쿠폰 행 UPDATE)와 <code>member_coupon</code> INSERT를 한다.
-동시 요청 A·B가 모두 같은 갭에 갭 락을 잡고, A가 쿠폰 행 락을 얻은 뒤 INSERT하려 하면 B의 갭 락에 막히고, B는 A가 쥔 쿠폰 행 락을 기다린다. InnoDB가 순환 대기를 보고 한쪽을 롤백(1213)하고, 그 요청은 <span data-http-status="500" class="semantic-http-status">500</span>이 된다.
+동시 요청 A·B가 모두 같은 갭에 갭 락을 잡고, A가 쿠폰 행 락을 얻은 뒤 INSERT하려 하면 B의 갭 락에 막히고, B는 A가 쥔 쿠폰 행 락을 기다린다. InnoDB가 순환 대기를 보고 한쪽을 롤백(1213)하고, 그 요청은 500이 된다.
 평소 한 명씩 받을 때는 갭을 나눠 가질 상대가 없어 재현되지 않는다. KINTO의 결제 중복 확인 <code>FOR UPDATE</code> 데드락과 같은 구조다.</p>
-<p data-content-kind="example"><strong>구현 예시 수정.</strong> 이미 받았는지는 잠그지 않고 확인하고(<code>existsByCouponIdAndMemberId</code>), 동시에 둘 다 통과한 경우는 <code>UNIQUE(coupon_id, member_id)</code> 위반을 잡아 <span data-http-status="409" class="semantic-http-status">409</span>로 바꾼다. 쓰지 않게 된 잠금 조회 메서드는 지운다(<code>tickets/B07/answer/fix.patch</code>).
+<p data-content-kind="example"><strong>구현 예시 수정.</strong> 이미 받았는지는 잠그지 않고 확인하고(<code>existsByCouponIdAndMemberId</code>), 동시에 둘 다 통과한 경우는 <code>UNIQUE(coupon_id, member_id)</code> 위반을 잡아 409로 바꾼다. 쓰지 않게 된 잠금 조회 메서드는 지운다(<code>tickets/B07/answer/fix.patch</code>).
 총량은 원래대로 조건부 UPDATE(<code>issued_quantity &lt; total_quantity</code>)가 지킨다. 데드락 재시도를 덧붙이는 것은 원인을 남겨 두는 땜질이고, 넣더라도 트랜잭션 밖에서 해야 한다.</p>
 <p data-content-kind="example"><strong>확인 테스트.</strong> <code>tickets/B07/answer/B07ConfirmTest.java</code> — <code>수량_20장을_20명이_동시에_받으면_모두_201이다</code>, <code>수량_10장을_20명이_동시에_받으면_10명은_201_나머지는_409다</code>
-<span data-http-status="201" class="semantic-http-status">201</span>·<span data-http-status="409" class="semantic-http-status">409</span>가 아닌 응답은 원인 예외의 SQL 오류 코드로 나눠 "데드락(1213/40001)이 아닌 실패"와 "데드락으로 실패한 요청"을 따로 단언하고, 회차마다 MySQL의 1213 발생 수(<code>performance_schema.events_errors_summary_global_by_error</code>, root로 조회) 증가분을 메시지에 남긴다. <span data-http-status="409" class="semantic-http-status">409</span>는 본문 <code>type</code>이 <code>/errors/coupon-exhausted</code>인지까지 본다.</p>
+<span data-http-status="201" class="semantic-http-status">201</span>·409가 아닌 응답은 원인 예외의 SQL 오류 코드로 나눠 "데드락(1213/40001)이 아닌 실패"와 "데드락으로 실패한 요청"을 따로 단언하고, 회차마다 MySQL의 1213 발생 수(<code>performance_schema.events_errors_summary_global_by_error</code>, root로 조회) 증가분을 메시지에 남긴다. 409는 본문 <code>type</code>이 <code>/errors/coupon-exhausted</code>인지까지 본다.</p>
 <p data-content-kind="example"><strong>1단계 구현 예시 서버는?</strong> <code>board-server/src/main/java/com/example/board/coupon/CouponService.java</code>는 잠금 조회 없이 <code>exists</code> 확인 → 조건부 UPDATE → INSERT 순서이고, 최종 방어선은 <code>schema.sql</code>의 <code>uk_member_coupon_coupon_member</code>다.
-<code>CouponIssueApiTest</code>·<code>CouponIssueConcurrencyTest</code>의 동시 발급 테스트가 이것을 확인했는데, 이 서버에서는 그 테스트들의 단언이 "총량을 넘지 않는다"만 보도록 약해져 있다(<span data-http-status="500" class="semantic-http-status">500</span>이 섞여도 통과한다).</p>
+<code>CouponIssueApiTest</code>·<code>CouponIssueConcurrencyTest</code>의 동시 발급 테스트가 이것을 확인했는데, 이 서버에서는 그 테스트들의 단언이 "총량을 넘지 않는다"만 보도록 약해져 있다(500이 섞여도 통과한다).</p>
 </div></details></section>
 
 
@@ -996,7 +996,7 @@ UNIQUE 위반(<code>1062 Duplicate entry</code>)이면 이미 <span data-http-st
     function measureHeader() { if (siteHeader) document.documentElement.style.setProperty('--course-header-height',siteHeader.getBoundingClientRect().height + 'px'); }
     measureHeader(); window.addEventListener('resize',measureHeader);
     if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
-    if (main.querySelector('[data-day-page]')) return;
+    if (main.querySelector('[data-day-page],[data-knowledge-reader],[data-core-learning]')) return;
     var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {

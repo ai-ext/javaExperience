@@ -1,0 +1,305 @@
+{
+  "source": "docs/knowledge/W11-why-tx-in-service.md",
+  "sourceSHA256": "4d9a55cb4ccf321ad91c0df27209536f5632f72bef2a242c061ae04f8ca27579",
+  "questions": [
+    {
+      "id": "repository",
+      "question": "재고가 부족한데 주문은 왜 남았을까?",
+      "source": "원문 코드 그대로 · 추가 standalone Spring 7.0.9 CGLIB / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 B: Repository별 경계",
+      "sourceNote": "B의 OrderUseCase에는 transaction 경계가 없습니다. 원문 Repository 두 메서드의 @Transactional은 그대로입니다. B/C 동명 대안은 별도 JVM에서 실행했습니다.",
+      "note": "추가 schema는 orders(product_id,quantity)·inventory(product_id,quantity)이며 매 run product7·재고5로 초기화했습니다. 연결 번호1/2는 run-local wrapper ID이며 DB session 번호나 pool 개수가 아닙니다. 관찰 SELECT·setup·assert 쿼리는 sourceSql 집계 밖이며 wire 계측이 아닙니다. Boot 앱·JPA·MySQL·Java 25·HTTP/MVC·응답 직렬화·Docker·broker·outbox·CDC·OSIV·pool/지연시간은 실행·계측하지 않았습니다.",
+      "stages": [
+        {
+          "id": "repository-insert",
+          "title": "첫 INSERT는 아직 writer에만",
+          "image": "W11-repository-v3.png",
+          "checks": [],
+          "runKeys": [
+            "variantB.repositoryFailure"
+          ]
+        },
+        {
+          "id": "repository-guard",
+          "title": "첫 commit 뒤 두 번째 guard0",
+          "image": "W11-repository-v3.png",
+          "checks": [
+            "B-inventory-guard-affects-zero"
+          ],
+          "runKeys": [
+            "variantB.repositoryFailure"
+          ]
+        },
+        {
+          "id": "repository-partial",
+          "title": "실패 뒤에도 주문7/6이 남음",
+          "image": "W11-repository-v3.png",
+          "checks": [
+            "B-partial-order-commit-survives-stock-failure",
+            "B-one-commit-one-rollback"
+          ],
+          "runKeys": [
+            "variantB.repositoryFailure"
+          ]
+        },
+        {
+          "id": "repository-success",
+          "title": "별도 성공은 두 번 commit",
+          "image": "W11-repository-v3.png",
+          "checks": [
+            "B-success-final-order-stock3",
+            "B-success-two-independent-commits"
+          ],
+          "runKeys": [
+            "variantB.repositorySuccess"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/w11-2026-10-20/source-proof/execution.json",
+        "docs/design/w11-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "controller",
+      "question": "Controller에 경계가 있으면 두 저장은 함께 rollback될까?",
+      "source": "원문 코드 그대로 · 추가 standalone Spring 7.0.9 CGLIB / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 A Controller",
+      "sourceNote": "Controller CGLIB 빈의 Java 메서드를 직접 호출했습니다. HTTP/MVC 처리·201 응답·직렬화를 실행한 결과가 아닙니다.",
+      "note": "추가 schema는 orders(product_id,quantity)·inventory(product_id,quantity)이며 매 run product7·재고5로 초기화했습니다. 연결 번호1/2는 run-local wrapper ID이며 DB session 번호나 pool 개수가 아닙니다. 관찰 SELECT·setup·assert 쿼리는 sourceSql 집계 밖이며 wire 계측이 아닙니다. 원문 A는 두 저장 호출을 감쌉니다. 이 실행은 DB 원자성 범위만 비교하며 HTTP 수명이나 다른 진입점 재사용을 실측하지 않았습니다. Boot 앱·JPA·MySQL·Java 25·HTTP/MVC·응답 직렬화·Docker·broker·outbox·CDC·OSIV·pool/지연시간은 실행·계측하지 않았습니다.",
+      "stages": [
+        {
+          "id": "controller-insert",
+          "title": "A의 두 Repository는 연결1 공유",
+          "image": "W11-controller-v3.png",
+          "checks": [
+            "A-controller-is-cglib-proxy",
+            "A-controller-repositories-share-one-connection"
+          ],
+          "runKeys": [
+            "variantB.controllerFailure"
+          ]
+        },
+        {
+          "id": "controller-failure",
+          "title": "quantity6 실패는 두 작업 rollback",
+          "image": "W11-controller-v3.png",
+          "checks": [
+            "A-controller-java-proxy-rolls-back-both",
+            "A-controller-one-rollback-no-commit"
+          ],
+          "runKeys": [
+            "variantB.controllerFailure"
+          ]
+        },
+        {
+          "id": "controller-success",
+          "title": "별도 quantity2는 한 번 commit",
+          "image": "W11-controller-v3.png",
+          "checks": [
+            "A-controller-java-proxy-success",
+            "A-controller-one-commit"
+          ],
+          "runKeys": [
+            "variantB.controllerSuccess"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/w11-2026-10-20/source-proof/execution.json",
+        "docs/design/w11-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "service",
+      "question": "서비스 경계에서 주문과 재고의 중간값은 어떻게 보일까?",
+      "source": "원문 코드 그대로 · 추가 standalone Spring 7.0.9 CGLIB / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 별도 variantC 원문 서비스 경계",
+      "sourceNote": "원문 C의 @Transactional OrderUseCase를 별도 JVM에서 실행했습니다. Repository 코드는 B와 같으며 기존 @Transactional을 제거하지 않았습니다.",
+      "note": "추가 schema는 orders(product_id,quantity)·inventory(product_id,quantity)이며 매 run product7·재고5로 초기화했습니다. 연결 번호1/2는 run-local wrapper ID이며 DB session 번호나 pool 개수가 아닙니다. 관찰 SELECT·setup·assert 쿼리는 sourceSql 집계 밖이며 wire 계측이 아닙니다. C의 원문 listener는 빈 no-op body입니다. 추가 ObservedListener가 원문 super handler 뒤 관찰만 기록했으며 알림·broker 전송은 하지 않았습니다. Boot 앱·JPA·MySQL·Java 25·HTTP/MVC·응답 직렬화·Docker·broker·outbox·CDC·OSIV·pool/지연시간은 실행·계측하지 않았습니다.",
+      "stages": [
+        {
+          "id": "service-insert",
+          "title": "C의 INSERT 뒤에도 observer는 이전 상태",
+          "image": "W11-service.png",
+          "checks": [],
+          "runKeys": [
+            "variantC.serviceSuccess"
+          ]
+        },
+        {
+          "id": "service-decrease",
+          "title": "차감 뒤 writer stock3·observer stock5",
+          "image": "W11-service.png",
+          "checks": [],
+          "runKeys": [
+            "variantC.serviceSuccess"
+          ]
+        },
+        {
+          "id": "service-commit",
+          "title": "서비스 commit 뒤 observer도 새 상태",
+          "image": "W11-service.png",
+          "checks": [
+            "C-service-success-order-stock3",
+            "C-service-one-connection-one-commit"
+          ],
+          "runKeys": [
+            "variantC.serviceSuccess"
+          ]
+        },
+        {
+          "id": "service-failure",
+          "title": "별도 quantity6은 모두 rollback",
+          "image": "W11-service.png",
+          "checks": [
+            "C-service-stock-failure-rolls-back-both",
+            "C-failure-no-listener-observation",
+            "C-service-failure-one-connection-one-rollback"
+          ],
+          "runKeys": [
+            "variantC.serviceFailure"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/w11-2026-10-20/source-proof/execution.json",
+        "docs/design/w11-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "required",
+      "question": "Repository 애노테이션이 같아도 왜 연결 수가 달라질까?",
+      "source": "원문 코드 그대로 · 추가 standalone Spring 7.0.9 CGLIB / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · B/C sourceBeans와 실제 sourceSql 연결",
+      "sourceNote": "B/C는 동명 OrderUseCase의 원문 대안이라 별도 source set/JVM입니다. 번호1/2는 각 run 안의 wrapper 식별자이며 같은 DB 세션 번호를 비교한 것이 아닙니다.",
+      "note": "원문 저장소의 @Transactional 기본 REQUIRED는 상위 transaction이 없으면 시작하고 있으면 참여합니다. C에서도 저장소 애노테이션을 보존했습니다. 추가 schema는 orders(product_id,quantity)·inventory(product_id,quantity)이며 매 run product7·재고5로 초기화했습니다. 연결 번호1/2는 run-local wrapper ID이며 DB session 번호나 pool 개수가 아닙니다. 관찰 SELECT·setup·assert 쿼리는 sourceSql 집계 밖이며 wire 계측이 아닙니다. Boot 앱·JPA·MySQL·Java 25·HTTP/MVC·응답 직렬화·Docker·broker·outbox·CDC·OSIV·pool/지연시간은 실행·계측하지 않았습니다.",
+      "stages": [
+        {
+          "id": "required-separate",
+          "title": "B는 상위 경계 없이1→2",
+          "image": "W11-required.png",
+          "checks": [
+            "B-repositories-are-proxies",
+            "B-usecase-has-no-transaction-proxy",
+            "B-repositories-use-two-connections"
+          ],
+          "runKeys": [
+            "variantB.sourceBeans",
+            "variantB.repositoryFailure"
+          ]
+        },
+        {
+          "id": "required-shared",
+          "title": "C는 보존한 Repository가1→1 참여",
+          "image": "W11-required.png",
+          "checks": [
+            "C-repositories-are-proxies",
+            "C-service-is-cglib-proxy"
+          ],
+          "runKeys": [
+            "variantC.sourceBeans",
+            "variantC.serviceSuccess"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/w11-2026-10-20/source-proof/execution.json",
+        "docs/design/w11-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "template",
+      "question": "추가 Risk 확인은 어느 transaction 밖에서 실행됐을까?",
+      "source": "원문 코드 그대로 · 추가 standalone Spring 7.0.9 CGLIB / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 D CheckedOrderUseCase + 추가 메모리 RiskClient",
+      "sourceNote": "RiskClient는 allowed를 제어하는 추가 메모리 stub입니다. 네트워크 위험도 API·결제·성능을 실행한 결과가 아닙니다.",
+      "note": "추가 schema는 orders(product_id,quantity)·inventory(product_id,quantity)이며 매 run product7·재고5로 초기화했습니다. 연결 번호1/2는 run-local wrapper ID이며 DB session 번호나 pool 개수가 아닙니다. 관찰 SELECT·setup·assert 쿼리는 sourceSql 집계 밖이며 wire 계측이 아닙니다. trackedConnectionsOpened는 setup/raw observer/assert 연결을 제외한 wrapper 개수입니다. 0이어도 전체 DB 연결0이라는 뜻이 아닙니다. Boot 앱·JPA·MySQL·Java 25·HTTP/MVC·응답 직렬화·Docker·broker·outbox·CDC·OSIV·pool/지연시간은 실행·계측하지 않았습니다.",
+      "stages": [
+        {
+          "id": "template-risk",
+          "title": "허용 확인은 transaction 시작 전",
+          "image": "W11-template-v2.png",
+          "checks": [
+            "D-risk-precedes-first-source-sql"
+          ],
+          "runKeys": [
+            "variantB.templateSuccess"
+          ]
+        },
+        {
+          "id": "template-rejected",
+          "title": "별도 거부는 sourceSql 없음",
+          "image": "W11-template-v2.png",
+          "checks": [
+            "D-risk-rejection-message",
+            "D-rejected-risk-opens-no-tracked-connection",
+            "D-risk-outside-transaction"
+          ],
+          "runKeys": [
+            "variantB.templateRejected"
+          ]
+        },
+        {
+          "id": "template-success",
+          "title": "허용 quantity2는 같은 연결 commit",
+          "image": "W11-template-v2.png",
+          "checks": [
+            "D-template-allowed-order-stock3",
+            "D-template-repositories-share-one-connection"
+          ],
+          "runKeys": [
+            "variantB.templateSuccess"
+          ]
+        },
+        {
+          "id": "template-failure",
+          "title": "허용 quantity6도 DB 실패는 rollback",
+          "image": "W11-template-v2.png",
+          "checks": [
+            "D-template-stock-failure-rolls-back-both",
+            "D-template-one-rollback"
+          ],
+          "runKeys": [
+            "variantB.templateFailure"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/w11-2026-10-20/source-proof/execution.json",
+        "docs/design/w11-2026-10-20/browser-observations.json"
+      ]
+    },
+    {
+      "id": "events",
+      "question": "commit 뒤 관찰은 원문에서 실제 알림을 보낸 것일까?",
+      "source": "원문 코드 그대로 · 추가 standalone Spring 7.0.9 CGLIB / H2 2.4.240 / JDK 21 · Boot 4.1.1 BOM만 사용 · 원문 C empty handler + 추가 ObservedListener",
+      "sourceNote": "원문 OrderNotificationListener.afterCommit 본문은 주석뿐인 no-op입니다. 추가 subclass가 super.afterCommit 뒤 DB 관찰을 기록했으며 실제 알림·broker 호출은 없습니다.",
+      "note": "listenerObservations는 추가 관측입니다. sequence는 같은 run의 로컬 사건 순서이며 지연시간이 아닙니다. callback active=true·sync=false는 물리 DB가 미커밋이라는 뜻이 아닙니다. 추가 schema는 orders(product_id,quantity)·inventory(product_id,quantity)이며 매 run product7·재고5로 초기화했습니다. 연결 번호1/2는 run-local wrapper ID이며 DB session 번호나 pool 개수가 아닙니다. 관찰 SELECT·setup·assert 쿼리는 sourceSql 집계 밖이며 wire 계측이 아닙니다. Boot 앱·JPA·MySQL·Java 25·HTTP/MVC·응답 직렬화·Docker·broker·outbox·CDC·OSIV·pool/지연시간은 실행·계측하지 않았습니다.",
+      "stages": [
+        {
+          "id": "events-observed",
+          "title": "commit sequence4 뒤 추가 관찰5",
+          "image": "W11-events-v3.png",
+          "checks": [
+            "C-additional-observer-invokes-original-empty-listener",
+            "C-listener-sees-committed-state"
+          ],
+          "runKeys": [
+            "variantC.serviceSuccess"
+          ]
+        },
+        {
+          "id": "events-failure",
+          "title": "재고 예외면 발행 줄 미도달",
+          "image": "W11-events-v3.png",
+          "checks": [
+            "C-failure-no-listener-observation"
+          ],
+          "runKeys": [
+            "variantC.serviceFailure"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/w11-2026-10-20/source-proof/execution.json",
+        "docs/design/w11-2026-10-20/browser-observations.json"
+      ]
+    }
+  ]
+}

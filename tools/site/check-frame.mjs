@@ -1,3 +1,4 @@
+import { CORE_UNITS } from './concept-curriculum.mjs';
 import fs from 'node:fs/promises';
 import { arg, loadPlaywright, checkOutput, startCheckServer } from './check-runtime.mjs';
 import assert from 'node:assert/strict';
@@ -5,6 +6,7 @@ const { chromium } = loadPlaywright();
 const out = await checkOutput('frame');
 const stage=arg('stage')||'after';
 const routes={홈:'index.html','45일 과정':'course/spring/README.html','출발 자료':'course/start/README.html','개념 학습':'docs/knowledge/README.html',Java:'course/java/README.html',티켓:'course/tickets/README.html','서비스 만들기':'scenario/README.html','실전 미션':'practice/MISSIONS.html','일자 상세':'course/spring/D05.html','Java 상세':'course/java/J05.html','티켓 상세':'course/tickets/B01.html','더미 데이터':'course/start/dummy/README.html','운영 실습':'course/start/ops/README.html','서비스 상세':'scenario/ch0-first-steps/0-1-ts-to-java.html','개념 상세':'docs/knowledge/P16-json-jackson-practical.html','레슨':'lessons/README.html','구현 티켓':'tickets/README.html'};
+Object.assign(routes, {'Spring 분야':'docs/knowledge/README.html#kc-category-spring', ...Object.fromEntries(CORE_UNITS.map(unit=>[unit.id, `lessons/concept-core.html?unit=${unit.id}`]))});
 const pairs=[['출발 자료','개념 학습'],['45일 과정','Java'],['티켓','서비스 만들기'],['홈','45일 과정'],['실전 미션','개념 학습']];
 const server = await startCheckServer();
 const base = server.base;
@@ -20,7 +22,7 @@ try{
    const rect=selector=>{const e=document.querySelector(selector),r=e?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height}:null;};
    return {header:rect('.site-topbar'),menu:rect('.site-topbar nav'),sidebar:rect('.site-frame-sidebar,.page-sidebar,.day-today'),content:rect('.site-frame-content,.page-navigation-content,.home-dashboard-content,.day-stepper-main'),labels:[...document.querySelectorAll('.site-topbar nav>a')].map(e=>e.textContent)};
   });
-  await page.screenshot({path:`${out}/${stage}/frame-${file.replaceAll('/','-')}.png`});
+  await page.screenshot({path:`${out}/${stage}/frame-${file.replace(/[^a-zA-Z0-9.-]/g,'-')}.png`});
  }
  for(const [from,to]of pairs){
   await page.goto(`${base}/${routes[from]}`);await page.waitForLoadState('networkidle');

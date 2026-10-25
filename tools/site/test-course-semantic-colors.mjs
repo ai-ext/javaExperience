@@ -20,7 +20,7 @@ test('HTTP 상태와 파일 층은 고유색이고 모든 공통 다크 면에�
 });
 
 test('HTTP 결과만 구분하며 200ms·파일명·코드 원문·문장 내용은 보존한다',()=>{
-  const body='<p>GET 응답 200 / 생성 201 / 오류 400 / 없음 404 / 타임아웃</p><p>대기 200ms 파일 D200.java 값 1400</p><pre><code>HTTP 400</code></pre>';
+  const body='<p>GET 응답 200 / 생성 201 / 오류 400 / 없음 404 / 타임아웃</p><p>대기 200ms 파일 D200.java 값 1400 · 201자 제목으로 실패</p><pre><code>HTTP 400</code></pre>';
   const result=renderSemanticColors(body),doc=new JSDOM(result).window.document;
   assert.deepEqual([...doc.querySelectorAll('[data-http-status]')].map(e=>e.dataset.httpStatus),['200','201','400','404','timeout']);
   assert.equal(doc.body.textContent,new JSDOM(body).window.document.body.textContent);
@@ -57,4 +57,12 @@ test('동적 요청 결과도 내용 보존과 상태별 색 적용을 유지한
   assert.equal(dynamic.querySelector('[data-http-status]').dataset.httpStatus,'400','나중에 생성된 학습 장면도 같은 상태색을 사용한다');
   assert.equal(dynamic.textContent,'400 Bad Request · 예상 결과');
   dom.window.close();
+});
+
+
+test('리더의 원문 DOM에는 의미색 주석을 삽입하지 않는다',()=>{
+ const original='<div class="knowledge-reader-original"><p>HTTP 201 응답과 timeout을 관찰한다.</p><span class="file-name">PostService.java</span></div>';
+ const dom=new JSDOM(renderSemanticColors(original));
+ assert.equal(dom.window.document.querySelector('.knowledge-reader-original').outerHTML,original);
+ dom.window.close();
 });

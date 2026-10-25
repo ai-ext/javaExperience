@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>J02. 예외 계층과 제네릭 Result, Lombok이 만드는 코드</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
+
 <link rel="stylesheet" href="../../tools/site/course-exercise.css?v=8eda63e0ec25">
 <link rel="stylesheet" href="../../tools/site/course.css?v=8e71bc7f78e2">
 <link rel="stylesheet" href="../../tools/site/course-stepper.css?v=1124522a27dd">
@@ -13,7 +14,6 @@
 
 
 
-<link rel="stylesheet" href="../../tools/site/course-stepper.css?v=1124522a27dd">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=7d70b43e3c66">
 <link rel="stylesheet" href="../../tools/site/course-content.css?v=35f34c292222">
 <link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="../../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../../tools/site/course-flow-layout.css?v=b33e13ca0173">
 <link rel="stylesheet" href="../../tools/site/section-switcher.css?v=975a56e01be7">
-<link rel="stylesheet" href="../../tools/site/site-frame.css?v=bf75cf02827a">
+<link rel="stylesheet" href="../../tools/site/site-frame.css?v=836815f322de">
 <script>(function prepareFirstPaint({panelMap,dayPanels}) {
   const root=document.documentElement;
   root.classList.add('js');
@@ -139,7 +139,7 @@ public final class Result&lt;T&gt; {
 <details class="exercise-context-links" data-content-kind="practice"><summary>실행 위치·연결 일자·이전 연습</summary><nav class="course-exercise-nav exercise-return" aria-label="연습에서 일정으로 돌아가기"><p class="exercise-return-links" data-content-kind="reference">이 연습을 쓰는 날: <a href="../spring/D02.html#오늘-순서">D02 · 공통 기반</a></p><p data-content-kind="reference"><a href="J01.html">← 이전 J01</a> · <a href="J03.html">다음 J03 →</a></p></nav><p data-content-kind="practice">Java는 저장소의 <code>java-track/</code>에서 작성하고 저장소 루트에서 실행한다.</p></details>
 
 
-<section class="exercise-section" aria-labelledby="상황" data-content-kind="guide" data-section-original-hidden="false" data-section-panel="" id="section-panel-2"><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span><h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2><p data-content-kind="guide">D02는 공통 기반을 세우는 날이다. ① <code>ErrorCode</code>와 <code>BusinessException</code>을 만들어 전역 예외 처리기가 코드 하나로 <span data-http-status="404" class="semantic-http-status">404</span>·<span data-http-status="409" class="semantic-http-status">409</span>를 내게 하고, ② <code>BaseEntity</code>를 만들며, ④ 상태 없는 닉네임 정규화는 static 유틸로 둔다.
+<section class="exercise-section" aria-labelledby="상황" data-content-kind="guide" data-section-original-hidden="false" data-section-panel="" id="section-panel-2"><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span><h2 id="상황"><a class="anchor" href="#상황" aria-hidden="true">#</a>상황</h2><p data-content-kind="guide">D02는 공통 기반을 세우는 날이다. ① <code>ErrorCode</code>와 <code>BusinessException</code>을 만들어 전역 예외 처리기가 코드 하나로 <span data-http-status="404" class="semantic-http-status">404</span>·409를 내게 하고, ② <code>BaseEntity</code>를 만들며, ④ 상태 없는 닉네임 정규화는 static 유틸로 둔다.
 오늘은 Spring 없이 예외 계층(<code>BusinessException</code> ← <code>NotFoundException</code>)과 성공 값·에러 코드를 담는 제네릭 <code>Result&lt;T&gt;</code>를 만든다. 엔티티 id가 왜 <code>Long</code>인지도 확인한다. D03부터 엔티티에 붙는 Lombok 애노테이션이 실제로 어떤 코드를 만드는지는 표로 읽고, 직접 써 보는 것은 선택 과제(실무 습관 칸)다.</p><figure class="content-visual visual-relations" data-content-kind="guide" data-visual-pattern="relations"><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span><h3 class="visual-title">예외 계층 · 자식이 부모 타입으로 잡힌다</h3><svg viewBox="0 0 880 340" role="img" aria-label="예외 계층 · 자식이 부모 타입으로 잡힌다"><g class="relation-edge"><path d="M440 132 V104 H440 V76"></path><path class="relation-arrow" d="M434 84 L440 76 L446 84"></path><text x="452" y="96">extends</text></g><g class="relation-edge"><path d="M440 252 V224 H440 V196"></path><path class="relation-arrow" d="M434 204 L440 196 L446 204"></path><text x="452" y="216">extends</text></g><g class="relation-node"><rect x="320" y="12" width="240" height="64" rx="6"></rect><text x="440" y="41" text-anchor="middle">RuntimeException</text><text class="relation-node-kind" x="440" y="64" text-anchor="middle">언체크 예외</text></g><g class="relation-node"><rect x="320" y="132" width="240" height="64" rx="6"></rect><text x="440" y="161" text-anchor="middle">BusinessException</text><text class="relation-node-kind" x="440" y="184" text-anchor="middle">에러 코드·메시지</text></g><g class="relation-node"><rect x="320" y="252" width="240" height="64" rx="6"></rect><text x="440" y="281" text-anchor="middle">NotFoundException</text><text class="relation-node-kind" x="440" y="304" text-anchor="middle">NOT_FOUND</text></g></svg><figcaption>BusinessException <code>extends</code> RuntimeException · NotFoundException <code>extends</code> BusinessException<p data-content-kind="guide">화살표는 자식에서 부모로 향한다. <code>catch (BusinessException e)</code>는 <code>NotFoundException</code>도 잡는다. 생성자에서는 <code>super(...)</code>로 부모에 값을 넘긴다.</p></figcaption></figure></section>
 
 <section class="exercise-section" aria-labelledby="빠른-연상" data-content-kind="guide" data-section-original-hidden="false" data-section-panel="" id="section-panel-3"><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span><h2 id="빠른-연상"><a class="anchor" href="#빠른-연상" aria-hidden="true">#</a>빠른 연상</h2><section class="content-visual visual-comparison" data-content-kind="example" data-visual-pattern="comparison"><span class="content-kind " data-kind-label="example"><span aria-hidden="true">{ }</span> 구현 예시<small>내 구현과 비교</small></span><div class="comparison-panels"><div class="comparison-side"><h4>static</h4><dl><dt>어디에 붙나</dt><dd>클래스 하나에 하나</dd><dt>부르는 법</dt><dd><code>Result.success("값")</code></dd><dt><code>this</code>를 쓸 수 있나</dt><dd>없다</dd><dt>쓰는 곳</dt><dd>객체를 만드는 팩토리, 상태 없는 유틸(<code>NicknameNormalizer</code>)</dd></dl></div><div class="comparison-side"><h4>인스턴스</h4><dl><dt>어디에 붙나</dt><dd><code>new</code>로 만든 객체마다</dd><dt>부르는 법</dt><dd><code>result.isSuccess()</code></dd><dt><code>this</code>를 쓸 수 있나</dt><dd>있다</dd><dt>쓰는 곳</dt><dd>객체가 가진 값으로 답하는 메서드</dd></dl></div><div class="comparison-note"><h4>TS로 치면</h4><dl><dt>어디에 붙나</dt><dd><code>static</code> 멤버 / 일반 멤버</dd><dt>부르는 법</dt><dd><code>Result.success()</code> / <code>result.isSuccess()</code></dd><dt><code>this</code>를 쓸 수 있나</dt><dd>같다</dd><dt>쓰는 곳</dt><dd></dd></dl></div></div></section><div class="table-wrap"><table data-content-kind="guide">
@@ -1316,7 +1316,7 @@ public boolean issue(long memberId) {
     function measureHeader() { if (siteHeader) document.documentElement.style.setProperty('--course-header-height',siteHeader.getBoundingClientRect().height + 'px'); }
     measureHeader(); window.addEventListener('resize',measureHeader);
     if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
-    if (main.querySelector('[data-day-page]')) return;
+    if (main.querySelector('[data-day-page],[data-knowledge-reader],[data-core-learning]')) return;
     var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {

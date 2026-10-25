@@ -296,11 +296,11 @@ await test('과정·홈은 다크 CSS만 로드하고 테마 선택 코드가 �
   const files = ['README.html', ...course.days.map(day => day.page), ...course.java.map(java => java.page), ...course.tickets.map(ticket => ticket.page).filter(Boolean), 'course/map.html', 'course/README.html', 'course/spring/README.html', 'course/start/README.html'];
   for (const file of files) {
     const doc = new JSDOM(fs.readFileSync(new URL(file, root), 'utf8')).window.document;
-    assert.equal(doc.documentElement.hasAttribute('data-theme'), false, file);
+    assert.ok([null,'dark'].includes(doc.documentElement.getAttribute('data-theme')), file + ': 고정 다크 또는 공통 다크');
     assert.ok(doc.querySelector('link[href*="course-tokens.css"]'), file);
     for (const link of doc.querySelectorAll('link[rel="stylesheet"]')) {
       const css = fs.readFileSync(new URL(link.getAttribute('href').split('?')[0], new URL(file, root)), 'utf8');
-      assert.doesNotMatch(css, /prefers-color-scheme|\[data-theme/, file + ': ' + link.href);
+      assert.doesNotMatch(css, /prefers-color-scheme|\[data-theme=["\']?light/, file + ': ' + link.href);
     }
     for (const script of doc.querySelectorAll('script:not([src])')) assert.doesNotMatch(script.textContent, /prefers-color-scheme|dataset\.theme/);
     doc.defaultView.close();

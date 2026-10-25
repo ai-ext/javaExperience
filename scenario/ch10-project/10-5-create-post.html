@@ -4,13 +4,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>10-5. 게시글 작성 — JPA, 검증 규칙·태그·작성자는 토큰 주인</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
+
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=dbfc9401043c">
 <link rel="stylesheet" href="../../tools/site/scenario-visual.css?v=8495b906d9ff">
 <link rel="stylesheet" href="../../tools/site/scenario-code-workbench.css?v=482ae3099111">
 <link rel="stylesheet" href="../../tools/site/lesson-atlas.css?v=5846acf91e90">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer=""></script>
 <link rel="stylesheet" href="../../tools/site/task-focus.css?v=fdf0e0effc45">
-
 
 
 
@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="../../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../../tools/site/course-flow-layout.css?v=b33e13ca0173">
 <link rel="stylesheet" href="../../tools/site/section-switcher.css?v=975a56e01be7">
-<link rel="stylesheet" href="../../tools/site/site-frame.css?v=bf75cf02827a">
+<link rel="stylesheet" href="../../tools/site/site-frame.css?v=836815f322de">
 <script>(function prepareFirstPaint({panelMap,dayPanels}) {
   const root=document.documentElement;
   root.classList.add('js');
@@ -55,7 +55,7 @@
       <div class="task-focus-after"><div><strong>직접 해볼 일</strong><p>로그인 후 P 작성 예제를 보내고 응답과 post_tags의 연결 행을 확인하세요.</p></div><a href="#직접-확인" data-task-open="true">요청 실행 화면 열기 ↗</a></div>
       <aside class="task-focus-expected" aria-label="구현 뒤 비교할 기대 결과">
         <p class="task-focus-eyebrow">확인할 결과 <span>실행 전 기대값</span></p>
-        <strong><span data-http-status="201" class="semantic-http-status">201</span>과 Location: /api/v1/posts/{id}; P 예제는 tags=[api,check], visibility=PUBLIC, author.id=1, viewCount=likeCount=0입니다.</strong>
+        <strong>201과 Location: /api/v1/posts/{id}; P 예제는 tags=[api,check], visibility=PUBLIC, author.id=1, viewCount=likeCount=0입니다.</strong>
         <p class="task-focus-boundary">이번에는 작성과 관계 저장을 만들며 liked·comments가 포함된 상세 응답은 10-6에서 확장합니다.</p>
       </aside>
     </details>
@@ -168,7 +168,7 @@ INSERT INTO post_tags (post_id, tag_id) VALUES (26, 7), (26, 8);</span></span></
 <td><span data-http-status="400" class="semantic-http-status">400</span>, <span data-http-status="401" class="semantic-http-status">401</span></td>
 </tr>
 </tbody></table></div>
-<p>규칙 칸에 "다듬기"가 섞여 있다. 공백 제거, 소문자, 중복 제거, 기본값이다. <strong>다듬은 다음에 검사한다</strong>는 순서가 중요하다. <code>"  abc  "</code>는 7글자지만 다듬으면 3글자라 <span data-http-status="400" class="semantic-http-status">400</span>이다. <code>["Java", "java"]</code>는 태그 두 개가 아니라 하나다.</p>
+<p>규칙 칸에 "다듬기"가 섞여 있다. 공백 제거, 소문자, 중복 제거, 기본값이다. <strong>다듬은 다음에 검사한다</strong>는 순서가 중요하다. <code>"  abc  "</code>는 7글자지만 다듬으면 3글자라 400이다. <code>["Java", "java"]</code>는 태그 두 개가 아니라 하나다.</p>
 <p>쓰기는 JPA로 한다. 처음으로 엔티티끼리의 <strong>연관관계</strong>를 쓴다. 글 → 작성자는 다대일(<code>@ManyToOne</code>), 글 ↔ 태그는 다대다(<code>@ManyToMany</code>, 연결 테이블 <code>post_tags</code>)다.</p>
 </div>
   </details><details class="lesson-scene lesson-understand" data-lesson-kind="understand" data-section-original-hidden="false" data-section-panel="" id="section-panel-2">
@@ -280,7 +280,7 @@ INSERT INTO post_tags (post_id, tag_id) VALUES (26, 7), (26, 8);</span></span></
 <li><strong>목록 원소 검증.</strong> <code>List&lt;@Size(min = 1, max = 20) String&gt; tags</code>처럼 타입 인자에 애노테이션을 붙이면 원소마다 검사한다. 실패 필드 이름은 <code>tags[1]</code>이 된다. <code>@Size(max = 5)</code>를 목록 자체에 붙이면 개수를 본다.</li>
 <li><strong><code>LAZY</code>.</strong> 글을 읽을 때 작성자까지 매번 읽지 않게 기본을 지연 로딩으로 둔다. 필요할 때 한 번에 가져오는 법은 10-6에서 다룬다.</li>
 <li><strong><code>@Enumerated(EnumType.STRING)</code>.</strong> 기본값(<code>ORDINAL</code>)은 enum의 순번(0, 1)을 저장한다. 테이블은 <code>ENUM('PUBLIC','PRIVATE')</code> 문자열이라 반드시 <code>STRING</code>이다.</li>
-<li><strong>같은 이름 태그를 동시에 처음 만들면?</strong> 두 요청이 동시에 "없다"를 보고 둘 다 INSERT하면 UNIQUE 위반으로 한쪽이 <span data-http-status="500" class="semantic-http-status">500</span>이 난다. 이 단계에서는 넘어가지만, 실무에서는 생긴다(티켓 T-018에서 다룬다).</li>
+<li><strong>같은 이름 태그를 동시에 처음 만들면?</strong> 두 요청이 동시에 "없다"를 보고 둘 다 INSERT하면 UNIQUE 위반으로 한쪽이 500이 난다. 이 단계에서는 넘어가지만, 실무에서는 생긴다(티켓 T-018에서 다룬다).</li>
 </ul>
 </div>
   </details><details class="lesson-scene lesson-build" data-lesson-kind="build" data-section-original-hidden="false" data-section-panel="" id="section-panel-4">
@@ -303,7 +303,7 @@ public ResponseEntity&lt;ApiResponse&lt;PostResponse&gt;&gt; create(
     return ResponseEntity.created(URI.create("/api/v1/posts/" + created.id()))
             .body(ApiResponse.created(created));
 }</code></pre>
-<p>작성자 id는 JSON이 아니라 <code>@LoginUser</code>에서 온다. 인증 인터셉터가 먼저 실행되므로 토큰이 없는 요청은 본문이 깨져 있어도 <span data-http-status="401" class="semantic-http-status">401</span>이다.</p>
+<p>작성자 id는 JSON이 아니라 <code>@LoginUser</code>에서 온다. 인증 인터셉터가 먼저 실행되므로 토큰이 없는 요청은 본문이 깨져 있어도 401이다.</p>
 </details>
 
 <details>
@@ -1580,7 +1580,7 @@ private Visibility visibility;</code></pre>
     function measureHeader() { if (siteHeader) document.documentElement.style.setProperty('--course-header-height',siteHeader.getBoundingClientRect().height + 'px'); }
     measureHeader(); window.addEventListener('resize',measureHeader);
     if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
-    if (main.querySelector('[data-day-page]')) return;
+    if (main.querySelector('[data-day-page],[data-knowledge-reader],[data-core-learning]')) return;
     var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {

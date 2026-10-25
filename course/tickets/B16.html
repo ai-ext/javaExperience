@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>B16. Redis 점검 시간에 글쓰기까지 멈췄다</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
+
 <link rel="stylesheet" href="../../tools/site/course-exercise.css?v=8eda63e0ec25">
 <link rel="stylesheet" href="../../tools/site/course.css?v=8e71bc7f78e2">
 <link rel="stylesheet" href="../../tools/site/course-stepper.css?v=1124522a27dd">
@@ -14,7 +15,6 @@
 
 
 
-<link rel="stylesheet" href="../../tools/site/course-stepper.css?v=1124522a27dd">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=7d70b43e3c66">
 <link rel="stylesheet" href="../../tools/site/course-content.css?v=35f34c292222">
 <link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="../../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../../tools/site/course-flow-layout.css?v=b33e13ca0173">
 <link rel="stylesheet" href="../../tools/site/section-switcher.css?v=975a56e01be7">
-<link rel="stylesheet" href="../../tools/site/site-frame.css?v=bf75cf02827a">
+<link rel="stylesheet" href="../../tools/site/site-frame.css?v=836815f322de">
 <script>(function prepareFirstPaint({panelMap,dayPanels}) {
   const root=document.documentElement;
   root.classList.add('js');
@@ -49,7 +49,7 @@
 
 
 <section class="exercise-section exercise-received" aria-labelledby="받은-티켓" data-content-kind="action" data-section-original-hidden="false" data-section-panel="" id="section-panel-1"><h2 id="받은-티켓"><a class="anchor" href="#받은-티켓" aria-hidden="true">#</a>받은 티켓</h2><blockquote data-content-kind="action">
-<p data-content-kind="action">어젯밤 Redis 점검(장애 조치 리허설) 20분 동안 글쓰기가 1분 넘게 돌다 실패했고, 인기글 화면은 <span data-http-status="500" class="semantic-http-status">500</span>이 섞여 나왔습니다.
+<p data-content-kind="action">어젯밤 Redis 점검(장애 조치 리허설) 20분 동안 글쓰기가 1분 넘게 돌다 실패했고, 인기글 화면은 500이 섞여 나왔습니다.
 Redis는 캐시라서 점검 중에도 서비스는 된다고 들었는데요. APM에서 글 저장 API가 <code>@Transactional</code> 메서드 근처에서 오래 걸린 것으로 보여서 DB 쪽 락을 먼저 의심하고 있습니다.
 다음 달 점검 전까지 원인 파악 부탁드립니다. — 운영팀</p>
 </blockquote></section>
@@ -64,7 +64,7 @@ Redis는 캐시라서 점검 중에도 서비스는 된다고 들었는데요. A
 </ul></li>
 <li class="repro-row" data-sequence="4"><div class="repro-command"> — Redis 컨테이너를 내린다(연결 끊김)
 <figure class="code-block"><figcaption class="code-toolbar"><span>실행</span><button type="button" data-copy-target="repro-b16-4">명령 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre id="repro-b16-4"><code>bash tickets/B16/repro.sh stop</code></pre></figure></div><ul data-content-kind="practice" class="repro-observation">
-<li data-sequence="1">기대 증상: 글쓰기는 <span data-http-status="201" class="semantic-http-status">201</span>이지만 <code>GET /api/posts/popular</code>가 <span data-http-status="500" class="semantic-http-status">500</span>이다.</li>
+<li data-sequence="1">기대 증상: 글쓰기는 201이지만 <code>GET /api/posts/popular</code>가 500이다.</li>
 </ul></li>
 <li data-sequence="5">멈춘 동안 다른 터미널에서 <code>"${JAVA_HOME:+$JAVA_HOME/bin/}jcmd" $(pgrep -f BoardApplication) Thread.print</code>로 스레드 덤프를 뜬다.<ul data-content-kind="practice">
 <li data-sequence="1"><code>jcmd</code>가 "Unable to locate a Java Runtime"을 내면(macOS에서 brew JDK를 <code>JAVA_HOME</code>으로만 쓸 때) <code>"$JAVA_HOME/bin/jcmd"</code>로 부른다. <code>repro.sh</code>가 찍는 안내 명령은 이 경로를 이미 넣어 둔다.</li>
@@ -74,7 +74,7 @@ Redis는 캐시라서 점검 중에도 서비스는 된다고 들었는데요. A
 
 <section class="exercise-section exercise-submission" aria-labelledby="제출물" data-content-kind="check" data-section-original-hidden="false" data-section-panel="" id="section-panel-3"><span class="content-kind " data-kind-label="check"><span aria-hidden="true">✓</span> 확인<small>끝났는지 판단</small></span><h2 id="제출물"><a class="anchor" href="#제출물" aria-hidden="true">#</a>제출물</h2><ul class="visual-rules" data-visual-pattern="rules" data-content-kind="check">
 <li>원인 서술: 요청 스레드가 무엇을 기다렸고, 왜 캐시 장애가 글쓰기·인기글 실패가 됐는가. "응답 지연"과 "연결 끊김"이 각각 어떻게 번졌는지 나눠서</li>
-<li>재현 테스트: Toxiproxy로 Redis 응답을 3초 늦춘 경우와 연결을 끊은 경우 각각, 글쓰기 <span data-http-status="201" class="semantic-http-status">201</span>·인기글 <span data-http-status="200" class="semantic-http-status">200</span>이 1초 안인지 보는 테스트(결함 상태에서 실패 → 수정 후 통과)</li>
+<li>재현 테스트: Toxiproxy로 Redis 응답을 3초 늦춘 경우와 연결을 끊은 경우 각각, 글쓰기 <span data-http-status="201" class="semantic-http-status">201</span>·인기글 200이 1초 안인지 보는 테스트(결함 상태에서 실패 → 수정 후 통과)</li>
 <li>수정 diff</li>
 </ul></section>
 <section class="ticket-flow flow" data-flow="B16" data-flow-kind="ticket" id="flow-b16" aria-labelledby="flow-b16-title" data-content-kind="practice" data-section-original-hidden="false" data-section-panel=""><span class="content-kind " data-kind-label="practice"><span aria-hidden="true">▷</span> 실습<small>실행하고 관찰</small></span>
@@ -94,11 +94,11 @@ Redis는 캐시라서 점검 중에도 서비스는 된다고 들었는데요. A
 </div>
   <div data-flow-overview="">
   <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>4단계 · 관측값은 직접 기록</small></h3>
-  <ol class="flow-steps" data-content-kind="practice"><li class="flow-step" id="flow-b16-1" data-order="1" data-node="redis" data-node-kind="cache"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">1</span><span class="flow-step-node">Redis 점검</span></p><p class="flow-step-title" data-content-kind="practice">Redis 점검(장애 조치 리허설) 20분</p><dl class="flow-values"><div><dt>재현 1</dt><dd>Redis 컨테이너를 일시 정지한다(연결은 살아 있는데 응답이 없다)</dd></div><div><dt>재현 2</dt><dd><code>repro.sh stop</code> — 컨테이너를 내린다(연결 끊김)</dd></div></dl></li><li class="flow-step" id="flow-b16-4" data-order="4" data-node="api" data-node-kind="controller"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">2</span><span class="flow-step-node">글쓰기</span></p><p class="flow-step-title" data-content-kind="practice">응답 없는 Redis 동안 글쓰기가 끝나지 않는다</p><dl class="flow-values"><div><dt>운영</dt><dd>글쓰기가 1분 넘게 돌다 실패</dd></div><div><dt>재현 1</dt><dd><code>POST /api/posts</code>와 <code>GET /api/posts/popular</code>가 15초 안에 끝나지 않는다</dd></div></dl></li><li class="flow-step" id="flow-b16-6" data-order="6" data-node="symptom" data-node-kind="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">3</span><span class="flow-step-node">인기글</span></p><p class="flow-step-title" data-content-kind="practice">연결이 끊기면 글쓰기는 되는데 인기글은 500</p><dl class="flow-values"><div><dt>재현 2</dt><dd>글쓰기는 <span data-http-status="201" class="semantic-http-status">201</span>이지만 <code>GET /api/posts/popular</code>가 <span data-http-status="500" class="semantic-http-status">500</span></dd></div><div><dt>운영</dt><dd>인기글 화면에 500이 섞였다</dd></div></dl></li><li class="flow-step" id="flow-b16-7" data-order="7" data-node="observe" data-node-kind="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">4</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title" data-content-kind="practice">멈춘 동안 스레드 덤프를 뜬다</p><dl class="flow-values"><div><dt>명령</dt><dd><code>"${JAVA_HOME:+$JAVA_HOME/bin/}jcmd" $(pgrep -f BoardApplication) Thread.print</code></dd></div><div><dt>더 보기</dt><dd>응답 시간 측정, 서버 경고 로그</dd></div></dl></li></ol>
+  <ol class="flow-steps" data-content-kind="practice"><li class="flow-step" id="flow-b16-1" data-order="1" data-node="redis" data-node-kind="cache"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">1</span><span class="flow-step-node">Redis 점검</span></p><p class="flow-step-title" data-content-kind="practice">Redis 점검(장애 조치 리허설) 20분</p><dl class="flow-values"><div><dt>재현 1</dt><dd>Redis 컨테이너를 일시 정지한다(연결은 살아 있는데 응답이 없다)</dd></div><div><dt>재현 2</dt><dd><code>repro.sh stop</code> — 컨테이너를 내린다(연결 끊김)</dd></div></dl></li><li class="flow-step" id="flow-b16-4" data-order="4" data-node="api" data-node-kind="controller"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">2</span><span class="flow-step-node">글쓰기</span></p><p class="flow-step-title" data-content-kind="practice">응답 없는 Redis 동안 글쓰기가 끝나지 않는다</p><dl class="flow-values"><div><dt>운영</dt><dd>글쓰기가 1분 넘게 돌다 실패</dd></div><div><dt>재현 1</dt><dd><code>POST /api/posts</code>와 <code>GET /api/posts/popular</code>가 15초 안에 끝나지 않는다</dd></div></dl></li><li class="flow-step" id="flow-b16-6" data-order="6" data-node="symptom" data-node-kind="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">3</span><span class="flow-step-node">인기글</span></p><p class="flow-step-title" data-content-kind="practice">연결이 끊기면 글쓰기는 되는데 인기글은 500</p><dl class="flow-values"><div><dt>재현 2</dt><dd>글쓰기는 201이지만 <code>GET /api/posts/popular</code>가 <span data-http-status="500" class="semantic-http-status">500</span></dd></div><div><dt>운영</dt><dd>인기글 화면에 500이 섞였다</dd></div></dl></li><li class="flow-step" id="flow-b16-7" data-order="7" data-node="observe" data-node-kind="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">4</span><span class="flow-step-node">관찰 지점</span></p><p class="flow-step-title" data-content-kind="practice">멈춘 동안 스레드 덤프를 뜬다</p><dl class="flow-values"><div><dt>명령</dt><dd><code>"${JAVA_HOME:+$JAVA_HOME/bin/}jcmd" $(pgrep -f BoardApplication) Thread.print</code></dd></div><div><dt>더 보기</dt><dd>응답 시간 측정, 서버 경고 로그</dd></div></dl></li></ol>
   </div>
   <details class="flow-cause" data-content-kind="practice"><summary>원인 쪽 단계 3개 펼치기 — "원인과 구현 예시"과 같은 수준</summary>
   <p class="flow-cause-note" data-content-kind="practice">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
-  <ol class="flow-steps is-cause" data-content-kind="practice"><li class="flow-step is-cause" id="flow-b16-2" data-order="2" data-node="redis" data-node-kind="cache"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 1</span><span class="flow-step-node">Redis 점검</span></p><p class="flow-step-title" data-content-kind="practice">명령 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span> 설정이 지워져 Lettuce 기본 60초를 쓴다</p><dl class="flow-values"><div><dt>설정</dt><dd><code>spring.data.redis.timeout</code> 없음</dd></div></dl></li><li class="flow-step is-cause" id="flow-b16-3" data-order="3" data-node="thread" data-node-kind="runtime"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 2</span><span class="flow-step-node">요청 스레드</span></p><p class="flow-step-title" data-content-kind="practice">커밋 뒤 랭킹 가산·캐시 삭제가 요청 스레드를 붙잡는다</p><dl class="flow-values"><div><dt>대기</dt><dd>Redis가 응답하지 않으면 호출마다 그만큼 기다린다</dd></div></dl></li><li class="flow-step is-cause" id="flow-b16-5" data-order="5" data-node="symptom" data-node-kind="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 3</span><span class="flow-step-node">인기글</span></p><p class="flow-step-title" data-content-kind="practice"><code>RedisGuard</code>가 <code>RedisConnectionFailureException</code>만 잡는다</p><dl class="flow-values"><div><dt>새는 예외</dt><dd>끊긴 연결의 <code>RedisSystemException</code>, 명령 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span>의 <code>QueryTimeoutException</code></dd></div></dl></li></ol></details>
+  <ol class="flow-steps is-cause" data-content-kind="practice"><li class="flow-step is-cause" id="flow-b16-2" data-order="2" data-node="redis" data-node-kind="cache"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 1</span><span class="flow-step-node">Redis 점검</span></p><p class="flow-step-title" data-content-kind="practice">명령 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span> 설정이 지워져 Lettuce 기본 60초를 쓴다</p><dl class="flow-values"><div><dt>설정</dt><dd><code>spring.data.redis.timeout</code> 없음</dd></div></dl></li><li class="flow-step is-cause" id="flow-b16-3" data-order="3" data-node="thread" data-node-kind="runtime"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 2</span><span class="flow-step-node">요청 스레드</span></p><p class="flow-step-title" data-content-kind="practice">커밋 뒤 랭킹 가산·캐시 삭제가 요청 스레드를 붙잡는다</p><dl class="flow-values"><div><dt>대기</dt><dd>Redis가 응답하지 않으면 호출마다 그만큼 기다린다</dd></div></dl></li><li class="flow-step is-cause" id="flow-b16-5" data-order="5" data-node="symptom" data-node-kind="observe"><p class="flow-step-head" data-content-kind="practice"><span class="flow-step-no">원인 3</span><span class="flow-step-node">인기글</span></p><p class="flow-step-title" data-content-kind="practice"><code>RedisGuard</code>가 <code>RedisConnectionFailureException</code>만 잡는다</p><dl class="flow-values"><div><dt>새는 예외</dt><dd>끊긴 연결의 <code>RedisSystemException</code>, 명령 타임아웃의 <code>QueryTimeoutException</code></dd></div></dl></li></ol></details>
 </section>
 <section class="exercise-section" aria-labelledby="힌트" data-content-kind="guide" data-section-original-hidden="false" data-section-panel="" id="section-panel-5"><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span><h2 id="힌트"><a class="anchor" href="#힌트" aria-hidden="true">#</a>힌트</h2><details data-content-kind="guide"><summary>1. 스레드 덤프에서 기다리는 곳을 찾는다<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body">
 
@@ -109,13 +109,13 @@ Redis는 캐시라서 점검 중에도 서비스는 된다고 들었는데요. A
 </div></details><details data-content-kind="guide"><summary>2. 얼마나 기다리는가<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body">
 
 
-<p data-content-kind="guide"><code>application.yml</code>(또는 <code>application.properties</code>)의 <code>spring.data.redis.*</code>를 spec-v2 8절의 운영 값과 비교한다. 명령 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span>을 주지 않으면 Lettuce 기본값(60초)을 쓴다.
+<p data-content-kind="guide"><code>application.yml</code>(또는 <code>application.properties</code>)의 <code>spring.data.redis.*</code>를 spec-v2 8절의 운영 값과 비교한다. 명령 타임아웃을 주지 않으면 Lettuce 기본값(60초)을 쓴다.
 글 하나 쓸 때 Redis를 몇 번 부르는지도 세어 본다(커밋 뒤 랭킹 가산, 인기글 캐시 삭제).</p>
 </div></details><details data-content-kind="guide"><summary>3. 실패는 어디까지 올라가는가<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body">
 
 
 <p data-content-kind="guide"><code>RedisGuard</code>가 무엇을 잡고 무엇을 올리는지 본다. 끊긴 연결에 명령을 보내면 Lettuce가 <code>Currently not connected</code>로 거절하고,
-Spring은 이를 <code>RedisSystemException</code>으로 바꾼다. 응답이 늦어 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span>이 나면 <code>QueryTimeoutException</code>이다. 둘 다 <code>RedisConnectionFailureException</code>이 아니다.</p>
+Spring은 이를 <code>RedisSystemException</code>으로 바꾼다. 응답이 늦어 타임아웃이 나면 <code>QueryTimeoutException</code>이다. 둘 다 <code>RedisConnectionFailureException</code>이 아니다.</p>
 </div></details><details data-content-kind="guide"><summary>4. 테스트로 고정하기<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body">
 
 
@@ -137,11 +137,11 @@ Spring은 이를 <code>RedisSystemException</code>으로 바꾼다. 응답이 �
 <p data-content-kind="example"><strong>원인.</strong> 두 가지가 겹쳤다.
 ① <code>application.yml</code>(또는 <code>application.properties</code>)에서 Redis 명령 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span>(<code>spring.data.redis.timeout</code>)을 지웠다("큰 명령이 중간에 끊기면 안 되므로 기본값"). Lettuce 기본값은 60초다.
 Redis가 응답하지 않으면 글쓰기 커밋 뒤의 랭킹 가산·인기글 캐시 삭제가 각각 그만큼 요청 스레드를 붙잡고, 인기글 조회도 캐시 조회·저장에서 같은 시간을 기다린다.
-② <code>RedisGuard</code>가 <code>RedisConnectionFailureException</code>(처음부터 붙지 못함)만 잡고 나머지는 올린다. 끊긴 연결의 명령 거절(<code>RedisSystemException</code>)과 명령 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span>(<code>QueryTimeoutException</code>)은 폴백되지 않아 인기글 조회가 <span data-http-status="500" class="semantic-http-status">500</span>이 된다.
+② <code>RedisGuard</code>가 <code>RedisConnectionFailureException</code>(처음부터 붙지 못함)만 잡고 나머지는 올린다. 끊긴 연결의 명령 거절(<code>RedisSystemException</code>)과 명령 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span>(<code>QueryTimeoutException</code>)은 폴백되지 않아 인기글 조회가 500이 된다.
 기존 테스트는 "Redis 없이 기동"(처음부터 연결 거부)만 남아 있어 둘 다 보지 못했다. DB 락은 오진이다. 글은 이미 커밋됐고(커넥션도 커밋 직후 풀에 돌아간다), 커밋 뒤 동기화 콜백에서 Redis를 기다린 것이다.</p>
 <p data-content-kind="example"><strong>구현 예시 수정.</strong> 명령 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span> 500ms를 되살리고(spec-v2 8절), <code>RedisGuard</code>는 <code>DataAccessException</code> 전체를 Redis 장애로 보고 폴백한다.
-한 번 실패하면 5초 동안 Redis를 건너뛰는 기존 동작 덕분에 글 하나에 Redis 호출이 두 번이어도 <span data-http-status="timeout" class="semantic-http-status">타임아웃</span>은 한 번만 기다린다.
-<span data-http-status="timeout" class="semantic-http-status">타임아웃</span>만 고치면 인기글 <span data-http-status="500" class="semantic-http-status">500</span>과 "500ms × 호출 수"가 남고, 예외만 고치면 지연 장애에서 60초를 그대로 기다린다. 둘 다 고쳐야 한다. (<code>tickets/B16/answer/fix.patch</code>)</p>
+한 번 실패하면 5초 동안 Redis를 건너뛰는 기존 동작 덕분에 글 하나에 Redis 호출이 두 번이어도 타임아웃은 한 번만 기다린다.
+타임아웃만 고치면 인기글 500과 "500ms × 호출 수"가 남고, 예외만 고치면 지연 장애에서 60초를 그대로 기다린다. 둘 다 고쳐야 한다. (<code>tickets/B16/answer/fix.patch</code>)</p>
 <p data-content-kind="example"><strong>확인 테스트.</strong> <code>tickets/B16/answer/B16ConfirmTest.java</code> — <code>Redis_응답이_3초씩_늦으면</code>·<code>Redis_연결이_끊기면</code> 각각 <code>장애_중에도_글쓰기_201과_그_뒤_인기글_200이_각각_1초_안이다</code>, <code>장애_뒤_첫_요청인_인기글도_1초_안에_DB_결과로_200이다</code></p>
 <p data-content-kind="example"><strong>1단계 구현 예시 서버는?</strong> <code>board-server/src/main/resources/application.yml</code>(또는 <code>board-server/src/main/resources/application.properties</code>)(학습자 구현에서는 <code>board-server/src/main/resources/application.properties</code>도 인정)이 <code><span data-http-status="timeout" class="semantic-http-status">timeout</span>: 500ms</code>·<code>connect-timeout: 500ms</code>를 두고,
 <code>board-server/src/main/java/com/example/board/config/RedisGuard.java</code>가 <code>DataAccessException</code>을 잡아 폴백한 뒤 5초간 건너뛴다.
@@ -1015,7 +1015,7 @@ Redis가 응답하지 않으면 글쓰기 커밋 뒤의 랭킹 가산·인기글
     function measureHeader() { if (siteHeader) document.documentElement.style.setProperty('--course-header-height',siteHeader.getBoundingClientRect().height + 'px'); }
     measureHeader(); window.addEventListener('resize',measureHeader);
     if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
-    if (main.querySelector('[data-day-page]')) return;
+    if (main.querySelector('[data-day-page],[data-knowledge-reader],[data-core-learning]')) return;
     var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {

@@ -65,13 +65,11 @@ git merge --ff-only origin/main
 
 충돌은 merge, rebase, cherry-pick에서 발생한다. 파일은 다음 세 구간으로 표시된다.
 
-~~~text
-<<<<<<< HEAD          # 현재 체크아웃한 쪽(ours)
-현재 브랜치 내용
-=======
-합치려는 커밋 내용     # theirs
->>>>>>> feature/x
-~~~
+    <<<<<<< HEAD          # 현재 체크아웃한 쪽(ours)
+    현재 브랜치 내용
+    =======
+    합치려는 커밋 내용     # theirs
+    >>>>>>> feature/x
 
 마커를 보고 한쪽을 무조건 택하는 것이 해결은 아니다. Spring 설정이면 두 값의 의미, 운영 기본값, 테스트를 확인해 최종 파일을 직접 작성한다.
 
@@ -182,15 +180,13 @@ git merge feature/timeout
 
 확인 방법: CONFLICT (content): Merge conflict in application.properties가 나오고 git status가 both modified를 보여야 한다. 실제 실행 충돌 파일은 다음과 같았다.
 
-~~~text
-<<<<<<< HEAD
-version=1
-timeout=5s
-=======
-version=2
-timeout=2s
->>>>>>> feature/timeout
-~~~
+    <<<<<<< HEAD
+    version=1
+    timeout=5s
+    =======
+    version=2
+    timeout=2s
+    >>>>>>> feature/timeout
 
 이 예에서는 version은 feature의 2, timeout은 운영 정책으로 선택한 5초로 직접 저장한다.
 

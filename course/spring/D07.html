@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>D07. 포인트·쿠폰 상점</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
+
 <link rel="stylesheet" href="../../tools/site/course.css?v=8e71bc7f78e2">
 <link rel="stylesheet" href="../../tools/site/course-stepper.css?v=1124522a27dd">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=7d70b43e3c66">
@@ -13,7 +14,6 @@
 
 
 
-<link rel="stylesheet" href="../../tools/site/course-stepper.css?v=1124522a27dd">
 <link rel="stylesheet" href="../../tools/site/course-tokens.css?v=7d70b43e3c66">
 <link rel="stylesheet" href="../../tools/site/course-content.css?v=35f34c292222">
 <link rel="stylesheet" href="../../tools/site/contrast.css?v=fa9b5b7d70bc">
@@ -22,7 +22,7 @@
 <link rel="stylesheet" href="../../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../../tools/site/course-flow-layout.css?v=b33e13ca0173">
 <link rel="stylesheet" href="../../tools/site/section-switcher.css?v=975a56e01be7">
-<link rel="stylesheet" href="../../tools/site/site-frame.css?v=bf75cf02827a">
+<link rel="stylesheet" href="../../tools/site/site-frame.css?v=836815f322de">
 <script>(function prepareFirstPaint({panelMap,dayPanels}) {
   const root=document.documentElement;
   root.classList.add('js');
@@ -103,7 +103,7 @@
 
 <ul data-content-kind="practice">
 <li>꼭 할 관찰: 1차 캐시와 RC/RR(15분, C16): 앞의 D05 실험을 확장해 MySQL InnoDB의 서로 다른 두 물리 연결 A/B를 쓴다. 테스트 자동 tx/OSIV와 2차 캐시를 끄고 각 실행의 @@transaction_isolation을 기록한다. A가 old를 일반 SELECT/find로 먼저 읽은 뒤 B에서 new로 UPDATE·commit한다(latch로 순서 고정). A에서 find 재호출(SQL 수), em.clear 후 find, 같은 A tx의 JDBC 일반 SELECT, A 종료 뒤 새 tx SELECT를 비교한다. clear 전 SQL 0회는 1차 캐시 증거다. REPEATABLE READ의 기존 consistent-read snapshot에서는 clear 후에도 old, READ COMMITTED는 새 SELECT에서 new, 새 tx는 두 수준 모두 new가 기대된다. DB snapshot과 Hibernate 변경 감지용 loaded state도 별개다. SELECT FOR UPDATE 같은 locking/current read는 이 예상표에서 제외한다. 두 격리 수준을 각각 새 tx로 실행하고 물리 연결을 바꾼 조회를 같은 tx의 JDBC 비교라고 적지 않는다.</li>
-<li>선택 관찰 B(15분, I12): D04의 공유 태그를 서로 다른 회원 A/B가 동시에 생성하는 상황으로 반복한다. 학습자 src/test의 두 worker가 각자 새 tx에서 고유한 같은 태그 이름을 findByName하여 둘 다 없음임을 확인한 지점에서 latch로 모은 뒤 INSERT를 시도한다. 둘 다 조회를 마치기 전에 INSERT하지 않으며 INSERT 뒤 두 worker barrier는 두지 않는다(UNIQUE 잠금 대기와 교착될 수 있다). 모든 Future를 <span data-http-status="timeout" class="semantic-http-status">timeout</span>과 함께 회수하고 worker별 SQL·UNIQUE 제약명·예외·commit/rollback을 기록한다. 기준 재현은 공유 태그 1건과 한 tx의 충돌이며 회원별 락만으로 공유 이름을 보호할 수 있는지 질문한다. 복구안을 선택해 별도 fixture에서 검증한다면 실패 tx를 끝낸 후 새 tx 재조회·기존 태그 재사용 또는 DB 충돌 처리 정책을 설명한다. 최종 목표는 공유 태그 1건·서로 다른 글의 연결 2행이며 다른 제약 오류를 모두 중복으로 삼키지 않는다. 현재 예시 서버가 이 경합을 통과한다고 가정하지 않는다.</li>
+<li>선택 관찰 B(15분, I12): D04의 공유 태그를 서로 다른 회원 A/B가 동시에 생성하는 상황으로 반복한다. 학습자 src/test의 두 worker가 각자 새 tx에서 고유한 같은 태그 이름을 findByName하여 둘 다 없음임을 확인한 지점에서 latch로 모은 뒤 INSERT를 시도한다. 둘 다 조회를 마치기 전에 INSERT하지 않으며 INSERT 뒤 두 worker barrier는 두지 않는다(UNIQUE 잠금 대기와 교착될 수 있다). 모든 Future를 timeout과 함께 회수하고 worker별 SQL·UNIQUE 제약명·예외·commit/rollback을 기록한다. 기준 재현은 공유 태그 1건과 한 tx의 충돌이며 회원별 락만으로 공유 이름을 보호할 수 있는지 질문한다. 복구안을 선택해 별도 fixture에서 검증한다면 실패 tx를 끝낸 후 새 tx 재조회·기존 태그 재사용 또는 DB 충돌 처리 정책을 설명한다. 최종 목표는 공유 태그 1건·서로 다른 글의 연결 2행이며 다른 제약 오류를 모두 중복으로 삼키지 않는다. 현재 예시 서버가 이 경합을 통과한다고 가정하지 않는다.</li>
 </ul>
 </div></details>
 
@@ -1058,7 +1058,7 @@ class CouponRepositoryTest extends ApiTestSupport {
 <li>수량 소진 뒤 → 409 <code>/errors/coupon-exhausted</code></li>
 <li><code>GET /api/me/coupons</code> → <span data-http-status="200" class="semantic-http-status">200</span></li>
 <li>트랜잭션 경계: 중복 확인·발급량 증가·보유 쿠폰 저장의 시작과 끝, 사전 판정과 동시 요청 경합 예외를 처리하는 위치와 그 이유를 적는다. 실패 시 발급량·보유 내역의 rollback 결과를 기록한다.</li>
-</ul></div><details class="step-references" data-content-kind="reference"><summary><span class="content-kind " data-kind-label="reference"><span aria-hidden="true">↗</span> 참고<small>필요할 때 찾기</small></span>명세·데이터 요구사항 보기</summary><div class="step-fact fact-spec" data-content-kind="reference"><p class="fact-label" data-content-kind="reference">명세</p><p data-content-kind="reference"><a href="../spec-v2.html#4-엔드포인트"><code>POST /api/coupons/{couponId}/issue</code></a> (<a href="../spec-v2.html#5-4-포인트쿠폰상점">5-4. 포인트·쿠폰·상점</a>) · <a href="../spec-v2.html#4-엔드포인트"><code>GET /api/me/coupons</code></a></p></div></details><details class="step-fact fact-trap" data-content-kind="guide"><summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>겪을 것<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body"><p data-content-kind="guide">발급 버튼 연타로 두 요청이 동시에 오면 "이미 받았나" 조회가 둘 다 통과하므로 UNIQUE 위반을 <span data-http-status="409" class="semantic-http-status">409</span>로 바꿔 막는다.</p></div></details></div><div class="step-help"><details class="step-context" data-content-kind="guide"><summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>순서 제목의 세부 조건 보기<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body"><p data-content-kind="guide">쿠폰 발급(1인 1매)과 내 쿠폰 목록 API (<code>coupon/MemberCouponRepository.java</code> 추가)</p></div></details><details class="step-hint" data-step="D07-4" data-content-kind="guide"><summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>막히면<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body">
+</ul></div><details class="step-references" data-content-kind="reference"><summary><span class="content-kind " data-kind-label="reference"><span aria-hidden="true">↗</span> 참고<small>필요할 때 찾기</small></span>명세·데이터 요구사항 보기</summary><div class="step-fact fact-spec" data-content-kind="reference"><p class="fact-label" data-content-kind="reference">명세</p><p data-content-kind="reference"><a href="../spec-v2.html#4-엔드포인트"><code>POST /api/coupons/{couponId}/issue</code></a> (<a href="../spec-v2.html#5-4-포인트쿠폰상점">5-4. 포인트·쿠폰·상점</a>) · <a href="../spec-v2.html#4-엔드포인트"><code>GET /api/me/coupons</code></a></p></div></details><details class="step-fact fact-trap" data-content-kind="guide"><summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>겪을 것<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body"><p data-content-kind="guide">발급 버튼 연타로 두 요청이 동시에 오면 "이미 받았나" 조회가 둘 다 통과하므로 UNIQUE 위반을 409로 바꿔 막는다.</p></div></details></div><div class="step-help"><details class="step-context" data-content-kind="guide"><summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>순서 제목의 세부 조건 보기<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body"><p data-content-kind="guide">쿠폰 발급(1인 1매)과 내 쿠폰 목록 API (<code>coupon/MemberCouponRepository.java</code> 추가)</p></div></details><details class="step-hint" data-step="D07-4" data-content-kind="guide"><summary><span class="content-kind " data-kind-label="guide"><span aria-hidden="true">i</span> 가이드<small>읽고 이해하기</small></span>막히면<span class="disclosure-chevron" aria-hidden="true">▸</span></summary><div class="disclosure-body">
 
 
 <ul data-content-kind="guide">
@@ -2646,7 +2646,7 @@ class ShopOrderRepositoryTest extends ApiTestSupport {
 <p data-content-kind="example"><strong>보완</strong> — 리뷰를 반영해 이 순서의 코드를 고친 커밋이다.</p>
 <p data-content-kind="example"><strong>보완 이력</strong></p>
 <ul data-content-kind="example">
-<li><a href="https://github.com/ai-ext/javaExperience/commit/8bb7627541782d6f1e69625513198806bb89ea9e" target="_blank" rel="noopener"><code>8bb76275</code></a> 필수 헤더가 빠진 <span data-http-status="400" class="semantic-http-status">400</span>에도 검증 실패 제목과 errors[]를 담는다</li>
+<li><a href="https://github.com/ai-ext/javaExperience/commit/8bb7627541782d6f1e69625513198806bb89ea9e" target="_blank" rel="noopener"><code>8bb76275</code></a> 필수 헤더가 빠진 400에도 검증 실패 제목과 errors[]를 담는다</li>
 </ul>
 <p data-content-kind="example"><strong>수정</strong> <code>src/main/java/com/example/board/common/GlobalExceptionHandler.java</code> (바뀐 부분)</p>
 <figure class="code-block"><figcaption class="code-toolbar"><span>코드</span><button type="button" data-copy-target="content-code-54">코드 복사</button><span class="copy-status" role="status" aria-live="polite"></span></figcaption><pre data-content-kind="example" id="content-code-54"><code data-lazy-lang="diff">@@ -18,6 +18,8 @@ import org.springframework.security.access.AccessDeniedException;
@@ -4041,7 +4041,7 @@ ROLLBACK;</code></pre></figure>
     function measureHeader() { if (siteHeader) document.documentElement.style.setProperty('--course-header-height',siteHeader.getBoundingClientRect().height + 'px'); }
     measureHeader(); window.addEventListener('resize',measureHeader);
     if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
-    if (main.querySelector('[data-day-page]')) return;
+    if (main.querySelector('[data-day-page],[data-knowledge-reader],[data-core-learning]')) return;
     var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {

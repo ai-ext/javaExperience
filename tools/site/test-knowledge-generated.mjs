@@ -11,7 +11,12 @@ win.eval(fs.readFileSync(new URL('tools/site/knowledge-learning.bundle.js',root)
 assert.ok(doc.body.classList.contains('knowledge-catalog-page'));
 assert.equal(doc.querySelectorAll('[data-kc-document]').length,134);
 const visible=()=>[...doc.querySelectorAll('[data-kc-document]')].filter((row)=>!row.hidden).map((row)=>row.dataset.kcDocument);
-assert.deepEqual(visible(),['P09','P04','P29']);
+assert.deepEqual(visible().slice(0,6),['P09','P01','P03','P12','W19','S01']);
+assert.equal(visible().length,12,'초기 12행 뒤 더보기');
+assert.equal($('[data-kc-category-select]').value,'all');
+assert.equal($('[data-kc-priority]').value,'required');
+assert.equal($('[data-kc-depth]').value,'foundation');
+assert.deepEqual([...doc.querySelectorAll('button[data-kc-category]')].map(button=>button.dataset.kcCategory),['all','java','spring','request','data','testing','delivery']);
 $('[data-kc-query="DTO"]').click();assert.equal(visible().length,7);
 $('button[data-kc-category="java"]').click();assert.equal(visible().length,0);
 $('[data-kc-filter-reset]').click();assert.equal(visible().length,7);assert.equal($('#knowledge-search-input').value,'DTO');
@@ -19,6 +24,10 @@ $('button[data-kc-category="delivery"]').click();
 $('[data-kc-reset]').click();
 // 검색어를 지운 뒤에도 사용자가 선택한 분야를 유지한다.
 assert.equal($('[data-kc-category-select]').value,'delivery');
+$('[data-kc-query="DTO"]').click();
+assert.equal(visible().length,0,'직전에 선택한 delivery 분야는 새 검색에도 유지');
+$('[data-kc-filter-reset]').click();
+assert.equal(visible().length,7,'명시적으로 모든 필터를 해제하면 DTO 결과를 복구');
 $('[data-kc-query="DTO"]').click();
 $('#knowledge-search-input').value='DTO는 왜 쓰나요?';
 $('.kc-search').dispatchEvent(new win.Event('submit',{cancelable:true,bubbles:true}));
@@ -37,4 +46,4 @@ for(const name of fs.readdirSync(new URL('docs/knowledge/',root)).filter((name)=
  assert.ok(content.includes('data-kc-catalog-return'),name+' 목록 복귀');assert.ok(content.includes('knowledge-learning.bundle.js'),name+' 일반 script 연결');
 }
 win.close();
-console.log('생성 HTML: 대표 3행·실제 134개/4분야·DTO 7건·필터·명시 질문·원문 앵커·134개 복귀 연결 통과');
+console.log('생성 HTML: 핵심 6단원·기본 12행·134개/6분야·필수 기초·DTO 7건·명시 필터·질문·원문 앵커·134개 복귀 연결 통과');

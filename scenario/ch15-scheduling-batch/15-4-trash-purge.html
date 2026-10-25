@@ -4,13 +4,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>15-4. 휴지통 비우기 — 자식 먼저, 1000건씩</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
+
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=dbfc9401043c">
 <link rel="stylesheet" href="../../tools/site/scenario-visual.css?v=8495b906d9ff">
 <link rel="stylesheet" href="../../tools/site/scenario-code-workbench.css?v=482ae3099111">
 <link rel="stylesheet" href="../../tools/site/lesson-atlas.css?v=5846acf91e90">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer=""></script>
 <link rel="stylesheet" href="../../tools/site/task-focus.css?v=fdf0e0effc45">
-
 
 
 
@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="../../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../../tools/site/course-flow-layout.css?v=b33e13ca0173">
 <link rel="stylesheet" href="../../tools/site/section-switcher.css?v=975a56e01be7">
-<link rel="stylesheet" href="../../tools/site/site-frame.css?v=bf75cf02827a">
+<link rel="stylesheet" href="../../tools/site/site-frame.css?v=836815f322de">
 <script>(function prepareFirstPaint({panelMap,dayPanels}) {
   const root=document.documentElement;
   root.classList.add('js');
@@ -152,7 +152,7 @@ COMMIT</span><span class="flow-step-detail"><b>note</b> 자식 → 부모 순서
 <p>3-2에서 글 삭제를 <code>deleted_at</code>만 채우는 soft delete로 만들었다. 실수로 지운 글을 되살리거나 신고를 처리하려면 한동안 남겨 두는 게 맞다. 하지만 영원히 둘 수는 없다. 이 단계는 보관 기간(30일)이 지난 글을 <strong>영구 삭제(hard delete)</strong> 한다. 부딪히는 문제는 세 가지다.</p>
 <ul>
 <li><strong>FK 순서</strong> — <code>post</code>를 먼저 지우면 그 글을 가리키는 <code>post_like</code>·<code>comment</code>·<code>bookmark</code>·<code>post_tag</code>·<code>notification</code>·<code>hall_of_fame</code> 때문에 실패한다. 자식부터 지운다. <code>comment</code>는 자기 자신도 가리킨다(답글 → 원댓글). 그래서 답글을 먼저 지운다.</li>
-<li><strong>양</strong> — 학습용 DB에는 30일 지난 삭제 글이 2,<span data-http-status="404" class="semantic-http-status">404</span>개 있다. 원래 있던 42·59·60·67번에 이 단계 마이그레이션이 넣는 연습용 2,<span data-http-status="400" class="semantic-http-status">400</span>개를 더한 수다. 한 트랜잭션으로 지우면 그동안 잠금이 길게 잡힌다. 중간에 실패하면 전부 되돌아간다. 1000건씩 끊어서 <strong>청크마다 커밋</strong>한다.</li>
+<li><strong>양</strong> — 학습용 DB에는 30일 지난 삭제 글이 2,404개 있다. 원래 있던 42·59·60·67번에 이 단계 마이그레이션이 넣는 연습용 2,400개를 더한 수다. 한 트랜잭션으로 지우면 그동안 잠금이 길게 잡힌다. 중간에 실패하면 전부 되돌아간다. 1000건씩 끊어서 <strong>청크마다 커밋</strong>한다.</li>
 <li><strong>경계</strong> — 정확히 30일 전(2026-09-05 00:00:00)에 삭제된 글은 남는다. 그 1초 전(2026-09-04 23:59:59)에 삭제된 글은 지운다.</li>
 </ul>
 <blockquote>
@@ -167,7 +167,7 @@ COMMIT</span><span class="flow-step-detail"><b>note</b> 자식 → 부모 순서
 <pre><code class="language-yaml"># application-practice.yml — spring: 아래에 (spring: 키를 하나 더 만들면 기동 실패)
   flyway:
     locations: classpath:db/migration,classpath:db/practice-data</code></pre>
-<p>시드 파일은 아래를 그대로 쓴다. 삭제된 글 2,420개를 만든다. 2,<span data-http-status="400" class="semantic-http-status">400</span>개는 30일이 지났고 20개는 아직 안 지났으며, 각 경계값이 1개씩 들어 있다. 자식 행은 글마다 좋아요 2·댓글 1·답글 1·북마크 1·태그 1개이고, 10개 중 1개 글에는 알림 2개가 더 붙는다.</p>
+<p>시드 파일은 아래를 그대로 쓴다. 삭제된 글 2,420개를 만든다. 2,400개는 30일이 지났고 20개는 아직 안 지났으며, 각 경계값이 1개씩 들어 있다. 자식 행은 글마다 좋아요 2·댓글 1·답글 1·북마크 1·태그 1개이고, 10개 중 1개 글에는 알림 2개가 더 붙는다.</p>
 <details>
 <summary>V63_1__seed_trash_posts.sql 펼치기</summary>
 
@@ -2121,7 +2121,7 @@ public class TrashPurgeService {
     function measureHeader() { if (siteHeader) document.documentElement.style.setProperty('--course-header-height',siteHeader.getBoundingClientRect().height + 'px'); }
     measureHeader(); window.addEventListener('resize',measureHeader);
     if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
-    if (main.querySelector('[data-day-page]')) return;
+    if (main.querySelector('[data-day-page],[data-knowledge-reader],[data-core-learning]')) return;
     var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {

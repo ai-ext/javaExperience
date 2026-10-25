@@ -1,0 +1,13 @@
+# S08 독립 검토·수정
+
+원문329줄/3Java와추가SpringJDBC42관측을메인이읽고재실행했다. 독립검수는임시복제에서42PASS/frozenJSON/원문SHA/의존성SHA/실제버전을재현했다. 추가fake계정저장소·강제INSERT후false·메모리gateway·연결트래커의범위와AFTER_COMMIT예외경로를대조했다.
+
+UI/data5파일은위임작성뒤동결했다. 메인은30상태를읽고TransactionTemplate callback전체·REQUIRED코드강조·NEW실제문장발췌를교정하고공통build/supplement/생성HTML보존검사를연결했다. 독립검수도30상태/42PASS/전체RUNS와history·모바일·storage비접근을검토하고현재unit검사를통과했다.
+
+10초안의생성모델이추가클래스를원문클래스로부르거나없는SQL/도우미/메서드본문을만든오류는메인이실제열람후imagegen으로교정했다. 정확한코드는HTML발췌로제공하고그림은관찰값/경계를중심으로줄였다. transfer·required의관찰시점과proxy·events의원문/추가/호출경로도교정했다.
+
+독립이미지검수Important1: template번호표가서비스반환을resource완료보다앞에놓았다. v4는callback반환→COMMIT/ROLLBACK→Service returns순서로수정했다. events-v3는target본문반환→interceptorcommit→listener→proxycaller반환을구별하고noTx이벤트88의실제ctx호출을명시했다. 독립검수가최종10그림을실제열람해미해소Critical/Important/Minor0을보고했다.
+
+독립마지막검수는실제캡처20개를읽고관찰60행을현재data와별도assert로대조했다. generatedHTML검사를독립실행해원문15066/code5/id28/기존집중map/bundle30/PNG10/42PASS보존도확인했다. 공유브라우저직접조작·전수픽셀정밀비교·학습자검증은미실행이다.
+
+Git whitespace검사는실제Gradle원시로그의끝공백만경로/행/SHA로한정한다. 원시출력을고치지않고나머지staged검사를수행한다. 현재구체예외는checks/whitespace-exceptions.json을따른다.

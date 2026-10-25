@@ -15,7 +15,7 @@ const examples = [
   ['scenario/labs/l12-query-methods/README.md', '서비스 만들기'], ['practice/MISSIONS.md', '실전 미션'],
   ['tickets/README.md', '서비스 만들기'], ['tickets/001-board-list-api.md', '서비스 만들기'],
   ['docs/knowledge/README.md', '개념 학습'], ['docs/knowledge/P02-mvc-layered-architecture.md', '개념 학습'],
-  ['lessons/nested/example.md', '개념 학습'], ['course/spec-v2.md', '45일 과정'], ['errors.md', null],
+  ['lessons/concept-core.md', '개념 학습'], ['docs/knowledge/S01-ioc-di.md', '개념 학습'], ['lessons/nested/example.md', '개념 학습'], ['course/spec-v2.md', '45일 과정'], ['errors.md', null],
 ];
 for (const [source, section] of examples) {
   const pageUrl = new URL(source, 'https://learn.example/');
@@ -78,6 +78,9 @@ if (process.argv.includes('--generated')) {
     const html = fs.readFileSync(new URL(source.replace(/\.md$/, '.html'), root), 'utf8');
     const header = html.match(/<header class="topbar[^"\n]*">[\s\S]*?<\/header>/)?.[0];
     assert.equal(header, renderSiteNavigation(source), `${source}: 생성된 메뉴·선택 상태 일치`);
+    const dom = new JSDOM(html);
+    assert.equal(dom.window.document.querySelectorAll('script[src*="tools/site/syntax-highlight.js"]').length, 1, `${source}: syntax-highlight.js 단일 등록`);
+    dom.window.close();
   }
   assert.equal(fs.readFileSync(new URL('index.html', root), 'utf8'), fs.readFileSync(new URL('README.html', root), 'utf8'), '홈 진입 두 경로 일치');
   for (const [source, expected] of [['scenario/README.md', '서비스 만들기'], ['practice/MISSIONS.md', '실전 미션'], ['docs/knowledge/README.md', '개념 학습']]) {

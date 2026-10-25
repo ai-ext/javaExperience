@@ -1,0 +1,11 @@
+# W11 독립 검토·수정
+
+메인은원문369줄/Java5블록·추가fixture·9case·19상태를읽었다. 원문B/C동명대안을각sourceSet/JVM으로분리해31관측을실행했다. 독립검수는임시복제로31PASS/B22C9·원문SHA·전체frozenJSON·SQL바인딩/관측순서·의존성SHA를재현했고미해소소견0이었다.
+
+UI/data5파일은위임작성뒤동결하고메인과독립검수가6topic19state·31PASS·9case/dottedmeta·원문코드/값/note를대조했다. 메인이공통build/wrapper/supplement/생성HTML검사를연동했다. 코드·storage비접근·history·모바일검사도독립unit통과다.
+
+초안6장중4장은계측시점/메서드이름/0행과SQL미실행/임의sequence에오류가있어실제imagegen으로교정했다. 최종repository-v3는순수commit시점의미측정DB표를제거하고SQL반환직후writer와최종observer를분리했다. controller-v3는decrease(command)/아직호출전/미측정rollbackOnly제거,template-v2는UPDATE실행2문장과0affectedRows/추가setupseed/tracked0제외를교정했다. events-v3는실제sequence2/3/4/5만표시하고원문emptyhandler·추가observer·activeflag한계를명시했다.
+
+메인·독립검수가최종6이미지를실제열람했고Critical/Important/Minor미해소0이다. 마지막독립검수는실제12캡처를전부읽고38관찰을현재data와별도assert로대조했다. generated검사도독립통과했다. 공유브라우저직접조작/픽셀전수비교/학습자검증은하지않았다.
+
+Git whitespace예외는원본Gradlelog2행끝공백과Groovy JsonOutput.prettyPrint가만든두관측JSON의빈배열들여쓰기뿐이다. JSON예외행이모두공백만인행임을확인했고원시출력의경로/행/SHA를checks/whitespace-exceptions.json에한정했다. source코드를고치거나모든JSON을일괄제외하지않는다.

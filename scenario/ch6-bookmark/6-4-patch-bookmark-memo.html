@@ -4,13 +4,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>6-4. 북마크 메모 부분 수정 — 생략과 null 구분</title>
 <link rel="stylesheet" href="../../tools/site/site.css?v=d360dce19dc2">
+
 <link rel="stylesheet" href="../../tools/site/api-architecture.css?v=dbfc9401043c">
 <link rel="stylesheet" href="../../tools/site/scenario-visual.css?v=8495b906d9ff">
 <link rel="stylesheet" href="../../tools/site/scenario-code-workbench.css?v=482ae3099111">
 <link rel="stylesheet" href="../../tools/site/lesson-atlas.css?v=5846acf91e90">
 <script src="../../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer=""></script>
 <link rel="stylesheet" href="../../tools/site/task-focus.css?v=fdf0e0effc45">
-
 
 
 
@@ -23,7 +23,7 @@
 <link rel="stylesheet" href="../../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../../tools/site/course-flow-layout.css?v=b33e13ca0173">
 <link rel="stylesheet" href="../../tools/site/section-switcher.css?v=975a56e01be7">
-<link rel="stylesheet" href="../../tools/site/site-frame.css?v=bf75cf02827a">
+<link rel="stylesheet" href="../../tools/site/site-frame.css?v=836815f322de">
 <script>(function prepareFirstPaint({panelMap,dayPanels}) {
   const root=document.documentElement;
   root.classList.add('js');
@@ -55,7 +55,7 @@
       <div class="task-focus-after"><div><strong>직접 해볼 일</strong><p>A로 준비한 뒤 B·C·D로 생략·null·문자열을 보내 같은 행의 memo만 달라지는지 비교하세요.</p></div><a href="#직접-확인" data-task-open="true">요청 실행 화면 열기 ↗</a></div>
       <aside class="task-focus-expected" aria-label="구현 뒤 비교할 기대 결과">
         <p class="task-focus-eyebrow">확인할 결과 <span>실행 전 기대값</span></p>
-        <strong>{}는 <span data-http-status="200" class="semantic-http-status">200</span>과 기존 메모, memo:null은 <span data-http-status="200" class="semantic-http-status">200</span>과 null이며 문자열 요청은 그 값으로 교체됩니다.</strong>
+        <strong>{}는 200과 기존 메모, memo:null은 200과 null이며 문자열 요청은 그 값으로 교체됩니다.</strong>
         <p class="task-focus-boundary">기존 북마크의 메모만 바꿉니다. 행 ID·폴더·생성 시각은 유지하고 folderId 이동은 6-2 계약입니다.</p>
       </aside>
     </details>
@@ -160,7 +160,7 @@
 <td><code>200</code>, 문자열로 교체한다. 빈 문자열도 허용한다.</td>
 </tr>
 <tr>
-<td><code>memo</code> <span data-http-status="201" class="semantic-http-status">201</span>자 또는 문자열/null 외 타입</td>
+<td><code>memo</code> 201자 또는 문자열/null 외 타입</td>
 <td><code><span data-http-status="400" class="semantic-http-status">400</span></code>, 기존 메모 유지.</td>
 </tr>
 <tr>
@@ -214,7 +214,7 @@ public class BookmarkMemoPatchRequest {
 <details>
 <summary>Service — 내 행을 찾고 메모만 바꾸기</summary>
 
-<p><code>member_id</code>와 <code>post_id</code> <strong>둘 다</strong> 조건으로 내 북마크를 잠가 찾는다. <code>memoPresent=false</code>면 그대로 반환하고, <code>true</code>면 <code>memo == null || memo.isNull()</code>을 메모 삭제로, <code>memo.isTextual()</code>을 문자열 변경으로 해석한다. 나머지 타입은 <code><span data-http-status="400" class="semantic-http-status">400</span></code>이다. 문자열 길이 <span data-http-status="200" class="semantic-http-status">200</span>자를 확인한 뒤 Service 트랜잭션에서 <code>memo</code>와 <code>updated_at</code>만 변경한다.</p>
+<p><code>member_id</code>와 <code>post_id</code> <strong>둘 다</strong> 조건으로 내 북마크를 잠가 찾는다. <code>memoPresent=false</code>면 그대로 반환하고, <code>true</code>면 <code>memo == null || memo.isNull()</code>을 메모 삭제로, <code>memo.isTextual()</code>을 문자열 변경으로 해석한다. 나머지 타입은 <code><span data-http-status="400" class="semantic-http-status">400</span></code>이다. 문자열 길이 200자를 확인한 뒤 Service 트랜잭션에서 <code>memo</code>와 <code>updated_at</code>만 변경한다.</p>
 <pre><code class="language-java">if (request.isMemoPresent()) {
     JsonNode value = request.getMemo();
     if (value != null &amp;&amp; !value.isNull() &amp;&amp; !value.isTextual()) {
@@ -243,7 +243,7 @@ Optional&lt;Bookmark&gt; findCurrentForUpdate(@Param("memberId") Long memberId,
 <details>
 <summary>MyBatis — 내 북마크 잠금 조회와 메모만 UPDATE</summary>
 
-<p><code>MyBatisBookmarkService.patchMemo</code>도 DTO의 <code>memoPresent</code>를 먼저 확인한다. 회원과 글로 행을 잠가 조회하므로 없는 행은 <code><span data-http-status="404" class="semantic-http-status">404</span></code>이고, 빈 객체는 UPDATE 없이 현재 응답을 돌려준다. 값이 있으면 Service에서 문자열 또는 <code>null</code>인지, <span data-http-status="200" class="semantic-http-status">200</span>자 이하인지 검사한 뒤 Mapper를 호출한다.</p>
+<p><code>MyBatisBookmarkService.patchMemo</code>도 DTO의 <code>memoPresent</code>를 먼저 확인한다. 회원과 글로 행을 잠가 조회하므로 없는 행은 <code><span data-http-status="404" class="semantic-http-status">404</span></code>이고, 빈 객체는 UPDATE 없이 현재 응답을 돌려준다. 값이 있으면 Service에서 문자열 또는 <code>null</code>인지, 200자 이하인지 검사한 뒤 Mapper를 호출한다.</p>
 <pre><code class="language-java">BookmarkRow row = bookmarks.findBookmark(me.id(), postId);
 if (row == null) throw new BookmarkNotFoundException();
 if (request.isMemoPresent()) {
@@ -3116,7 +3116,7 @@ class PostReplaceControllerTest {
     function measureHeader() { if (siteHeader) document.documentElement.style.setProperty('--course-header-height',siteHeader.getBoundingClientRect().height + 'px'); }
     measureHeader(); window.addEventListener('resize',measureHeader);
     if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
-    if (main.querySelector('[data-day-page]')) return;
+    if (main.querySelector('[data-day-page],[data-knowledge-reader],[data-core-learning]')) return;
     var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {

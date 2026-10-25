@@ -1,0 +1,271 @@
+{
+  "source": "docs/knowledge/P16-json-jackson-practical.md",
+  "sourceSHA256": "53c490407480ef4bcea2476bafe8a2bcef4a0e4b576251e2fa99f136784474b8",
+  "questions": [
+    {
+      "id": "property",
+      "question": "Java 이름과 JSON 이름은 어떻게 연결할까?",
+      "source": "원문 §2.3 · 추가 입력 실험 · P16MapperProof · Jackson 3.1.5 / JDK 21 · Boot·HTTP·DB·Java 25 미실행",
+      "note": "@JsonProperty의 외부 이름은 쓰기와 읽기의 계약입니다. 아래 id=7·name=Mina는 원문 UserResponse 선언에 넣어 실행한 추가 입력이며, 기존 주문 예제의 id=1·keyboard와 별개입니다.",
+      "stages": [
+        {
+          "id": "property-out",
+          "title": "Java 객체를 외부 이름으로 쓰기",
+          "image": "P16-property.png",
+          "checks": [
+            "property-out"
+          ]
+        },
+        {
+          "id": "property-in",
+          "title": "외부 이름으로 record 읽기",
+          "image": "P16-property.png",
+          "checks": [
+            "property-in"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p16-2026-10-20/source-proof/verification.json",
+        "docs/design/p16-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "inclusion",
+      "question": "null 생략과 프로퍼티 무시는 무엇이 다를까?",
+      "source": "원문 §2.4 · 추가 입력 실험 · P16MapperProof · Jackson 3.1.5 / JDK 21 · Boot·HTTP·DB·Java 25 미실행",
+      "note": "NON_NULL은 출력에 null 프로퍼티를 포함할지 정하는 정책이며 입력 null 검증이 아닙니다. 빈 문자열은 null이 아니므로 유지합니다. @JsonIgnore는 읽기와 쓰기 모두에 적용됩니다. AccountResponse·7·Mina·hash-demo·supplied는 별도 추가 입력입니다.",
+      "stages": [
+        {
+          "id": "inclusion-null",
+          "title": "null nickname은 출력에서 생략",
+          "image": "P16-inclusion-v3.png",
+          "checks": [
+            "non-null-omits-null"
+          ]
+        },
+        {
+          "id": "inclusion-empty",
+          "title": "빈 문자열은 그대로 유지",
+          "image": "P16-inclusion-v3.png",
+          "checks": [
+            "non-null-keeps-empty",
+            "ignore-output"
+          ]
+        },
+        {
+          "id": "inclusion-ignore",
+          "title": "입력의 passwordHash도 무시",
+          "image": "P16-inclusion-v3.png",
+          "checks": [
+            "ignore-input"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p16-2026-10-20/source-proof/verification.json",
+        "docs/design/p16-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "time",
+      "question": "날짜·지역 시각·한 순간은 같은 값일까?",
+      "source": "원문 §2.6 · 추가 입력 실험 · P16MapperProof · Jackson 3.1.5 / JDK 21 · Boot·HTTP·DB·Java 25 미실행",
+      "note": "원문의 날짜 예시 값으로 EventResponse를 실행했습니다. LocalEvent와 offset 비교는 별도 추가 실험입니다. LocalDateTime에는 offset이나 시간대가 없으므로 숫자가 같다고 특정 순간이라고 단정할 수 없습니다. offset 비교는 Java 시간 타입의 비교이며 JSON 변환 실측과 구분합니다.",
+      "stages": [
+        {
+          "id": "time-instant",
+          "title": "Instant와 LocalDate를 ISO 문자열로",
+          "image": "P16-time-v2.png",
+          "checks": [
+            "instant-iso",
+            "local-date"
+          ]
+        },
+        {
+          "id": "time-local",
+          "title": "LocalDateTime에는 offset이 없음",
+          "image": "P16-time-v2.png",
+          "checks": [
+            "local-no-offset"
+          ]
+        },
+        {
+          "id": "time-offset",
+          "title": "+09:00의 09시는 Z의 00시와 같은 순간",
+          "image": "P16-time-v2.png",
+          "checks": [
+            "offset-same-instant"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p16-2026-10-20/source-proof/verification.json",
+        "docs/design/p16-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "enum",
+      "question": "Enum의 Java 상수와 JSON 값은 어떻게 다를까?",
+      "source": "원문 §2.7 · 추가 입력 실험 · P16MapperProof · Jackson 3.1.5 / JDK 21 · Boot·HTTP·DB·Java 25 미실행",
+      "note": "Jackson 3.1.5에서는 Enum의 toString() 사용이 기본입니다. 이 OrderStatus에는 toString() 재정의가 없어서 상수명 PAID와 같은 문자열이 나옵니다. PaymentStatus는 별도 Enum이며 @JsonProperty로 외부 값을 명시했습니다. 두 타입을 같은 Enum의 전후 상태로 섞지 않습니다.",
+      "stages": [
+        {
+          "id": "enum-default",
+          "title": "OrderStatus.PAID는 PAID",
+          "image": "P16-enum.png",
+          "checks": [
+            "enum-default-out"
+          ]
+        },
+        {
+          "id": "enum-contract",
+          "title": "별도 PaymentStatus는 paid로 왕복",
+          "image": "P16-enum.png",
+          "checks": [
+            "enum-contract-out",
+            "enum-contract-in"
+          ]
+        },
+        {
+          "id": "enum-unknown",
+          "title": "OrderStatus의 PENDING 입력은 거부",
+          "image": "P16-enum.png",
+          "checks": [
+            "enum-unknown-reject"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p16-2026-10-20/source-proof/verification.json",
+        "docs/design/p16-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "unknown",
+      "question": "없는 필드와 오타를 무시할지 어디서 정할까?",
+      "source": "원문 §2.8 · 추가 입력 실험 · P16MapperProof · Jackson 3.1.5 / JDK 21 · Boot·HTTP·DB·Java 25 미실행",
+      "note": "이 Jackson 3.1.5 기본 mapper는 FAIL_ON_UNKNOWN_PROPERTIES=false입니다. strict는 enable로 선택한 정책이며 기본값이라고 표시하지 않습니다. 원문의 strict 권고와 라이브러리 기본 동작을 구분합니다. 추가 EmailCommand와 ExternalWebhook의 실제 입력만 비교합니다.",
+      "stages": [
+        {
+          "id": "unknown-default",
+          "title": "기본 mapper는 emial 오타도 무시",
+          "image": "P16-unknown-v4.png",
+          "checks": [
+            "unknown-default-false",
+            "unknown-default-typo"
+          ]
+        },
+        {
+          "id": "unknown-strict",
+          "title": "명시 strict로 같은 오타 거부",
+          "image": "P16-unknown-v4.png",
+          "checks": [
+            "unknown-strict-reject"
+          ]
+        },
+        {
+          "id": "unknown-webhook",
+          "title": "DTO 하나만 예외로 완화",
+          "image": "P16-unknown-v4.png",
+          "checks": [
+            "unknown-dto-exception"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p16-2026-10-20/source-proof/verification.json",
+        "docs/design/p16-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "creator",
+      "question": "record와 불변 클래스는 어떤 생성자로 읽을까?",
+      "source": "원문 §3.3 MapperExample + 별도 P16MapperProof · Jackson 3.1.5 / JDK 21",
+      "note": "Profile의 Kim·29는 원문 MapperExample을 그대로 추출해 실행한 값입니다. ImmutableName·Mina는 명시 creator를 보여 주는 독립 추가 fixture입니다. 두 예제를 섞지 않으며 getter는 Java 조회와 직렬화의 읽기 지점을 드러냅니다. Boot·HTTP·DB·Java 25는 미실행입니다.",
+      "stages": [
+        {
+          "id": "creator-record",
+          "title": "원문 Profile을 쓰고 다시 읽기",
+          "image": "P16-creator-v3.png",
+          "checks": []
+        },
+        {
+          "id": "creator-explicit",
+          "title": "추가 ImmutableName의 명시 creator",
+          "image": "P16-creator-v3.png",
+          "checks": [
+            "immutable-creator",
+            "immutable-getter-output"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p16-2026-10-20/source-proof/verification.json",
+        "docs/design/p16-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "shape",
+      "question": "JSON 객체 키 순서와 배열 순서는 같은 규칙일까?",
+      "source": "원문 §7 Q6 · 추가 입력 실험 · P16MapperProof · Jackson 3.1.5 / JDK 21 · Boot·HTTP·DB·Java 25 미실행",
+      "note": "추가 JsonNode.equals 구조 비교입니다. 원문은 일반 API 객체의 이름-값 매핑과 배열 순서를 구분하라고 설명합니다. 문자열 전체나 서명·해시의 특수한 순서 계약을 비교한 실험은 아닙니다.",
+      "stages": [
+        {
+          "id": "shape-object",
+          "title": "객체는 키 순서가 달라도 같음",
+          "image": "P16-shape.png",
+          "checks": [
+            "object-key-order"
+          ]
+        },
+        {
+          "id": "shape-array",
+          "title": "배열은 순서가 다르면 다름",
+          "image": "P16-shape.png",
+          "checks": [
+            "array-order"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p16-2026-10-20/source-proof/verification.json",
+        "docs/design/p16-2026-10-20/browser-all-states.json"
+      ]
+    },
+    {
+      "id": "null",
+      "question": "JSON null을 int와 Integer에 읽으면 같을까?",
+      "source": "원문 타입 경계 설명을 보완하는 추가 입력 실험 · P16MapperProof · Jackson 3.1.5 / JDK 21 · Boot·HTTP·DB·Java 25 미실행",
+      "note": "Quantity(int)와 NullableQuantity(Integer)는 서로 다른 독립 추가 record입니다. 이 mapper에서 JSON null을 읽은 결과만 비교했습니다. Integer가 null을 받을 수 있다는 사실이 필수값 검증을 대신하지 않으며 NON_NULL 출력 생략 정책과도 별개입니다.",
+      "stages": [
+        {
+          "id": "null-primitive",
+          "title": "int 대상의 null은 거부",
+          "image": "P16-null-v2.png",
+          "checks": [
+            "null-primitive-reject"
+          ]
+        },
+        {
+          "id": "null-wrapper",
+          "title": "Integer 대상에는 null",
+          "image": "P16-null-v2.png",
+          "checks": [
+            "null-wrapper-allowed"
+          ]
+        }
+      ],
+      "evidence": [
+        "docs/design/p16-2026-10-20/source-proof/verification.json",
+        "docs/design/p16-2026-10-20/browser-all-states.json"
+      ]
+    }
+  ],
+  "remaining": [
+    "JPA 순환·지연로딩 직접재현 및 별도시각장면",
+    "global SNAKE_CASE·NON_EMPTY·레거시 JsonFormat의 추가실행",
+    "Boot4.1.1/Java25 전체앱/실제HTTP",
+    "전체시안·실제화면 정밀대조와 학습자검증"
+  ]
+}

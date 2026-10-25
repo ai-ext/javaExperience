@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "독립 Sol high",
+  "attempt": 1,
+  "checkedAtUTC": "2026-10-24T21:00:24.041925+00:00",
+  "scope": "D12 국소 Mermaid 가시성·직렬화·원문 보존·중간 전환·dispose·fallback helper 계약. 실제 CDN/Chrome 검수는 메인 담당.",
+  "specVerdict": "FAIL",
+  "qualityVerdict": "NOT_RUN_SPEC_GATE",
+  "counts": {
+    "C": 0,
+    "I": 1,
+    "M": 0
+  },
+  "findings": [
+    {
+      "id": "D12-MERMAID-I1",
+      "severity": "I",
+      "title": "in-flight dispose의 종료·오류 경로가 남아 pending 대기와 DOM 갱신이 계속됨",
+      "file": "tools/site/d12-source-diagrams.mjs",
+      "evidence": "실제 helper에 지연 fake Mermaid를 주입해 재현했다. 성공 결과가 dispose 뒤 완료되면 renderAgain=true가 남고 finally가 resolveIdle만 호출하므로 isIdle=false로 whenIdle 대기가 끝나지 않는다. 실패 결과가 dispose 뒤 reject되면 catch가 disposed를 확인하지 않아 오류 안내를 다시 삽입한다.",
+      "required": "dispose 뒤 성공/실패 모두 stale 결과를 폐기하고 scheduler flag와 idle waiters를 정리한다. error notice를 다시 만들거나 새 node 렌더를 시작하지 않아야 한다. queued dispose, in-flight 성공 dispose, in-flight 실패 dispose 회귀 검사를 추가한다.",
+      "reproduction": "mermaid-sol-logs/attempt1/01-dispose-repro.mjs 및 .json",
+      "limits": "JSDOM과 delayed fake renderer의 생명주기 검수이며 실제 Mermaid CDN/Chrome 수용 판정은 아님"
+    }
+  ],
+  "evidence": {
+    "repro": "mermaid-sol-logs/attempt1/01-dispose-repro.json",
+    "baselineTests": "mermaid-sol-logs/attempt1/02-tests.json",
+    "fingerprintStart": "mermaid-sol-logs/attempt1/00-input-start.json",
+    "fingerprintEnd": "mermaid-sol-logs/attempt1/03-input-end.json",
+    "snapshot": "LOCAL_HOME/research/javaexperience-d12-linux-terminal-20261025/_data/mermaid-sol-candidate1-source"
+  },
+  "checked": [
+    "원인 문서와 main scene-first/initial-read JSON 대조",
+    "helper·신규 테스트·D12 전용 build 분기·package script 검토",
+    "기존 하네스 npm run test:d12 exit0",
+    "독립 in-flight 성공 dispose의 whenIdle 미해소 재현",
+    "독립 in-flight reject dispose 뒤 error notice 재삽입 재현"
+  ],
+  "REDLimit": "구현 기록의 최초 RED는 fake hidden width0/visible 대조 확인 후 신규 helper MODULE_NOT_FOUND였다. 실제 기존 helper에 대한 실패 테스트로 확대하지 않는다.",
+  "notPerformed": [
+    "spec FAIL 이후 quality mutants 미실행",
+    "실제 CDN/Chrome 재현·최종 수용",
+    "Docker/Linux proof 재실행",
+    "웹/외부CLI/다른LLM",
+    "제품·원문·이미지·기존보고서 수정",
+    "커밋/push/merge"
+  ]
+}

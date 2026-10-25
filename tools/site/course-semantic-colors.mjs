@@ -39,16 +39,20 @@ export function fileLayer(text) {
 export function annotateSemanticColors(root) {
   const doc = root.ownerDocument || root;
   for (const el of root.querySelectorAll('.file-layer,.file-name,.file-path,.file-paths code,.fact-layers li,.fact-layers code,.step-layer,.relation-node')) {
+    if (el.closest('.knowledge-reader-original')) continue;
     const layer = fileLayer(el.textContent);
     if (layer) el.dataset.fileLayer = layer;
   }
   for (const el of root.querySelectorAll('.flow-node[data-node],.flow-step[data-node]')) {
+    if (el.closest('.knowledge-reader-original')) continue;
     if (!el.classList.contains('is-masked') && NODE_KINDS[el.dataset.node]) el.dataset.nodeKind = NODE_KINDS[el.dataset.node];
   }
   for (const el of root.querySelectorAll('.visual-procedure li,.visual-flow li,.guide-day-flow li,.task-visual-sequence > ol > li,.task-visual-timeline > ol > li')) {
+    if (el.closest('.knowledge-reader-original')) continue;
     el.dataset.sequence = String([...el.parentElement.children].indexOf(el) % 6 + 1);
   }
   for (const label of root.querySelectorAll('.fact-layers p:not(.fact-label),.fact-layers li,.step-layer')) {
+    if (label.closest('.knowledge-reader-original')) continue;
     const labels = doc.createTreeWalker(label, 4), parts = [];
     while (labels.nextNode()) parts.push(labels.currentNode);
     for (const part of parts) {
@@ -69,7 +73,7 @@ export function annotateSemanticColors(root) {
   while (walker.nextNode()) texts.push(walker.currentNode);
   for (const text of texts) {
     const parent = text.parentElement;
-    if (!parent || parent.closest('pre,script,style,textarea,option,svg,[data-http-status],.file-path,.file-name,input')) continue;
+    if (!parent || parent.closest('.knowledge-reader-original,pre,script,style,textarea,option,svg,[data-http-status],.file-path,.file-name,input')) continue;
     const matches = [...text.textContent.matchAll(/\b(?:200|201|202|204|400|401|403|404|405|408|409|415|422|429|500|502|503|504|4xx|5xx)\b|\btimeout\b|타임아웃/gi)];
     if (!matches.length) continue;
     const context = parent.closest('tr,li,p,dd,dt,h2,h3,h4,.flow-values,.visual-comparison,.request-response')?.textContent || parent.textContent;
@@ -80,7 +84,7 @@ export function annotateSemanticColors(root) {
     for (const match of matches) {
       const before = text.textContent[match.index - 1] || '';
       const after = text.textContent[match.index + match[0].length] || '';
-      if (/[\w./-]/.test(before) || /[\w./-]/.test(after)) continue;
+      if (/[\w./-]/.test(before) || /[\w./가-힣-]/.test(after)) continue;
       fragment.append(text.textContent.slice(cursor, match.index));
       const badge = doc.createElement('span');
       badge.dataset.httpStatus = /timeout|타임아웃/i.test(match[0]) ? 'timeout' : match[0].toLowerCase();

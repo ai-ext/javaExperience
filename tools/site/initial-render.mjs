@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import { renderSectionNavigation } from './site-navigation.mjs';
 import { JSDOM } from 'jsdom';
+import { initCoreLearning } from './core-learning.js';
 import { initKnowledgeCatalog } from './knowledge-catalog-controller.mjs';
+const reader = fs.readFileSync(new URL('./knowledge-reader.js', import.meta.url),'utf8');
 const switcher = fs.readFileSync(new URL('./section-switcher.js', import.meta.url),'utf8');
 // 런타임과 같은 탐색 규칙으로 레이아웃을 먼저 확정한다.
 export function renderInitialPage(html, sourcePath = 'README.md') {
@@ -11,6 +13,13 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
   if(doc.querySelector('.kc-catalog')){
     initKnowledgeCatalog(doc,win);
     delete doc.querySelector('.kc-catalog').dataset.ready;
+  }
+  if(doc.querySelector('[data-knowledge-reader]')) {
+    win.eval(reader + '\ninitKnowledgeReader(document, window);');
+  }
+  if(doc.querySelector('[data-core-learning]')) {
+    initCoreLearning(doc,win);
+    delete doc.querySelector('[data-core-learning]').dataset.ready;
   }
   const map=doc.querySelector('[data-course-map]');
   if(map){
@@ -48,6 +57,14 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
     sidebar.innerHTML=renderSectionNavigation(sourcePath);
     const local=main.querySelector('.page-sidebar,.day-today');
     if(local){local.classList.add('site-local-navigation');sidebar.append(local);}
+    const toc=main.querySelector('.kr-toc');
+    if(toc)sidebar.append(toc);
+    const coreNav=main.querySelector('.core-learning-sidebar');
+    if(coreNav) {
+      const prerequisites=coreNav.querySelector('.core-prerequisites');
+      if(prerequisites)sidebar.append(prerequisites);
+      coreNav.hidden=true;
+    }
     const content=doc.createElement('div');content.className='site-frame-content';
     content.append(...main.childNodes);frame.append(sidebar,content);main.append(frame);
     main.classList.add('site-main');
@@ -66,7 +83,8 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
   const fallback=doc.createElement('noscript');
   const fallbackStyle=doc.createElement('style');fallbackStyle.textContent='body main [data-day-panel][hidden],body main [data-wrap-panel][hidden],body main [data-section-panel][hidden],body main [data-config-panel][hidden]{display:block!important}body .section-switcher,body .day-wrap-tabs,body [data-day-expand]{display:none!important}';fallback.append(fallbackStyle);
   doc.head.append(fallback);
-  const result=dom.serialize().replace(/^[ \t]+$/gm,'');win.close();return result;
+  // 교육 예시의 구간 경계는 같은 글자로 표시하되 실제 병합 마커와 구분한다.
+  const result=dom.serialize().replace(/^[ \t]+$/gm,'').replace(/^={7}$/gm,'&#61;======');win.close();return result;
 }
 
 // head에서 실행된다. 런타임이 같은 선택을 인계받은 뒤 임시 CSS만 제거한다.

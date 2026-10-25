@@ -4,8 +4,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>T-003. 게시판 글 목록 정렬 옵션</title>
 <link rel="stylesheet" href="../tools/site/site.css?v=d360dce19dc2">
-<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer=""></script>
 
+<script src="../tools/site/syntax-highlight.js?v=6f5c9bf3c00e" defer=""></script>
 
 
 
@@ -18,7 +18,7 @@
 <link rel="stylesheet" href="../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../tools/site/course-flow-layout.css?v=b33e13ca0173">
 <link rel="stylesheet" href="../tools/site/section-switcher.css?v=975a56e01be7">
-<link rel="stylesheet" href="../tools/site/site-frame.css?v=bf75cf02827a">
+<link rel="stylesheet" href="../tools/site/site-frame.css?v=836815f322de">
 <script>(function prepareFirstPaint({panelMap,dayPanels}) {
   const root=document.documentElement;
   root.classList.add('js');
@@ -48,14 +48,14 @@
 <ul>
 <li>게시판 글 목록 API에 정렬 파라미터를 추가해 주세요. 안 보내면 지금처럼 최신순입니다.</li>
 <li>좋아요 0개인 글이 많아서, 값이 같을 때 순서가 매번 바뀌면 페이지를 넘길 때 글이 겹치거나 빠집니다. 같으면 최신순으로 이어 주세요.</li>
-<li>모르는 정렬 값은 조용히 무시하지 말고 <span data-http-status="400" class="semantic-http-status">400</span>으로 알려 주세요(프론트 오타를 바로 알 수 있게).</li>
+<li>모르는 정렬 값은 조용히 무시하지 말고 400으로 알려 주세요(프론트 오타를 바로 알 수 있게).</li>
 <li><strong>완료 조건</strong>: 정렬만 바뀌고 "볼 수 있는 글" 조건·전체 건수·페이지 응답 모양은 그대로다.</li>
 </ul>
 <p><strong>DB 시작 상태</strong>: <code>community</code> 처음 상태(이 저장소 루트에서 <code>docker compose down -v &amp;&amp; docker compose up -d</code> — <code>community</code>·<code>practice</code>·<code>project</code> 세 DB를 모두 지우고 <code>docker/mysql/init/</code>의 처음 상태로 다시 만든다(<code>project</code>는 빈 DB, CloudBeaver 작업 공간도 초기화). 남길 데이터가 있으면 먼저 <code>./docker/mysql/dump.sh</code>로 세 DB를 <code>docker/mysql/backup/&lt;시각&gt;/</code>에 SQL 파일로 떠 둔다. CloudBeaver에 저장한 SQL 스크립트·바꾼 설정은 이 백업에 들어가지 않으니 따로 복사해 둔다 — 미리 만든 연결 세 개는 다시 들어간다). 기준 코드로 앱을 켜면 Flyway가 V2~V6을 적용한다. 자유 게시판(<code>free</code>)에서 비로그인이 볼 수 있는 글은 13개다.</p>
 <h2 id="지금-코드"><a class="anchor" href="#지금-코드" aria-hidden="true">#</a>지금 코드</h2>
 <ul>
 <li>게시판 글 목록 API가 받는 파라미터와, 실제 쿼리를 조립하는 곳을 찾는다. 같은 쿼리 조립기를 조합 검색 API도 쓴다 — 검색 API의 동작은 바꾸지 않는다.</li>
-<li>정렬 기준(<code>ORDER BY</code>)이 지금 어디에 고정돼 있는지 본다. 잘못된 검색 조건을 <span data-http-status="400" class="semantic-http-status">400</span>으로 바꾸는 예외도 이미 하나 있다.</li>
+<li>정렬 기준(<code>ORDER BY</code>)이 지금 어디에 고정돼 있는지 본다. 잘못된 검색 조건을 400으로 바꾸는 예외도 이미 하나 있다.</li>
 </ul>
 <h2 id="화면-시나리오"><a class="anchor" href="#화면-시나리오" aria-hidden="true">#</a>화면 시나리오</h2>
 <section class="scenario-preview" aria-label="화면 시나리오" data-section-original-hidden="false" data-section-panel=""><div class="scenario-mockup"><div class="mockup-topline"><span class="mockup-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>시나리오 화면</span><span class="mockup-live"><i></i> 단계 시안</span></div><div class="scenario-display"><div class="scenario-display-heading"><div><span class="scenario-kicker">사용자에게 보이는 상태</span><h3>자유 게시판 — 정렬 바꾸기</h3><p>정렬 버튼을 누르면 sort 파라미터만 바꿔 같은 목록 API를 다시 부른다.</p></div></div><div class="mock-screen" aria-label="자유 게시판 — 정렬 바꾸기 미리보기"><header class="mock-bar" data-screen-id="bar"><strong>자유 게시판</strong><span></span></header><div class="mock-chip-group" data-screen-id="sort"><span class="screen-widget-label">정렬</span><span class="mock-chip">최신순</span><span class="mock-chip">좋아요순</span><span class="mock-chip">조회순</span></div><div class="mock-list" data-screen-id="posts"><div class="mock-list-item tone-default" data-screen-id="p4"><span class="mock-list-main"><strong>주말 회고</strong><small>이스프링 · 좋아요 2</small></span></div><div class="mock-list-item tone-default" data-screen-id="p14"><span class="mock-list-main"><strong>자유글 03</strong><small>이스프링 · 좋아요 1</small></span></div><div class="mock-list-item tone-default" data-screen-id="p12"><span class="mock-list-main"><strong>자유글 01</strong><small>이스프링 · 좋아요 1</small></span></div></div><div class="mock-toast tone-error" data-screen-id="toast"><span class="mock-toast-icon" aria-hidden="true">!</span><span>정렬 값이 올바르지 않습니다</span></div></div></div></div><div class="scenario-flow-panel"><div class="flow-panel-heading"><div><span class="scenario-kicker">화면 뒤에서 일어나는 일</span><h4>요청부터 응답까지</h4></div><span class="flow-hint">이 단계에 기록된 처리 순서를 보여줍니다.</span></div><div class="flow-tracks" aria-label="흐름별 요청 처리 경로"><div class="flow-route" aria-label="좋아요순"><span class="flow-node" data-node="client" data-index="0" data-node-kind="client"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="mysql" data-index="2" data-node-kind="database"><span class="flow-node-number">3</span>MySQL</span><span class="flow-node" data-node="response" data-index="3" data-node-kind="dto"><span class="flow-node-number">4</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="4"><span class="flow-node-number">5</span>응답 반영</span></div><div class="flow-route" aria-label="모르는 정렬 값"><span class="flow-node" data-node="client" data-index="0" data-node-kind="client"><span class="flow-node-number">1</span>사용자 화면</span><span class="flow-node" data-node="request" data-index="1"><span class="flow-node-number">2</span>HTTP 요청</span><span class="flow-node" data-node="response" data-index="2" data-node-kind="dto"><span class="flow-node-number">3</span>HTTP 응답</span><span class="flow-node" data-node="screen" data-index="3"><span class="flow-node-number">4</span>응답 반영</span></div></div><p class="flow-swipe-hint">좌우로 밀어 전체 경로 보기 →</p><aside class="db-observer" aria-label="별도 데이터베이스 관찰 경로"><span class="observer-caption">API와 분리된 관찰 경로</span><span class="observer-line" aria-hidden="true">┄ ┄ ┄</span><span class="observer-tool">DBeaver / CloudBeaver</span><span class="observer-caption">직접 MySQL에 접속해 저장 결과를 조회</span></aside><p class="flow-selection-status" role="status" aria-live="polite">카드를 선택하면 화면의 관련 요소와 계층이 강조됩니다.</p><div class="scenario-flows"><section class="scenario-flow" aria-label="좋아요순" data-flow-index="0"><h5>좋아요순<span class="scenario-flow-count">6단계</span></h5><ol><li><button type="button" class="flow-step" data-node="client" data-nodes="client" data-method="" data-path="" data-focus="sort" aria-pressed="false" data-node-kind="client"><span class="flow-step-meta"><span class="flow-kind">사용자 화면</span></span><span class="flow-layers"><span class="flow-layer" data-node="client">사용자 화면</span></span><span class="flow-step-text">[좋아요순]을 누른다</span></button></li><li><button type="button" class="flow-step" data-node="request" data-nodes="request" data-method="GET" data-path="/api/boards/free/posts?sort=likes&amp;size=5" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-method method-get">GET</span><span class="flow-kind">HTTP 요청</span><code class="flow-path">/api/boards/free/posts?sort=likes&amp;size=5</code></span><span class="flow-layers"><span class="flow-layer" data-node="request">HTTP 요청</span></span><span class="flow-step-text">GET /api/boards/free/posts?sort=likes&amp;size=5</span></button></li><li><button type="button" class="flow-step" data-node="" data-nodes="" data-method="" data-path="" data-focus="" aria-pressed="false"><span class="flow-step-meta"><span class="flow-kind">서버</span></span><span class="flow-step-text">조건(볼 수 있는 글)은 그대로, 정렬만 좋아요 수 → 게시 시각 → id 내림차순으로 바꾼다</span></button></li><li><button type="button" class="flow-step" data-node="mysql" data-nodes="mysql" data-method="" data-path="" data-focus="" aria-pressed="false" data-node-kind="database"><span class="flow-step-meta"><span class="flow-kind">MySQL</span></span><span class="flow-layers"><span class="flow-layer" data-node="mysql">MySQL</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>sql</b> SELECT … FROM post p WHERE … ORDER BY p.like_count DESC, p.published_at DESC, p.id DESC LIMIT 5</span></span></button></li><li><button type="button" class="flow-step" data-node="response" data-nodes="response" data-method="" data-path="" data-focus="" aria-pressed="false" data-node-kind="dto"><span class="flow-step-meta"><span class="flow-kind">HTTP 응답</span></span><span class="flow-layers"><span class="flow-layer" data-node="response">HTTP 응답</span></span><span class="flow-step-details"><span class="flow-step-detail"><b>status</b> <span data-http-status="200" class="semantic-http-status">200</span></span></span></button><details class="flow-payload"><summary>본문 예시 보기</summary><pre>{
@@ -149,7 +149,7 @@
 </tr>
 <tr>
 <td>모르는 값</td>
-<td><code><span data-http-status="400" class="semantic-http-status">400</span></code> (Problem Details, 다른 <span data-http-status="400" class="semantic-http-status">400</span>과 같은 모양)</td>
+<td><code><span data-http-status="400" class="semantic-http-status">400</span></code> (Problem Details, 다른 400과 같은 모양)</td>
 </tr>
 <tr>
 <td>그대로인 것</td>
@@ -238,7 +238,7 @@ curl -i "$BASE/api/boards/free/posts?sort=hot"                    # 요청 E —
 <li><a href="../docs/knowledge/W15-paging-offset-vs-cursor.html">W15 페이징 — OFFSET vs 커서</a> — 순서가 끝까지 정해져야 하는 이유(R2)</li>
 <li><a href="../docs/knowledge/S10-spring-data-query.html">S10 Spring Data와 쿼리 도구</a> — Criteria·정렬</li>
 <li><a href="../docs/knowledge/R05-index-btree.html">R05 인덱스와 B-Tree</a> — 정렬과 인덱스(R4)</li>
-<li><a href="../docs/knowledge/W10-where-to-validate.html">W10 검증은 어디서 하나</a> — 모르는 값을 무시할까 <span data-http-status="400" class="semantic-http-status">400</span>일까</li>
+<li><a href="../docs/knowledge/W10-where-to-validate.html">W10 검증은 어디서 하나</a> — 모르는 값을 무시할까 400일까</li>
 </ul>
 <h2 id="힌트-막힐-때만"><a class="anchor" href="#힌트-막힐-때만" aria-hidden="true">#</a>힌트 (막힐 때만)</h2>
 <details data-section-original-hidden="false" data-section-panel="">
@@ -272,7 +272,7 @@ curl -i "$BASE/api/boards/free/posts?sort=hot"                    # 요청 E —
     function measureHeader() { if (siteHeader) document.documentElement.style.setProperty('--course-header-height',siteHeader.getBoundingClientRect().height + 'px'); }
     measureHeader(); window.addEventListener('resize',measureHeader);
     if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
-    if (main.querySelector('[data-day-page]')) return;
+    if (main.querySelector('[data-day-page],[data-knowledge-reader],[data-core-learning]')) return;
     var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {

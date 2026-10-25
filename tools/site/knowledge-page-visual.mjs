@@ -41,13 +41,14 @@ export function renderKnowledgePageSections(html) {
   const before = html.slice(0, headings[0].index);
   const cards = headings.map((match, index) => {
     const next = headings[index + 1]?.index ?? html.length;
-    const section = transformVersionTables(html.slice(match.index + match[0].length, next));
+    let section = transformVersionTables(html.slice(match.index + match[0].length, next));
     const id = match[0].match(/\bid="([^"]+)"/)?.[1] || `knowledge-section-${index + 1}`;
     const title = textOnly(match[0]).replace(/^#\s*/, '');
     const subtopics = [...section.matchAll(/<h3\b[^>]*>([\s\S]*?)<\/h3>/g)]
       .map((part) => textOnly(part[1]).replace(/^#\s*/, '')).filter(Boolean).slice(0, 4);
     const codeCount = (section.match(/<pre\b/g) || []).length;
     const topics = [...section.matchAll(/<h3\b[^>]*id="([^"]+)"[^>]*>[\s\S]*?<\/h3>/g)];
+    if (/자가\s*점검.*Q&A|Q&A.*자가\s*점검/i.test(title) && !/<h3\b/i.test(section)) section = transformQuestionAnswerParagraphs(section);
     const introduction = topics.length ? section.slice(0, topics[0].index) : section;
     const topicCards = topics.map((topic, topicIndex) => {
       const end = topics[topicIndex + 1]?.index ?? section.length;
@@ -79,6 +80,47 @@ export function renderKnowledgePageSections(html) {
   reveal(location.hash);
 })();
 </script>`;
+}
+
+/** H3 없이 Q1 문단으로 이어지는 Q&A만 질문/답 details로 감싼다. 원문 strong과 답 노드는 한 번씩만 출력한다. */
+export function transformQuestionAnswerParagraphs(section) {
+  const questions = [...section.matchAll(/<p>\s*(<strong>[\s\S]*?<\/strong>)([\s\S]*?)<\/p>/g)]
+    .filter((match) => /^Q\d+\./.test(textOnly(match[1])));
+  if (!questions.length) return transformQuestionAnswerOrderedLists(section);
+  let output = '';
+  let cursor = 0;
+  for (let index = 0; index < questions.length; index += 1) {
+    const question = questions[index];
+    const end = question.index + question[0].length;
+    const nextStart = questions[index + 1]?.index ?? section.length;
+    const followingAnswers = section.slice(end, nextStart);
+    const inlineAnswer = question[2].trim() ? `<p>${question[2]}</p>` : '';
+    output += section.slice(cursor, question.index)
+      + `<details class="knowledge-topic" data-kr-qa-answer><summary>${question[1]}</summary><div class="knowledge-topic-body">${inlineAnswer}${followingAnswers}</div></details>`;
+    cursor = nextStart;
+  }
+  return transformQuestionAnswerOrderedLists(output + section.slice(cursor));
+}
+
+/** Q&A 절의 순서 목록에서만 첫 strong 질문을 접기 summary로 옮긴다. */
+function transformQuestionAnswerOrderedLists(section) {
+  return section.replace(/<ol(\b[^>]*)>([\s\S]*?)<\/ol>/g, (whole, attributes, content) => {
+    const items = [...content.matchAll(/<li>([\s\S]*?)<\/li>/g)];
+    const parsed = items.map((item) => ({
+      item,
+      parts: item[1].match(/^(\s*<p\b[^>]*>\s*)(<strong>[\s\S]*?<\/strong>)([\s\S]*?)<\/p>([\s\S]*)$/),
+    }));
+    if (!parsed.length || parsed.some(({ parts }) => !parts)) return whole;
+    let transformed = '';
+    let cursor = 0;
+    for (const { item, parts } of parsed) {
+      const [, , question, inlineAnswer, following] = parts;
+      transformed += content.slice(cursor, item.index)
+        + `<li><details class="knowledge-topic" data-kr-qa-answer><summary>${question}</summary><div class="knowledge-topic-body"><p>${inlineAnswer}</p>${following}</div></details></li>`;
+      cursor = item.index + item[0].length;
+    }
+    return `<ol${attributes}>${transformed}${content.slice(cursor)}</ol>`;
+  });
 }
 
 /** 버전 비교 표는 내용을 유지한 채 배경과 실무 영향을 나눈 카드로 보여 준다. */

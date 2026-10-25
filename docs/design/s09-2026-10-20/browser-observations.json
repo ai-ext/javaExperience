@@ -1,0 +1,1194 @@
+[
+  {
+    "viewport": "1672x941",
+    "code": "ProbePost fresh = new ProbePost(42L, \"첫 글\");",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS assigned-id-can-still-be-new",
+    "proofOpen": false,
+    "sql": "",
+    "stage": "cache-new",
+    "title": "id=42여도 아직 new",
+    "topic": "cache",
+    "values": "Java id / title / version42 / 첫 글 / 0em.containsfalseHibernate Entryno-entryHibernate loadedState{} · 해당 객체 Entry 없음",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.persist(fresh);",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS persist-registered-managed\nPASS assigned-persist-delays-insert\nPASS persist-before-flush-observer-empty",
+    "proofOpen": false,
+    "sql": "seedPersistSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "cache-persist",
+    "title": "persist가 관리 상태로 등록",
+    "topic": "cache",
+    "values": "Java id / title / version42 / 첫 글 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0이 구간 ORM SQL0 · INSERT 아직 없음별도 observerid42 행 없음",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.flush();\n// 같은 transaction JDBC / 별도 observer 비교",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS seed-flush-insert-one\nPASS seed-flush-not-commit",
+    "proofOpen": false,
+    "sql": "seedFlushSql · 바인딩값 미기록seedFlushSql[0]insert into probe_post (title,version,id) values (?,?,?)",
+    "stage": "cache-seed-flush",
+    "title": "첫 flush는 INSERT 실행",
+    "topic": "cache",
+    "values": "같은 transaction DB 행id=42 / 첫 글 / version=0별도 observerid42 행 없음이 구간 ORM SQLINSERT 1문장확정 여부아직 commit 아님",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.getTransaction().commit();\nem.close();",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS seed-commit-row-visible",
+    "proofOpen": false,
+    "sql": "seedCommitSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "cache-seed-commit",
+    "title": "commit 뒤 외부에 첫 글",
+    "topic": "cache",
+    "values": "별도 observer DB 행id=42 / 첫 글 / version=0이 구간 추가 SQL문0 · 이미 전송한 INSERT 확정다음 조회새 EntityManager에서 진행",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "ProbePost first = em.find(ProbePost.class, 42L);",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS first-find-one-select",
+    "proofOpen": false,
+    "sql": "firstFindSql · 바인딩값 미기록firstFindSql[0]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0 where pp1_0.id=?",
+    "stage": "cache-find",
+    "title": "새 컨텍스트의 첫 find",
+    "topic": "cache",
+    "values": "Java id / title / version42 / 첫 글 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0이번 find SQLSELECT 1문장",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "ProbePost second = em.find(ProbePost.class, 42L);\n// first == second",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS second-find-same-instance\nPASS second-find-no-select",
+    "proofOpen": false,
+    "sql": "secondFindSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "cache-find-again",
+    "title": "같은 컨텍스트는 같은 객체",
+    "topic": "cache",
+    "values": "객체 동일성first == second → true현재 값id=42 / 첫 글 / version=0두 번째 find 추가 SQL0범위같은 영속성 컨텍스트 · 공유 애플리케이션 캐시 아님",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "first.setTitle(\"수정된 글\");",
+    "image": "../design/s09-2026-10-20/images/S09-flush-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS changed-java-before-flush\nPASS changed-before-flush-db-old\nPASS setter-no-sql",
+    "proofOpen": false,
+    "sql": "setterSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "flush-change",
+    "title": "setter 직후 Java만 변경",
+    "topic": "flush",
+    "values": "Java id / title / version42 / 수정된 글 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0같은 transaction DB첫 글 / version=0별도 observer DB첫 글 / version=0setter 추가 SQL0",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.flush();\n// 같은 transaction DB와 별도 observer를 비교",
+    "image": "../design/s09-2026-10-20/images/S09-flush-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS dirty-flush-one-update\nPASS loaded-state-refreshes-after-flush\nPASS flush-inside-new-outside-old",
+    "proofOpen": false,
+    "sql": "dirtyFlushSql · 바인딩값 미기록dirtyFlushSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "flush-flush",
+    "title": "flush가 UPDATE와 loadedState 갱신",
+    "topic": "flush",
+    "values": "Java id / title / version42 / 수정된 글 / 1em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=수정된 글 / version=1같은 transaction DB수정된 글 / version=1별도 observer DB첫 글 / version=0flush ORM SQLUPDATE 1문장",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.getTransaction().commit();\nem.close();",
+    "image": "../design/s09-2026-10-20/images/S09-flush-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS commit-outside-new-version-one",
+    "proofOpen": false,
+    "sql": "dirtyCommitSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "flush-commit",
+    "title": "commit하면 외부도 수정된 글",
+    "topic": "flush",
+    "values": "별도 observer DBid=42 / 수정된 글 / version=1commit 구간 추가 SQL문0의미flush한 UPDATE의 transaction 확정",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "p.setTitle(\"수정된 글\");\nem.flush();\nem.getTransaction().rollback();\nem.close();\n// 같은 Java 객체의 getter 값과 별도 DB 행을 비교",
+    "image": "../design/s09-2026-10-20/images/S09-flush-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS rollback-branch-flush-inside-new-outside-old\nPASS rollback-does-not-revert-java-title-here\nPASS rollback-restores-db-first-version-zero",
+    "proofOpen": false,
+    "sql": "rollbackDirtyFlushSql · 바인딩값 미기록rollbackDirtyFlushSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "flush-rollback",
+    "title": "별도 분기: DB와 Java를 구분",
+    "topic": "flush",
+    "values": "rollback 전 flush 후 같은 transaction DB수정된 글 / version=1rollback 전 별도 observer DB첫 글 / version=0rollback·EM close 뒤 Java수정된 글 / version=1rollback 뒤 DB첫 글 / version=0주의rollback이 이 Java 필드 값까지 옛값으로 복구하지 않음",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "first.setTitle(\"준영속 수정\");\n// 새 EntityManager의 em.merge(first) 이후에도 원본 first는 detached",
+    "image": "../design/s09-2026-10-20/images/S09-merge-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS merge-original-remains-detached",
+    "proofOpen": false,
+    "sql": "",
+    "stage": "merge-detached",
+    "title": "원본은 detached로 남음",
+    "topic": "merge",
+    "values": "Java id / title / version42 / 준영속 수정 / 1em.containsfalseHibernate Entryno-entryHibernate loadedState{} · 해당 객체 Entry 없음",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "ProbePost merged = em.merge(first);\n// merged != first && em.contains(merged)",
+    "image": "../design/s09-2026-10-20/images/S09-merge-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS merge-returns-distinct-managed\nPASS merge-copies-current-state",
+    "proofOpen": false,
+    "sql": "mergeReadSql · 바인딩값 미기록mergeReadSql[0]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0 where pp1_0.id=?",
+    "stage": "merge-copied",
+    "title": "복사받은 별도 managed 반환",
+    "topic": "merge",
+    "values": "Java id / title / version42 / 준영속 수정 / 1em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=수정된 글 / version=1객체 구분merged != first → true",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "first.setTitle(\"원본만 변경\");\nmerged.setTitle(\"반환 객체 수정\");\nem.getTransaction().commit();",
+    "image": "../design/s09-2026-10-20/images/S09-merge-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS detached-edit-does-not-follow-merge\nPASS merge-returned-edit-committed",
+    "proofOpen": false,
+    "sql": "mergeCommitSql · 바인딩값 미기록mergeCommitSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "merge-returned-change",
+    "title": "반환 객체의 변경이 commit됨",
+    "topic": "merge",
+    "values": "detached 원본 Java원본만 변경 / version=1 / managed=falsecommit 전 managed 반환 객체반환 객체 수정 / version=1 / loadedState=수정된 글·1commit 뒤 별도 observer DB반환 객체 수정 / version=2",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.remove(removed);",
+    "image": "../design/s09-2026-10-20/images/S09-remove-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS removed-not-contained\nPASS remove-schedules-no-sql-yet\nPASS removed-before-flush-outside-row-kept",
+    "proofOpen": false,
+    "sql": "removeScheduleSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "remove-scheduled",
+    "title": "contains=false·Entry=DELETED",
+    "topic": "remove",
+    "values": "Java id / title / version42 / 반환 객체 수정 / 2em.containsfalseHibernate EntryDELETEDHibernate loadedStatetitle=반환 객체 수정 / version=2별도 observer DB행 존재 · 반환 객체 수정 / version=2추가 SQL문0 · 삭제 예약 상태",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.flush();\n// 내부 JDBC / 별도 observer 비교",
+    "image": "../design/s09-2026-10-20/images/S09-remove-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS remove-flush-one-delete\nPASS removed-inside-gone-outside-kept",
+    "proofOpen": false,
+    "sql": "removeFlushSql · 바인딩값 미기록removeFlushSql[0]delete from probe_post where id=? and version=?",
+    "stage": "remove-flushed",
+    "title": "flush 뒤 내부는 없고 외부는 존재",
+    "topic": "remove",
+    "values": "같은 transaction DBid42 행 없음별도 observer DB반환 객체 수정 / version=2 행 존재flush ORM SQLDELETE 1문장",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.getTransaction().commit();\nem.close();",
+    "image": "../design/s09-2026-10-20/images/S09-remove-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS remove-commit-outside-gone",
+    "proofOpen": false,
+    "sql": "removeCommitSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "remove-committed",
+    "title": "commit 뒤 외부도 행 없음",
+    "topic": "remove",
+    "values": "별도 observer DBid42 행 없음commit 구간 추가 SQL문0",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "@OrderBy(\"id ASC\") @BatchSize(size = 32)\nprivate List<OrderLine> lines = new ArrayList<>();\n// 추가 probe: for (PurchaseOrder o : orders) o.getLines().size();",
+    "image": "../design/s09-2026-10-20/images/S09-fetch-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS original-list-root-one-query\nPASS original-list-three-parents\nPASS original-collections-initially-lazy\nPASS original-batch32-one-additional-query",
+    "proofOpen": false,
+    "sql": "batchRootSql · 바인딩값 미기록batchRootSql[0]select po1_0.id,po1_0.version from PurchaseOrder po1_0 order by po1_0.idbatchCollectionSql · 바인딩값 미기록batchCollectionSql[0]select l1_0.order_id,l1_0.id,l1_0.quantity from order_line l1_0 where l1_0.order_id in (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) order by l1_0.id",
+    "stage": "fetch-batch",
+    "title": "root1 + batch collection1",
+    "topic": "fetch",
+    "values": "원문 모델PurchaseOrder 3개 / OrderLine 총 6개초기 컬렉션세 부모 모두 미초기화원문 설정@BatchSize(size=32) 유지접근별 추가 SQL 누계order1: 1 / order2: 1 / order3: 1총 ORM SQLroot SELECT 1 + batch SELECT 1 = 2",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "List<PurchaseOrder> fetched = readService.findOrdersWithLines();\n// 원문 HQL: select distinct o from PurchaseOrder o left join fetch o.lines order by o.id",
+    "image": "../design/s09-2026-10-20/images/S09-fetch-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS original-read-service-one-query\nPASS original-fetchjoin-access-no-extra-query\nPASS fetchjoin-six-jdbc-rows-not-three",
+    "proofOpen": false,
+    "sql": "originalFetchJoinSql · 바인딩값 미기록originalFetchJoinSql[0]select distinct po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.idfetchJoinAccessSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "fetch-join",
+    "title": "fetch join: 부모3·별도 재실행 행6",
+    "topic": "fetch",
+    "values": "ORM 반환 부모 / 총 자식3 / 6fetch join SQL / 접근 추가 SQL1 / 0별도 JDBC SQL 재실행 행 수6 · Hibernate wire 행 수 계측 아님원문 서비스 호출 방식직접 Java · 수동 transaction · Spring 프록시 아님",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "EntityGraph<PurchaseOrder> graph = em.createEntityGraph(PurchaseOrder.class);\ngraph.addAttributeNodes(\"lines\");\nem.createQuery(\"select o from PurchaseOrder o order by o.id\", PurchaseOrder.class)\n    .setHint(\"jakarta.persistence.fetchgraph\", graph).getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-fetch-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS extra-fetchgraph-one-query-here",
+    "proofOpen": false,
+    "sql": "extraFetchGraphSql · 바인딩값 미기록extraFetchGraphSql[0]select po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.id",
+    "stage": "fetch-graph",
+    "title": "추가 fetch graph도 이 조건에서1",
+    "topic": "fetch",
+    "values": "추가 조회 설정jakarta.persistence.fetchgraph · lines부모 / 자식3 / 6실측 ORM SQL1 · 이 fixture 조건의 관측",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "new OrderService(em).addLine(1L, 99);\n// 원문 메서드 내부\norder.addLine(new OrderLine(quantity));\nentityManager.flush();",
+    "image": "../design/s09-2026-10-20/images/S09-service-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS original-service-direct-java-add-and-flush",
+    "proofOpen": false,
+    "sql": "originalAddLineServiceSql · 바인딩값 미기록originalAddLineServiceSql[0]insert into order_line (order_id,quantity,id) values (?,?,default)",
+    "stage": "service-source-add",
+    "title": "원문 addLine: 자식2에서3",
+    "topic": "service",
+    "values": "원문 모델PurchaseOrder id1 / OrderLine메모리 자식 수 전 → 후2 → 3flush 뒤 부모 version0실측 SQLorder_line INSERT 1문장실험 종료수동 transaction rollback",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "PurchaseOrder closed = em.find(PurchaseOrder.class, 1L);\nem.close();\nclosed.getLines().size();",
+    "image": "../design/s09-2026-10-20/images/S09-service-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS original-closed-collection-starts-lazy\nPASS original-closed-collection-lazy-fails\nPASS closed-lazy-emits-no-query",
+    "proofOpen": false,
+    "sql": "closedLazyFailureSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "service-closed-lazy",
+    "title": "닫힌 뒤 컬렉션은 초기화 실패",
+    "topic": "service",
+    "values": "초기 컬렉션미초기화접근 시점EntityManager 종료 뒤실측 예외org.hibernate.LazyInitializationException실패 구간 추가 SQL0DB 행 관찰이 실패 구간에서는 미측정",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "ProbePost pa = a.find(ProbePost.class, 42L);\nProbePost pb = b.find(ProbePost.class, 42L);",
+    "image": "../design/s09-2026-10-20/images/S09-lock.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS two-contexts-read-version-zero",
+    "proofOpen": false,
+    "sql": "lockBothReadsSql · 바인딩값 미기록lockBothReadsSql[0]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0 where pp1_0.id=?lockBothReadsSql[1]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0 where pp1_0.id=?",
+    "stage": "lock-reads",
+    "title": "두 컨텍스트가 각각 version0",
+    "topic": "lock",
+    "values": "A Java / loadedState첫 글·version0 / 첫 글·version0B Java / loadedState첫 글·version0 / 첫 글·version0객체 동일성pa != pb별도 초기 DBs09_lock · id42 / 첫 글 / version0",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "pa.setTitle(\"A 수정\");\na.getTransaction().commit();",
+    "image": "../design/s09-2026-10-20/images/S09-lock.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS lock-a-commit-version-one",
+    "proofOpen": false,
+    "sql": "lockACommitSql · 바인딩값 미기록lockACommitSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "lock-a-commit",
+    "title": "A가 먼저 version1로 commit",
+    "topic": "lock",
+    "values": "A 변경 입력A 수정A commit 뒤 DB version1B가 읽어 둔 version0A 구간 ORM SQLversion 조건 UPDATE 1문장",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "pb.setTitle(\"B 수정\");\nb.flush();\n// 예외 뒤 B transaction rollback",
+    "image": "../design/s09-2026-10-20/images/S09-lock.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS stale-version-flush-rejected\nPASS stale-update-does-not-overwrite-a",
+    "proofOpen": false,
+    "sql": "lockBFailureSql · 바인딩값 미기록lockBFailureSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "lock-b-failure",
+    "title": "B의 오래된 version은 거부",
+    "topic": "lock",
+    "values": "B 입력 / 읽은 versionB 수정 / 0실측 예외jakarta.persistence.OptimisticLockExceptionDB 최종 관찰id42 / A 수정 / version1실패 SQLUPDATE ... WHERE id=? AND version=?",
+    "zoom": "false",
+    "failures": []
+  },
+  {
+    "viewport": "1672x941",
+    "code": "p.setTitle(\"쿼리 전 변경\");\n// em.getFlushMode() == FlushModeType.AUTO",
+    "image": "../design/s09-2026-10-20/images/S09-auto-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS default-flush-mode-auto",
+    "proofOpen": false,
+    "sql": "",
+    "stage": "auto-changed",
+    "title": "기본 AUTO에서 제목 변경",
+    "topic": "auto",
+    "values": "Java id / title / version42 / 쿼리 전 변경 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0기본 flush modeAUTO",
+    "zoom": "false",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.createQuery(\"select o from PurchaseOrder o\", PurchaseOrder.class).getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-auto-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS unrelated-query-no-post-update",
+    "proofOpen": false,
+    "sql": "autoUnrelatedQuerySql · 바인딩값 미기록autoUnrelatedQuerySql[0]select po1_0.id,po1_0.version from PurchaseOrder po1_0",
+    "stage": "auto-unrelated",
+    "title": "무관한 PurchaseOrder 조회",
+    "topic": "auto",
+    "values": "Java id / title / version42 / 쿼리 전 변경 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0이번 SQLPurchaseOrder SELECT 1 · probe_post UPDATE 없음",
+    "zoom": "false",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "1672x941",
+    "code": "em.createQuery(\"select p from ProbePost p\", ProbePost.class).getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-auto-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS overlap-auto-update-before-select\nPASS auto-flush-still-not-commit",
+    "proofOpen": false,
+    "sql": "autoOverlappingQuerySql · 바인딩값 미기록autoOverlappingQuerySql[0]update probe_post set title=?,version=? where id=? and version=?autoOverlappingQuerySql[1]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0",
+    "stage": "auto-overlap",
+    "title": "겹치는 ProbePost 조회 전 UPDATE",
+    "topic": "auto",
+    "values": "Java id / title / version42 / 쿼리 전 변경 / 1em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=쿼리 전 변경 / version=1관측 SQL 순서probe_post UPDATE → probe_post SELECT별도 observer DB title첫 글 · AUTO flush도 commit 아님",
+    "zoom": "false",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "1672x941",
+    "code": "query.setMaxResults(1);\n// 두 번째 독립 변형에는 다음도 설정\nquery.setFirstResult(0);\nList<PurchaseOrder> actual = query.getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-pagination-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS pagination-fetch-api-max1-one-statement-observed\nPASS pagination-fetch-api-max1-configured-max-one\nPASS pagination-fetch-api-first0-max1-one-statement-observed\nPASS pagination-fetch-api-first0-max1-configured-max-one",
+    "proofOpen": false,
+    "sql": "fetch-api-max1Sql · 바인딩값 미기록fetch-api-max1Sql[0]select distinct po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.idfetch-api-first0-max1Sql · 바인딩값 미기록fetch-api-first0-max1Sql[0]select distinct po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.id",
+    "stage": "pagination-api",
+    "title": "API max1인데 부모3개 관측",
+    "topic": "pagination",
+    "values": "검사한 두 변형fetch-api-max1 / fetch-api-first0-max1API 설정 max / first1 / 0 · 두 변형 모두실제 부모 IDs / 자식 수[1,2,3] / [2,2,2]별도 JDBC 재실행 행 수6 / 6판정 범위설정·관측 검증 · 정확성 통과 아님",
+    "zoom": "false",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "1672x941",
+    "code": "query.setMaxResults(1);\nquery.setHint(\"org.hibernate.limitInMemory\", true);\nList<PurchaseOrder> actual = query.getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-pagination-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS pagination-fetch-memory-hint-max1-one-statement-observed\nPASS pagination-fetch-memory-hint-max1-configured-max-one",
+    "proofOpen": false,
+    "sql": "fetch-memory-hint-max1Sql · 바인딩값 미기록fetch-memory-hint-max1Sql[0]select distinct po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.id",
+    "stage": "pagination-memory",
+    "title": "명시 memory hint는 부모1·raw6",
+    "topic": "pagination",
+    "values": "추가 hintorg.hibernate.limitInMemory=trueAPI 설정 max / first1 / 0실제 부모 IDs / 자식 수[1] / [2]별도 JDBC 재실행 행 수6해석 한계hint 사용 권고·성능 측정 아님",
+    "zoom": "false",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "1672x941",
+    "code": "TypedQuery<PurchaseOrder> query = pageEm.createQuery(\n    fetchHql + \" limit 1\", PurchaseOrder.class);\nList<PurchaseOrder> actual = query.getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-pagination-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS pagination-fetch-hql-limit1-one-statement-observed",
+    "proofOpen": false,
+    "sql": "fetch-hql-limit1Sql · 바인딩값 미기록fetch-hql-limit1Sql[0]select po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from (select distinct po1_0.id,po1_0.version from PurchaseOrder po1_0 order by po1_0.id fetch first 1 rows only) po1_0(id,version) left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.id",
+    "stage": "pagination-hql",
+    "title": "HQL inline limit는 부모1·raw2",
+    "topic": "pagination",
+    "values": "제한 표현HQL inline limit 1 · API max 미설정API getMaxResults / first2147483647 / 0실제 부모 IDs / 자식 수[1] / [2]별도 JDBC 재실행 행 수2해석 한계다른 런타임·MySQL·업그레이드 결과 아님",
+    "zoom": "false",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "1672x941",
+    "code": "TypedQuery<PurchaseOrder> query = pageEm.createQuery(\n    \"select o from PurchaseOrder o order by o.id\", PurchaseOrder.class);\nquery.setMaxResults(1);",
+    "image": "../design/s09-2026-10-20/images/S09-pagination-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS pagination-plain-root-api-max1-one-statement-observed\nPASS pagination-plain-root-api-max1-configured-max-one\nPASS pagination-plain-root-control-one-parent",
+    "proofOpen": false,
+    "sql": "plain-root-api-max1Sql · 바인딩값 미기록plain-root-api-max1Sql[0]select po1_0.id,po1_0.version from PurchaseOrder po1_0 order by po1_0.id fetch first ? rows only",
+    "stage": "pagination-root",
+    "title": "plain root 대조군은 부모1·raw1",
+    "topic": "pagination",
+    "values": "대조군plain-root-api-max1 · collection fetch 없음실제 부모 IDs[1]별도 JDBC 재실행유일한 limit 파라미터 1 → 1 바인딩 · 1행컬렉션 크기이 대조군에서는 미측정관측 해석원인·upstream 수정 여부 미확인",
+    "zoom": "false",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "390x844",
+    "code": "ProbePost fresh = new ProbePost(42L, \"첫 글\");",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS assigned-id-can-still-be-new",
+    "proofOpen": false,
+    "sql": "",
+    "stage": "cache-new",
+    "title": "id=42여도 아직 new",
+    "topic": "cache",
+    "values": "Java id / title / version42 / 첫 글 / 0em.containsfalseHibernate Entryno-entryHibernate loadedState{} · 해당 객체 Entry 없음",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.persist(fresh);",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS persist-registered-managed\nPASS assigned-persist-delays-insert\nPASS persist-before-flush-observer-empty",
+    "proofOpen": false,
+    "sql": "seedPersistSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "cache-persist",
+    "title": "persist가 관리 상태로 등록",
+    "topic": "cache",
+    "values": "Java id / title / version42 / 첫 글 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0이 구간 ORM SQL0 · INSERT 아직 없음별도 observerid42 행 없음",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.flush();\n// 같은 transaction JDBC / 별도 observer 비교",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS seed-flush-insert-one\nPASS seed-flush-not-commit",
+    "proofOpen": false,
+    "sql": "seedFlushSql · 바인딩값 미기록seedFlushSql[0]insert into probe_post (title,version,id) values (?,?,?)",
+    "stage": "cache-seed-flush",
+    "title": "첫 flush는 INSERT 실행",
+    "topic": "cache",
+    "values": "같은 transaction DB 행id=42 / 첫 글 / version=0별도 observerid42 행 없음이 구간 ORM SQLINSERT 1문장확정 여부아직 commit 아님",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.getTransaction().commit();\nem.close();",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS seed-commit-row-visible",
+    "proofOpen": false,
+    "sql": "seedCommitSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "cache-seed-commit",
+    "title": "commit 뒤 외부에 첫 글",
+    "topic": "cache",
+    "values": "별도 observer DB 행id=42 / 첫 글 / version=0이 구간 추가 SQL문0 · 이미 전송한 INSERT 확정다음 조회새 EntityManager에서 진행",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "ProbePost first = em.find(ProbePost.class, 42L);",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS first-find-one-select",
+    "proofOpen": false,
+    "sql": "firstFindSql · 바인딩값 미기록firstFindSql[0]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0 where pp1_0.id=?",
+    "stage": "cache-find",
+    "title": "새 컨텍스트의 첫 find",
+    "topic": "cache",
+    "values": "Java id / title / version42 / 첫 글 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0이번 find SQLSELECT 1문장",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "ProbePost second = em.find(ProbePost.class, 42L);\n// first == second",
+    "image": "../design/s09-2026-10-20/images/S09-cache-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS second-find-same-instance\nPASS second-find-no-select",
+    "proofOpen": false,
+    "sql": "secondFindSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "cache-find-again",
+    "title": "같은 컨텍스트는 같은 객체",
+    "topic": "cache",
+    "values": "객체 동일성first == second → true현재 값id=42 / 첫 글 / version=0두 번째 find 추가 SQL0범위같은 영속성 컨텍스트 · 공유 애플리케이션 캐시 아님",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "first.setTitle(\"수정된 글\");",
+    "image": "../design/s09-2026-10-20/images/S09-flush-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS changed-java-before-flush\nPASS changed-before-flush-db-old\nPASS setter-no-sql",
+    "proofOpen": false,
+    "sql": "setterSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "flush-change",
+    "title": "setter 직후 Java만 변경",
+    "topic": "flush",
+    "values": "Java id / title / version42 / 수정된 글 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0같은 transaction DB첫 글 / version=0별도 observer DB첫 글 / version=0setter 추가 SQL0",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.flush();\n// 같은 transaction DB와 별도 observer를 비교",
+    "image": "../design/s09-2026-10-20/images/S09-flush-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS dirty-flush-one-update\nPASS loaded-state-refreshes-after-flush\nPASS flush-inside-new-outside-old",
+    "proofOpen": false,
+    "sql": "dirtyFlushSql · 바인딩값 미기록dirtyFlushSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "flush-flush",
+    "title": "flush가 UPDATE와 loadedState 갱신",
+    "topic": "flush",
+    "values": "Java id / title / version42 / 수정된 글 / 1em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=수정된 글 / version=1같은 transaction DB수정된 글 / version=1별도 observer DB첫 글 / version=0flush ORM SQLUPDATE 1문장",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.getTransaction().commit();\nem.close();",
+    "image": "../design/s09-2026-10-20/images/S09-flush-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS commit-outside-new-version-one",
+    "proofOpen": false,
+    "sql": "dirtyCommitSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "flush-commit",
+    "title": "commit하면 외부도 수정된 글",
+    "topic": "flush",
+    "values": "별도 observer DBid=42 / 수정된 글 / version=1commit 구간 추가 SQL문0의미flush한 UPDATE의 transaction 확정",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "p.setTitle(\"수정된 글\");\nem.flush();\nem.getTransaction().rollback();\nem.close();\n// 같은 Java 객체의 getter 값과 별도 DB 행을 비교",
+    "image": "../design/s09-2026-10-20/images/S09-flush-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS rollback-branch-flush-inside-new-outside-old\nPASS rollback-does-not-revert-java-title-here\nPASS rollback-restores-db-first-version-zero",
+    "proofOpen": false,
+    "sql": "rollbackDirtyFlushSql · 바인딩값 미기록rollbackDirtyFlushSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "flush-rollback",
+    "title": "별도 분기: DB와 Java를 구분",
+    "topic": "flush",
+    "values": "rollback 전 flush 후 같은 transaction DB수정된 글 / version=1rollback 전 별도 observer DB첫 글 / version=0rollback·EM close 뒤 Java수정된 글 / version=1rollback 뒤 DB첫 글 / version=0주의rollback이 이 Java 필드 값까지 옛값으로 복구하지 않음",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "first.setTitle(\"준영속 수정\");\n// 새 EntityManager의 em.merge(first) 이후에도 원본 first는 detached",
+    "image": "../design/s09-2026-10-20/images/S09-merge-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS merge-original-remains-detached",
+    "proofOpen": false,
+    "sql": "",
+    "stage": "merge-detached",
+    "title": "원본은 detached로 남음",
+    "topic": "merge",
+    "values": "Java id / title / version42 / 준영속 수정 / 1em.containsfalseHibernate Entryno-entryHibernate loadedState{} · 해당 객체 Entry 없음",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "ProbePost merged = em.merge(first);\n// merged != first && em.contains(merged)",
+    "image": "../design/s09-2026-10-20/images/S09-merge-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS merge-returns-distinct-managed\nPASS merge-copies-current-state",
+    "proofOpen": false,
+    "sql": "mergeReadSql · 바인딩값 미기록mergeReadSql[0]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0 where pp1_0.id=?",
+    "stage": "merge-copied",
+    "title": "복사받은 별도 managed 반환",
+    "topic": "merge",
+    "values": "Java id / title / version42 / 준영속 수정 / 1em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=수정된 글 / version=1객체 구분merged != first → true",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "first.setTitle(\"원본만 변경\");\nmerged.setTitle(\"반환 객체 수정\");\nem.getTransaction().commit();",
+    "image": "../design/s09-2026-10-20/images/S09-merge-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS detached-edit-does-not-follow-merge\nPASS merge-returned-edit-committed",
+    "proofOpen": false,
+    "sql": "mergeCommitSql · 바인딩값 미기록mergeCommitSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "merge-returned-change",
+    "title": "반환 객체의 변경이 commit됨",
+    "topic": "merge",
+    "values": "detached 원본 Java원본만 변경 / version=1 / managed=falsecommit 전 managed 반환 객체반환 객체 수정 / version=1 / loadedState=수정된 글·1commit 뒤 별도 observer DB반환 객체 수정 / version=2",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.remove(removed);",
+    "image": "../design/s09-2026-10-20/images/S09-remove-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS removed-not-contained\nPASS remove-schedules-no-sql-yet\nPASS removed-before-flush-outside-row-kept",
+    "proofOpen": false,
+    "sql": "removeScheduleSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "remove-scheduled",
+    "title": "contains=false·Entry=DELETED",
+    "topic": "remove",
+    "values": "Java id / title / version42 / 반환 객체 수정 / 2em.containsfalseHibernate EntryDELETEDHibernate loadedStatetitle=반환 객체 수정 / version=2별도 observer DB행 존재 · 반환 객체 수정 / version=2추가 SQL문0 · 삭제 예약 상태",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.flush();\n// 내부 JDBC / 별도 observer 비교",
+    "image": "../design/s09-2026-10-20/images/S09-remove-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS remove-flush-one-delete\nPASS removed-inside-gone-outside-kept",
+    "proofOpen": false,
+    "sql": "removeFlushSql · 바인딩값 미기록removeFlushSql[0]delete from probe_post where id=? and version=?",
+    "stage": "remove-flushed",
+    "title": "flush 뒤 내부는 없고 외부는 존재",
+    "topic": "remove",
+    "values": "같은 transaction DBid42 행 없음별도 observer DB반환 객체 수정 / version=2 행 존재flush ORM SQLDELETE 1문장",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.getTransaction().commit();\nem.close();",
+    "image": "../design/s09-2026-10-20/images/S09-remove-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS remove-commit-outside-gone",
+    "proofOpen": false,
+    "sql": "removeCommitSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "remove-committed",
+    "title": "commit 뒤 외부도 행 없음",
+    "topic": "remove",
+    "values": "별도 observer DBid42 행 없음commit 구간 추가 SQL문0",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "@OrderBy(\"id ASC\") @BatchSize(size = 32)\nprivate List<OrderLine> lines = new ArrayList<>();\n// 추가 probe: for (PurchaseOrder o : orders) o.getLines().size();",
+    "image": "../design/s09-2026-10-20/images/S09-fetch-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS original-list-root-one-query\nPASS original-list-three-parents\nPASS original-collections-initially-lazy\nPASS original-batch32-one-additional-query",
+    "proofOpen": false,
+    "sql": "batchRootSql · 바인딩값 미기록batchRootSql[0]select po1_0.id,po1_0.version from PurchaseOrder po1_0 order by po1_0.idbatchCollectionSql · 바인딩값 미기록batchCollectionSql[0]select l1_0.order_id,l1_0.id,l1_0.quantity from order_line l1_0 where l1_0.order_id in (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) order by l1_0.id",
+    "stage": "fetch-batch",
+    "title": "root1 + batch collection1",
+    "topic": "fetch",
+    "values": "원문 모델PurchaseOrder 3개 / OrderLine 총 6개초기 컬렉션세 부모 모두 미초기화원문 설정@BatchSize(size=32) 유지접근별 추가 SQL 누계order1: 1 / order2: 1 / order3: 1총 ORM SQLroot SELECT 1 + batch SELECT 1 = 2",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "List<PurchaseOrder> fetched = readService.findOrdersWithLines();\n// 원문 HQL: select distinct o from PurchaseOrder o left join fetch o.lines order by o.id",
+    "image": "../design/s09-2026-10-20/images/S09-fetch-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS original-read-service-one-query\nPASS original-fetchjoin-access-no-extra-query\nPASS fetchjoin-six-jdbc-rows-not-three",
+    "proofOpen": false,
+    "sql": "originalFetchJoinSql · 바인딩값 미기록originalFetchJoinSql[0]select distinct po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.idfetchJoinAccessSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "fetch-join",
+    "title": "fetch join: 부모3·별도 재실행 행6",
+    "topic": "fetch",
+    "values": "ORM 반환 부모 / 총 자식3 / 6fetch join SQL / 접근 추가 SQL1 / 0별도 JDBC SQL 재실행 행 수6 · Hibernate wire 행 수 계측 아님원문 서비스 호출 방식직접 Java · 수동 transaction · Spring 프록시 아님",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "EntityGraph<PurchaseOrder> graph = em.createEntityGraph(PurchaseOrder.class);\ngraph.addAttributeNodes(\"lines\");\nem.createQuery(\"select o from PurchaseOrder o order by o.id\", PurchaseOrder.class)\n    .setHint(\"jakarta.persistence.fetchgraph\", graph).getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-fetch-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS extra-fetchgraph-one-query-here",
+    "proofOpen": false,
+    "sql": "extraFetchGraphSql · 바인딩값 미기록extraFetchGraphSql[0]select po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.id",
+    "stage": "fetch-graph",
+    "title": "추가 fetch graph도 이 조건에서1",
+    "topic": "fetch",
+    "values": "추가 조회 설정jakarta.persistence.fetchgraph · lines부모 / 자식3 / 6실측 ORM SQL1 · 이 fixture 조건의 관측",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "new OrderService(em).addLine(1L, 99);\n// 원문 메서드 내부\norder.addLine(new OrderLine(quantity));\nentityManager.flush();",
+    "image": "../design/s09-2026-10-20/images/S09-service-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS original-service-direct-java-add-and-flush",
+    "proofOpen": false,
+    "sql": "originalAddLineServiceSql · 바인딩값 미기록originalAddLineServiceSql[0]insert into order_line (order_id,quantity,id) values (?,?,default)",
+    "stage": "service-source-add",
+    "title": "원문 addLine: 자식2에서3",
+    "topic": "service",
+    "values": "원문 모델PurchaseOrder id1 / OrderLine메모리 자식 수 전 → 후2 → 3flush 뒤 부모 version0실측 SQLorder_line INSERT 1문장실험 종료수동 transaction rollback",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "PurchaseOrder closed = em.find(PurchaseOrder.class, 1L);\nem.close();\nclosed.getLines().size();",
+    "image": "../design/s09-2026-10-20/images/S09-service-v2.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS original-closed-collection-starts-lazy\nPASS original-closed-collection-lazy-fails\nPASS closed-lazy-emits-no-query",
+    "proofOpen": false,
+    "sql": "closedLazyFailureSql · 바인딩값 미기록이 구간에서 기록한 SQL 없음",
+    "stage": "service-closed-lazy",
+    "title": "닫힌 뒤 컬렉션은 초기화 실패",
+    "topic": "service",
+    "values": "초기 컬렉션미초기화접근 시점EntityManager 종료 뒤실측 예외org.hibernate.LazyInitializationException실패 구간 추가 SQL0DB 행 관찰이 실패 구간에서는 미측정",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "ProbePost pa = a.find(ProbePost.class, 42L);\nProbePost pb = b.find(ProbePost.class, 42L);",
+    "image": "../design/s09-2026-10-20/images/S09-lock.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS two-contexts-read-version-zero",
+    "proofOpen": false,
+    "sql": "lockBothReadsSql · 바인딩값 미기록lockBothReadsSql[0]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0 where pp1_0.id=?lockBothReadsSql[1]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0 where pp1_0.id=?",
+    "stage": "lock-reads",
+    "title": "두 컨텍스트가 각각 version0",
+    "topic": "lock",
+    "values": "A Java / loadedState첫 글·version0 / 첫 글·version0B Java / loadedState첫 글·version0 / 첫 글·version0객체 동일성pa != pb별도 초기 DBs09_lock · id42 / 첫 글 / version0",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "pa.setTitle(\"A 수정\");\na.getTransaction().commit();",
+    "image": "../design/s09-2026-10-20/images/S09-lock.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS lock-a-commit-version-one",
+    "proofOpen": false,
+    "sql": "lockACommitSql · 바인딩값 미기록lockACommitSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "lock-a-commit",
+    "title": "A가 먼저 version1로 commit",
+    "topic": "lock",
+    "values": "A 변경 입력A 수정A commit 뒤 DB version1B가 읽어 둔 version0A 구간 ORM SQLversion 조건 UPDATE 1문장",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "pb.setTitle(\"B 수정\");\nb.flush();\n// 예외 뒤 B transaction rollback",
+    "image": "../design/s09-2026-10-20/images/S09-lock.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS stale-version-flush-rejected\nPASS stale-update-does-not-overwrite-a",
+    "proofOpen": false,
+    "sql": "lockBFailureSql · 바인딩값 미기록lockBFailureSql[0]update probe_post set title=?,version=? where id=? and version=?",
+    "stage": "lock-b-failure",
+    "title": "B의 오래된 version은 거부",
+    "topic": "lock",
+    "values": "B 입력 / 읽은 versionB 수정 / 0실측 예외jakarta.persistence.OptimisticLockExceptionDB 최종 관찰id42 / A 수정 / version1실패 SQLUPDATE ... WHERE id=? AND version=?",
+    "zoom": "true",
+    "failures": []
+  },
+  {
+    "viewport": "390x844",
+    "code": "p.setTitle(\"쿼리 전 변경\");\n// em.getFlushMode() == FlushModeType.AUTO",
+    "image": "../design/s09-2026-10-20/images/S09-auto-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS default-flush-mode-auto",
+    "proofOpen": false,
+    "sql": "",
+    "stage": "auto-changed",
+    "title": "기본 AUTO에서 제목 변경",
+    "topic": "auto",
+    "values": "Java id / title / version42 / 쿼리 전 변경 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0기본 flush modeAUTO",
+    "zoom": "true",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.createQuery(\"select o from PurchaseOrder o\", PurchaseOrder.class).getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-auto-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS unrelated-query-no-post-update",
+    "proofOpen": false,
+    "sql": "autoUnrelatedQuerySql · 바인딩값 미기록autoUnrelatedQuerySql[0]select po1_0.id,po1_0.version from PurchaseOrder po1_0",
+    "stage": "auto-unrelated",
+    "title": "무관한 PurchaseOrder 조회",
+    "topic": "auto",
+    "values": "Java id / title / version42 / 쿼리 전 변경 / 0em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=첫 글 / version=0이번 SQLPurchaseOrder SELECT 1 · probe_post UPDATE 없음",
+    "zoom": "true",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "390x844",
+    "code": "em.createQuery(\"select p from ProbePost p\", ProbePost.class).getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-auto-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS overlap-auto-update-before-select\nPASS auto-flush-still-not-commit",
+    "proofOpen": false,
+    "sql": "autoOverlappingQuerySql · 바인딩값 미기록autoOverlappingQuerySql[0]update probe_post set title=?,version=? where id=? and version=?autoOverlappingQuerySql[1]select pp1_0.id,pp1_0.title,pp1_0.version from probe_post pp1_0",
+    "stage": "auto-overlap",
+    "title": "겹치는 ProbePost 조회 전 UPDATE",
+    "topic": "auto",
+    "values": "Java id / title / version42 / 쿼리 전 변경 / 1em.containstrueHibernate EntryMANAGEDHibernate loadedStatetitle=쿼리 전 변경 / version=1관측 SQL 순서probe_post UPDATE → probe_post SELECT별도 observer DB title첫 글 · AUTO flush도 commit 아님",
+    "zoom": "true",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "390x844",
+    "code": "query.setMaxResults(1);\n// 두 번째 독립 변형에는 다음도 설정\nquery.setFirstResult(0);\nList<PurchaseOrder> actual = query.getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-pagination-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS pagination-fetch-api-max1-one-statement-observed\nPASS pagination-fetch-api-max1-configured-max-one\nPASS pagination-fetch-api-first0-max1-one-statement-observed\nPASS pagination-fetch-api-first0-max1-configured-max-one",
+    "proofOpen": false,
+    "sql": "fetch-api-max1Sql · 바인딩값 미기록fetch-api-max1Sql[0]select distinct po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.idfetch-api-first0-max1Sql · 바인딩값 미기록fetch-api-first0-max1Sql[0]select distinct po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.id",
+    "stage": "pagination-api",
+    "title": "API max1인데 부모3개 관측",
+    "topic": "pagination",
+    "values": "검사한 두 변형fetch-api-max1 / fetch-api-first0-max1API 설정 max / first1 / 0 · 두 변형 모두실제 부모 IDs / 자식 수[1,2,3] / [2,2,2]별도 JDBC 재실행 행 수6 / 6판정 범위설정·관측 검증 · 정확성 통과 아님",
+    "zoom": "true",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "390x844",
+    "code": "query.setMaxResults(1);\nquery.setHint(\"org.hibernate.limitInMemory\", true);\nList<PurchaseOrder> actual = query.getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-pagination-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS pagination-fetch-memory-hint-max1-one-statement-observed\nPASS pagination-fetch-memory-hint-max1-configured-max-one",
+    "proofOpen": false,
+    "sql": "fetch-memory-hint-max1Sql · 바인딩값 미기록fetch-memory-hint-max1Sql[0]select distinct po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from PurchaseOrder po1_0 left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.id",
+    "stage": "pagination-memory",
+    "title": "명시 memory hint는 부모1·raw6",
+    "topic": "pagination",
+    "values": "추가 hintorg.hibernate.limitInMemory=trueAPI 설정 max / first1 / 0실제 부모 IDs / 자식 수[1] / [2]별도 JDBC 재실행 행 수6해석 한계hint 사용 권고·성능 측정 아님",
+    "zoom": "true",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "390x844",
+    "code": "TypedQuery<PurchaseOrder> query = pageEm.createQuery(\n    fetchHql + \" limit 1\", PurchaseOrder.class);\nList<PurchaseOrder> actual = query.getResultList();",
+    "image": "../design/s09-2026-10-20/images/S09-pagination-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS pagination-fetch-hql-limit1-one-statement-observed",
+    "proofOpen": false,
+    "sql": "fetch-hql-limit1Sql · 바인딩값 미기록fetch-hql-limit1Sql[0]select po1_0.id,l1_0.order_id,l1_0.id,l1_0.quantity,po1_0.version from (select distinct po1_0.id,po1_0.version from PurchaseOrder po1_0 order by po1_0.id fetch first 1 rows only) po1_0(id,version) left join order_line l1_0 on po1_0.id=l1_0.order_id order by po1_0.id,l1_0.id",
+    "stage": "pagination-hql",
+    "title": "HQL inline limit는 부모1·raw2",
+    "topic": "pagination",
+    "values": "제한 표현HQL inline limit 1 · API max 미설정API getMaxResults / first2147483647 / 0실제 부모 IDs / 자식 수[1] / [2]별도 JDBC 재실행 행 수2해석 한계다른 런타임·MySQL·업그레이드 결과 아님",
+    "zoom": "true",
+    "failures": [],
+    "finalImageRechecked": true
+  },
+  {
+    "viewport": "390x844",
+    "code": "TypedQuery<PurchaseOrder> query = pageEm.createQuery(\n    \"select o from PurchaseOrder o order by o.id\", PurchaseOrder.class);\nquery.setMaxResults(1);",
+    "image": "../design/s09-2026-10-20/images/S09-pagination-v3.png",
+    "natural": [
+      1672,
+      941
+    ],
+    "pageOverflow": false,
+    "passes": "PASS pagination-plain-root-api-max1-one-statement-observed\nPASS pagination-plain-root-api-max1-configured-max-one\nPASS pagination-plain-root-control-one-parent",
+    "proofOpen": false,
+    "sql": "plain-root-api-max1Sql · 바인딩값 미기록plain-root-api-max1Sql[0]select po1_0.id,po1_0.version from PurchaseOrder po1_0 order by po1_0.id fetch first ? rows only",
+    "stage": "pagination-root",
+    "title": "plain root 대조군은 부모1·raw1",
+    "topic": "pagination",
+    "values": "대조군plain-root-api-max1 · collection fetch 없음실제 부모 IDs[1]별도 JDBC 재실행유일한 limit 파라미터 1 → 1 바인딩 · 1행컬렉션 크기이 대조군에서는 미측정관측 해석원인·upstream 수정 여부 미확인",
+    "zoom": "true",
+    "failures": [],
+    "finalImageRechecked": true
+  }
+]

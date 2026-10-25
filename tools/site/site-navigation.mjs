@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { CORE_UNITS, DOMAINS } from './concept-curriculum.mjs';
 
 export const siteDestinations = [
   { label: '홈', target: 'index.html', description: '오늘 할 일과 과정의 전체 흐름을 확인합니다.' },
@@ -34,12 +35,19 @@ export function renderSectionNavigation(sourcePath) {
     '45일 과정':courseDestinations,
     '서비스 만들기':[{label:'서비스 만들기',target:'scenario/README.html'},{label:'구현 티켓',target:'tickets/README.html'}],
     '실전 미션':[{label:'미션 목록',target:'practice/MISSIONS.html'}],
-    '개념 학습':[{label:'개념 목록',target:'docs/knowledge/README.html'},{label:'레슨',target:'lessons/README.html'}],
+    '개념 학습':[
+      {label:'개념 목록',target:'docs/knowledge/README.html'},
+      ...DOMAINS.map(({id,label})=>({label,target:`docs/knowledge/README.html#kc-category-${id}`})),
+      ...CORE_UNITS.map(({id,title})=>({label:`${id} · ${title}`,target:`lessons/concept-core.html?unit=${id}`})),
+      {label:'레슨',target:'lessons/README.html'},
+    ],
   };
   const entries=groups[current]||siteDestinations;
   const target=sourcePath.replace(/\.md$/,'.html');
   const exact=entries.find(e=>e.target===target);
-  const active=exact || [...entries].sort((a,b)=>b.target.length-a.target.length).find(e=>target.startsWith(path.posix.dirname(e.target)+'/'));
+  const baseTarget=value=>value.split(/[?#]/)[0];
+  const coreDefault=target==='lessons/concept-core.html' ? entries.find(e=>e.target==='lessons/concept-core.html?unit=C01') : null;
+  const active=exact || coreDefault || entries.filter(e=>e.target===baseTarget(e.target)).sort((a,b)=>b.target.length-a.target.length).find(e=>target.startsWith(path.posix.dirname(e.target)+'/'));
   return `<p class="page-sidebar-caption">${current||'학습 안내'}</p><nav class="section-navigation" aria-label="${current||'학습'} 영역">${entries.map(e=>`<a href="${path.posix.relative(path.posix.dirname(sourcePath),e.target)}"${e===active?' aria-current="page"':''}>${e.label}</a>`).join('')}</nav>`;
 }
 

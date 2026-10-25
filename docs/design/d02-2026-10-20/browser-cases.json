@@ -1,0 +1,1961 @@
+[
+  {
+    "id": "url",
+    "question": "URL의 어떤 부분이 HTTP 요청에 실릴까요?",
+    "source": "추가 Python URL parser + 별도 실제 loopback TLS 요청",
+    "sourceNote": "api.example.com URL은 parser 입력일 뿐 해당 호스트에 요청하지 않았습니다. 실제 요청은 추가 client serializer가 d02.test loopback proxy에 보낸 별도 사례이며 브라우저 캡처가 아닙니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "url-parts",
+        "title": "URL의 여섯 구성요소",
+        "lead": "원문의 예시 URL을 Python으로 나눴습니다. 포트8443은 이 문자열의 값이며 실제 앱의 listen port가 아닙니다.",
+        "code": "    u=urlsplit('https://api.example.com:8443/orders/42?expand=items#history')",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "scheme / host / port",
+            "https / api.example.com / 8443"
+          ],
+          [
+            "path / query",
+            "/orders/42 / expand=items"
+          ],
+          [
+            "fragment",
+            "history"
+          ],
+          [
+            "example.com 실제 요청",
+            "없음 · parser 입력만"
+          ]
+        ],
+        "checks": [
+          "extra-url-parts-are-separate"
+        ],
+        "runKeys": [
+          "facts.extra-url-parts-are-separate"
+        ],
+        "image": "D02-url",
+        "asset": {
+          "file": "url.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "URL의 어떤 부분이 HTTP 요청에 실릴까요?",
+          "focus": {
+            "url-parts": [
+              1,
+              20,
+              56,
+              69
+            ],
+            "url-target": [
+              59,
+              20,
+              40,
+              69
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-url-parts-are-separate",
+            {
+              "scheme": "https",
+              "host": "api.example.com",
+              "port": 8443,
+              "path": "/orders/42",
+              "query": "expand=items",
+              "fragment": "history",
+              "scope": "Python URL parser; no request to example.com"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "url-target",
+        "title": "fragment는 request target에서 제외",
+        "lead": "별도 Python serializer는 path와 query로 target을 만들었습니다. 실제 TLS proxy가 받은 target에는 #history가 없었습니다.",
+        "code": "    target=target_url.path+('?'+target_url.query if target_url.query else '')",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "clientFragment",
+            "history"
+          ],
+          [
+            "observedRequestTarget",
+            "/api/probe?expand=items"
+          ],
+          [
+            "실제 요청 범위",
+            "추가 loopback TLS · d02.test"
+          ]
+        ],
+        "checks": [
+          "extra-client-fragment-not-sent-over-http"
+        ],
+        "runKeys": [
+          "facts.extra-client-fragment-not-sent-over-http"
+        ],
+        "image": "D02-url",
+        "asset": {
+          "file": "url.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "URL의 어떤 부분이 HTTP 요청에 실릴까요?",
+          "focus": {
+            "url-parts": [
+              1,
+              20,
+              56,
+              69
+            ],
+            "url-target": [
+              59,
+              20,
+              40,
+              69
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-client-fragment-not-sent-over-http",
+            {
+              "clientFragment": "history",
+              "observedRequestTarget": "/api/probe?expand=items",
+              "scope": "additional Python client serializer and actual loopback TLS request, not browser capture"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dns",
+    "question": "DNS의 주소·이름·오류 응답은 무엇이 다를까요?",
+    "source": "추가 고정 UDP DNS fixture",
+    "sourceNote": "local toy responder와 client의 DNS packet 실험입니다. documentation IP이며 실제 resolver·Root/TLD·OS DNS·해당 주소 HTTP 생존 검증은 아닙니다. TTL60도 이 고정 응답의 값입니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "dns-a",
+        "title": "A는 IPv4 주소 응답",
+        "lead": "추가 responder가 A 요청에 documentation IPv4 하나를 답했습니다. DNS 응답 성공이 HTTP 성공을 뜻하지 않습니다.",
+        "code": "if kind==1:data=ipaddress.ip_address('203.0.113.10').packed",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "A value",
+            "203.0.113.10"
+          ],
+          [
+            "rcode / answers / ttl",
+            "0 / 1 / 60"
+          ]
+        ],
+        "checks": [
+          "extra-dns-udp-address-records"
+        ],
+        "runKeys": [
+          "facts.extra-dns-udp-address-records"
+        ],
+        "image": "D02-dns",
+        "asset": {
+          "file": "dns-v2.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "DNS의 주소·이름·오류 응답은 무엇이 다를까요?",
+          "focus": {
+            "dns-a": [
+              1,
+              58,
+              19,
+              39
+            ],
+            "dns-aaaa": [
+              21,
+              58,
+              19,
+              39
+            ],
+            "dns-cname": [
+              41,
+              58,
+              19,
+              39
+            ],
+            "dns-errors": [
+              60,
+              58,
+              39,
+              39
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-dns-udp-address-records",
+            {
+              "A": {
+                "rcode": 0,
+                "answers": 1,
+                "value": "203.0.113.10",
+                "ttl": 60
+              },
+              "AAAA": {
+                "rcode": 0,
+                "answers": 1,
+                "value": "2001:db8::10",
+                "ttl": 60
+              },
+              "scope": "local fixed UDP DNS fixture; documentation IPs, not real resolver or HTTP health"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "dns-aaaa",
+        "title": "AAAA는 IPv6 주소 응답",
+        "lead": "같은 고정 UDP fixture의 AAAA 응답은 documentation IPv6입니다. 이 주소로 연결하지 않았습니다.",
+        "code": "elif kind==28:data=ipaddress.ip_address('2001:db8::10').packed",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "AAAA value",
+            "2001:db8::10"
+          ],
+          [
+            "rcode / answers / ttl",
+            "0 / 1 / 60"
+          ]
+        ],
+        "checks": [
+          "extra-dns-udp-address-records"
+        ],
+        "runKeys": [
+          "facts.extra-dns-udp-address-records"
+        ],
+        "image": "D02-dns",
+        "asset": {
+          "file": "dns-v2.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "DNS의 주소·이름·오류 응답은 무엇이 다를까요?",
+          "focus": {
+            "dns-a": [
+              1,
+              58,
+              19,
+              39
+            ],
+            "dns-aaaa": [
+              21,
+              58,
+              19,
+              39
+            ],
+            "dns-cname": [
+              41,
+              58,
+              19,
+              39
+            ],
+            "dns-errors": [
+              60,
+              58,
+              39,
+              39
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-dns-udp-address-records",
+            {
+              "A": {
+                "rcode": 0,
+                "answers": 1,
+                "value": "203.0.113.10",
+                "ttl": 60
+              },
+              "AAAA": {
+                "rcode": 0,
+                "answers": 1,
+                "value": "2001:db8::10",
+                "ttl": 60
+              },
+              "scope": "local fixed UDP DNS fixture; documentation IPs, not real resolver or HTTP health"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "dns-cname",
+        "title": "CNAME은 이름 답 · redirect 아님",
+        "lead": "추가 CNAME packet은 origin.d02.test라는 이름을 답했습니다. alias나 target으로 HTTP 요청·redirect를 실행하지 않았습니다.",
+        "code": "elif kind==5:data=wire_name('origin.d02.test')",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "CNAME value",
+            "origin.d02.test"
+          ],
+          [
+            "rcode / answers / ttl",
+            "0 / 1 / 60"
+          ],
+          [
+            "httpRedirectExecuted",
+            "false"
+          ]
+        ],
+        "checks": [
+          "extra-dns-cname-is-name-answer"
+        ],
+        "runKeys": [
+          "facts.extra-dns-cname-is-name-answer"
+        ],
+        "image": "D02-dns",
+        "asset": {
+          "file": "dns-v2.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "DNS의 주소·이름·오류 응답은 무엇이 다를까요?",
+          "focus": {
+            "dns-a": [
+              1,
+              58,
+              19,
+              39
+            ],
+            "dns-aaaa": [
+              21,
+              58,
+              19,
+              39
+            ],
+            "dns-cname": [
+              41,
+              58,
+              19,
+              39
+            ],
+            "dns-errors": [
+              60,
+              58,
+              39,
+              39
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-dns-cname-is-name-answer",
+            {
+              "CNAME": {
+                "rcode": 0,
+                "answers": 1,
+                "value": "origin.d02.test",
+                "ttl": 60
+              },
+              "httpRedirectExecuted": false,
+              "scope": "DNS packet only; no HTTP connection to alias/target"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "dns-errors",
+        "title": "NXDOMAIN3과 SERVFAIL2",
+        "lead": "의도적으로 고정한 두 오류 응답의 rcode는 다릅니다. 외부 DNS 장애를 관측한 실험이 아닙니다.",
+        "code": "rcode=3 if name=='missing.d02.test'else 2 if name=='broken.d02.test'else 0",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "NXDOMAIN rcode / answers",
+            "3 / 0"
+          ],
+          [
+            "SERVFAIL rcode / answers",
+            "2 / 0"
+          ],
+          [
+            "두 응답 value / ttl",
+            "null / null"
+          ]
+        ],
+        "checks": [
+          "extra-dns-negative-rcodes-differ"
+        ],
+        "runKeys": [
+          "facts.extra-dns-negative-rcodes-differ"
+        ],
+        "image": "D02-dns",
+        "asset": {
+          "file": "dns-v2.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "DNS의 주소·이름·오류 응답은 무엇이 다를까요?",
+          "focus": {
+            "dns-a": [
+              1,
+              58,
+              19,
+              39
+            ],
+            "dns-aaaa": [
+              21,
+              58,
+              19,
+              39
+            ],
+            "dns-cname": [
+              41,
+              58,
+              19,
+              39
+            ],
+            "dns-errors": [
+              60,
+              58,
+              39,
+              39
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-dns-negative-rcodes-differ",
+            {
+              "NXDOMAIN": {
+                "rcode": 3,
+                "answers": 0,
+                "value": null,
+                "ttl": null
+              },
+              "SERVFAIL": {
+                "rcode": 2,
+                "answers": 0,
+                "value": null,
+                "ttl": null
+              },
+              "scope": "two intentionally fixed fixture responses; no external DNS failure"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cache",
+    "question": "TTL cache가 있으면 매번 조회할까요?",
+    "source": "추가 fixed-clock cache model",
+    "sourceNote": "실제 OS·브라우저·재귀 resolver cache 관측이 아닙니다. 모델 시각0/30/60과 TTL60으로 hit 조건만 계산했습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "cache-miss",
+        "title": "t0: cache miss",
+        "lead": "모델은 저장된 만료 시각이 없는 첫 시각0에서 miss를 기록합니다. 실제 DNS packet을 이 장면마다 보내는 것이 아닙니다.",
+        "code": "    hit=cache_expires is not None and model_now<cache_expires\n    cache_hits.append(hit)\n    if not hit:cache_queries+=1;cache_expires=model_now+60",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "모델 시각 / TTL",
+            "0 / 60"
+          ],
+          [
+            "모델 hit",
+            "false"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.dns-cache"
+        ],
+        "image": "D02-cache",
+        "asset": {
+          "file": "cache.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "TTL cache가 있으면 매번 조회할까요?",
+          "focus": {
+            "cache-miss": [
+              1,
+              19,
+              33,
+              60
+            ],
+            "cache-hit": [
+              34,
+              19,
+              33,
+              60
+            ],
+            "cache-expired": [
+              67,
+              19,
+              32,
+              60
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "models.dns-cache",
+            {
+              "kind": "added fixed-clock cache model",
+              "ttl": 60,
+              "times": [
+                0,
+                30,
+                60
+              ],
+              "hit": [
+                false,
+                true,
+                false
+              ],
+              "queries": 2,
+              "scope": "not OS/browser/recursive resolver cache observation"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "cache-hit",
+        "title": "t30: 유효해서 hit",
+        "lead": "고정 시각30은 기존 만료 시각60보다 작으므로 모델 hit입니다.",
+        "code": "    hit=cache_expires is not None and model_now<cache_expires\n    cache_hits.append(hit)\n    if not hit:cache_queries+=1;cache_expires=model_now+60",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "모델 시각",
+            "30"
+          ],
+          [
+            "모델 hit",
+            "true"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.dns-cache"
+        ],
+        "image": "D02-cache",
+        "asset": {
+          "file": "cache.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "TTL cache가 있으면 매번 조회할까요?",
+          "focus": {
+            "cache-miss": [
+              1,
+              19,
+              33,
+              60
+            ],
+            "cache-hit": [
+              34,
+              19,
+              33,
+              60
+            ],
+            "cache-expired": [
+              67,
+              19,
+              32,
+              60
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "models.dns-cache",
+            {
+              "kind": "added fixed-clock cache model",
+              "ttl": 60,
+              "times": [
+                0,
+                30,
+                60
+              ],
+              "hit": [
+                false,
+                true,
+                false
+              ],
+              "queries": 2,
+              "scope": "not OS/browser/recursive resolver cache observation"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "cache-expired",
+        "title": "t60: 경계에서는 miss",
+        "lead": "hit 조건은 now < expires입니다. 시각60은 경계에 닿아 miss이며 전체 모델 조회 수는2입니다.",
+        "code": "    hit=cache_expires is not None and model_now<cache_expires\n    cache_hits.append(hit)\n    if not hit:cache_queries+=1;cache_expires=model_now+60",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "모델 시각",
+            "60"
+          ],
+          [
+            "모델 hit",
+            "false"
+          ],
+          [
+            "전체 모델 queries",
+            "2"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.dns-cache"
+        ],
+        "image": "D02-cache",
+        "asset": {
+          "file": "cache.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "TTL cache가 있으면 매번 조회할까요?",
+          "focus": {
+            "cache-miss": [
+              1,
+              19,
+              33,
+              60
+            ],
+            "cache-hit": [
+              34,
+              19,
+              33,
+              60
+            ],
+            "cache-expired": [
+              67,
+              19,
+              32,
+              60
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "models.dns-cache",
+            {
+              "kind": "added fixed-clock cache model",
+              "ttl": 60,
+              "times": [
+                0,
+                30,
+                60
+              ],
+              "hit": [
+                false,
+                true,
+                false
+              ],
+              "queries": 2,
+              "scope": "not OS/browser/recursive resolver cache observation"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "socket",
+    "question": "bind·TCP 연결·HTTP 응답은 같은 상태일까요?",
+    "source": "추가 own loopback socket 관측",
+    "sourceNote": "현재 OS의 own socket 실험입니다. bind-only 관측은 timeout이었으며 refused를 실측하지 않았습니다. timeout 단독으로 firewall·경로·패킷손실·지연 원인을 확정할 수 없습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "socket-bound",
+        "title": "bind했지만 아직 listen하지 않음",
+        "lead": "자체 port0 socket을 bind하고 listen 전 연결을 시도했습니다. 이 OS에서 timeout을 관측했습니다.",
+        "code": "        listener.bind(('127.0.0.1',0));testport=listener.getsockname()[1];failure=None\n        try:socket.create_connection(('127.0.0.1',testport),timeout=1).close()\n        except OSError as e:failure='timeout'if isinstance(e,socket.timeout)else errno.errorcode.get(e.errno,type(e).__name__)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "bound / listening",
+            "true / false"
+          ],
+          [
+            "observedFailure",
+            "timeout"
+          ],
+          [
+            "해석 한계",
+            "이 OS·이 own socket 관측 · 보편 원인 아님"
+          ]
+        ],
+        "checks": [
+          "extra-bound-without-listen-no-tcp-connection"
+        ],
+        "runKeys": [
+          "facts.extra-bound-without-listen-no-tcp-connection"
+        ],
+        "image": "D02-socket",
+        "asset": {
+          "file": "socket.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "bind·TCP 연결·HTTP 응답은 같은 상태일까요?",
+          "focus": {
+            "socket-bound": [
+              1,
+              11,
+              32,
+              84
+            ],
+            "socket-listen": [
+              34,
+              11,
+              32,
+              84
+            ],
+            "socket-silent": [
+              67,
+              11,
+              32,
+              84
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-bound-without-listen-no-tcp-connection",
+            {
+              "bound": true,
+              "listening": false,
+              "observedFailure": "timeout",
+              "scope": "this OS/own bound socket; no universal refused-vs-timeout or firewall diagnosis"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "socket-listen",
+        "title": "listen 뒤 TCP 연결 · HTTP는 없음",
+        "lead": "같은 own socket이 listen하고 accept한 TCP 연결은 성공했습니다. HTTP handler를 두지 않아 HTTP 응답을 관측하지 않았습니다.",
+        "code": "        listener.listen(1)\n        with socket.create_connection(('127.0.0.1',testport),timeout=1)as client:\n            accepted,_=listener.accept();accepted.close()",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "tcpConnected",
+            "true"
+          ],
+          [
+            "httpResponseObserved",
+            "false"
+          ]
+        ],
+        "checks": [
+          "extra-listen-accepts-tcp-not-http"
+        ],
+        "runKeys": [
+          "facts.extra-listen-accepts-tcp-not-http"
+        ],
+        "image": "D02-socket",
+        "asset": {
+          "file": "socket.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "bind·TCP 연결·HTTP 응답은 같은 상태일까요?",
+          "focus": {
+            "socket-bound": [
+              1,
+              11,
+              32,
+              84
+            ],
+            "socket-listen": [
+              34,
+              11,
+              32,
+              84
+            ],
+            "socket-silent": [
+              67,
+              11,
+              32,
+              84
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-listen-accepts-tcp-not-http",
+            {
+              "tcpConnected": true,
+              "httpResponseObserved": false,
+              "scope": "same own socket after listen; no HTTP handler"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "socket-silent",
+        "title": "연결 뒤 무응답도 read deadline",
+        "lead": "별도 서버가 의도적으로 아무 byte도 보내지 않았습니다. 연결은 됐지만 client의 설정된 read deadline에 닿았습니다.",
+        "code": "                client.settimeout(.2);timed_out=False\n                try:client.recv(1)\n                except socket.timeout:timed_out=True",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "tcpConnected / applicationSentBytes",
+            "true / 0"
+          ],
+          [
+            "readDeadlineReached",
+            "true"
+          ],
+          [
+            "configuredReadDeadlineSeconds",
+            "0.2 · 설정값이며 지연 실측 아님"
+          ]
+        ],
+        "checks": [
+          "extra-connected-read-deadline-not-firewall-proof"
+        ],
+        "runKeys": [
+          "facts.extra-connected-read-deadline-not-firewall-proof"
+        ],
+        "image": "D02-socket",
+        "asset": {
+          "file": "socket.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "bind·TCP 연결·HTTP 응답은 같은 상태일까요?",
+          "focus": {
+            "socket-bound": [
+              1,
+              11,
+              32,
+              84
+            ],
+            "socket-listen": [
+              34,
+              11,
+              32,
+              84
+            ],
+            "socket-silent": [
+              67,
+              11,
+              32,
+              84
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-connected-read-deadline-not-firewall-proof",
+            {
+              "tcpConnected": true,
+              "applicationSentBytes": 0,
+              "readDeadlineReached": true,
+              "configuredReadDeadlineSeconds": 0.2,
+              "scope": "server deliberately silent; no latency or packet-loss measurement"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "tls",
+    "question": "인증서가 맞지 않으면 HTTP handler까지 갈까요?",
+    "source": "추가 새 CA·leaf / 검증 활성 loopback TLS",
+    "sourceNote": "새 demo CA는 이 client context에서만 신뢰했습니다. OS·브라우저 truststore는 바꾸지 않았고 인증서 검증을 끄지 않았습니다. 실제 외부 인증기관·서비스 시험은 아닙니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "tls-valid",
+        "title": "체인·이름 검증과 SNI",
+        "lead": "추가 TLS client는 demo CA로 검증했고 hostname과 관측 SNI가 d02.test였습니다. 인증서 수락 뒤 정상 응답을 얻었습니다.",
+        "code": "    trusted=ssl.create_default_context(cafile=str(run/'ca.pem'))",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "certificateAccepted",
+            "true"
+          ],
+          [
+            "hostname / sniObserved",
+            "d02.test / d02.test"
+          ],
+          [
+            "신뢰 범위",
+            "이 client context의 새 demo CA"
+          ]
+        ],
+        "checks": [
+          "extra-tls-valid-chain-name-and-sni"
+        ],
+        "runKeys": [
+          "facts.extra-tls-valid-chain-name-and-sni"
+        ],
+        "image": "D02-tls",
+        "asset": {
+          "file": "tls.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "인증서가 맞지 않으면 HTTP handler까지 갈까요?",
+          "focus": {
+            "tls-valid": [
+              1,
+              23,
+              33,
+              73
+            ],
+            "tls-wrong": [
+              35,
+              23,
+              32,
+              73
+            ],
+            "tls-untrusted": [
+              68,
+              23,
+              31,
+              73
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-tls-valid-chain-name-and-sni",
+            {
+              "certificateAccepted": true,
+              "hostname": "d02.test",
+              "sniObserved": "d02.test",
+              "scope": "fresh demo CA trusted only by this client context; no system trust change"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "tls-wrong",
+        "title": "이름이 다르면 거부 · handler 추가0",
+        "lead": "wrong.d02.test로 검증하는 추가 요청은 인증서 이름 검증에서 거부됐습니다. 뒤의 HTTP handler 호출은 늘지 않았습니다.",
+        "code": "    for id,host,ctx in [('extra-tls-wrong-name-rejected','wrong.d02.test',trusted),('extra-tls-untrusted-ca-rejected','d02.test',ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT))]:\n        rejected=False\n        try:https_get(host,'/api/probe',context=ctx)\n        except ssl.SSLCertVerificationError:rejected=True",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "certificateVerificationRejected",
+            "true"
+          ],
+          [
+            "httpHandlerCallsAdded",
+            "0"
+          ],
+          [
+            "검증 상태",
+            "계속 활성 · hostname 불일치"
+          ]
+        ],
+        "checks": [
+          "extra-tls-wrong-name-rejected"
+        ],
+        "runKeys": [
+          "facts.extra-tls-wrong-name-rejected"
+        ],
+        "image": "D02-tls",
+        "asset": {
+          "file": "tls.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "인증서가 맞지 않으면 HTTP handler까지 갈까요?",
+          "focus": {
+            "tls-valid": [
+              1,
+              23,
+              33,
+              73
+            ],
+            "tls-wrong": [
+              35,
+              23,
+              32,
+              73
+            ],
+            "tls-untrusted": [
+              68,
+              23,
+              31,
+              73
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-tls-wrong-name-rejected",
+            {
+              "certificateVerificationRejected": true,
+              "httpHandlerCallsAdded": 0,
+              "scope": "verification remains enabled; no HTTP after failed certificate validation"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "tls-untrusted",
+        "title": "CA를 신뢰하지 않아도 거부",
+        "lead": "demo CA를 신뢰하지 않는 별도 client context도 인증서를 거부했습니다. HTTP handler 추가 호출은0입니다.",
+        "code": "    for id,host,ctx in [('extra-tls-wrong-name-rejected','wrong.d02.test',trusted),('extra-tls-untrusted-ca-rejected','d02.test',ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT))]:\n        rejected=False\n        try:https_get(host,'/api/probe',context=ctx)\n        except ssl.SSLCertVerificationError:rejected=True",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "certificateVerificationRejected",
+            "true"
+          ],
+          [
+            "httpHandlerCallsAdded",
+            "0"
+          ],
+          [
+            "검증 상태",
+            "계속 활성 · untrusted CA"
+          ]
+        ],
+        "checks": [
+          "extra-tls-untrusted-ca-rejected"
+        ],
+        "runKeys": [
+          "facts.extra-tls-untrusted-ca-rejected"
+        ],
+        "image": "D02-tls",
+        "asset": {
+          "file": "tls.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "인증서가 맞지 않으면 HTTP handler까지 갈까요?",
+          "focus": {
+            "tls-valid": [
+              1,
+              23,
+              33,
+              73
+            ],
+            "tls-wrong": [
+              35,
+              23,
+              32,
+              73
+            ],
+            "tls-untrusted": [
+              68,
+              23,
+              31,
+              73
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-tls-untrusted-ca-rejected",
+            {
+              "certificateVerificationRejected": true,
+              "httpHandlerCallsAdded": 0,
+              "scope": "verification remains enabled; no HTTP after failed certificate validation"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "proxy",
+    "question": "앞단 TLS와 내부 HTTP·path는 어떻게 이어질까요?",
+    "source": "추가 Python TLS proxy → 원문 Boot 앱",
+    "sourceNote": "실제 Nginx·제품 LB는 실행하지 않았습니다. X-D02-Rewrite는 fixture 분기 제어일 뿐 Forwarded 신뢰 정책을 검증한 것이 아닙니다. 앞단 TLS와 upstream HTTP를 분리해 읽습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "proxy-termination",
+        "title": "TLS는 proxy에서 종료 · upstream HTTP",
+        "lead": "추가 proxy는 client TLS를 받아 원문 Boot 앱에 HTTP로 요청했습니다. 앞단 HTTPS가 내부 구간 TLS를 보장하지 않습니다.",
+        "code": "            rewrite=self.headers.get('X-D02-Rewrite','on')=='on'\n            target=self.path[4:]if rewrite and self.path.startswith('/api/')else self.path\n            status,body=http_get(port,target);payload=body.encode()",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "front / upstream",
+            "TLS / HTTP"
+          ],
+          [
+            "실제 proxy 종류",
+            "추가 Python proxy · Nginx 아님"
+          ]
+        ],
+        "checks": [
+          "extra-tls-termination-http-upstream-rewrite"
+        ],
+        "runKeys": [
+          "facts.extra-tls-termination-http-upstream-rewrite"
+        ],
+        "image": "D02-proxy",
+        "asset": {
+          "file": "proxy.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "앞단 TLS와 내부 HTTP·path는 어떻게 이어질까요?",
+          "focus": {
+            "proxy-termination": [
+              1,
+              15,
+              98,
+              30
+            ],
+            "proxy-rewrite": [
+              1,
+              46,
+              98,
+              21
+            ],
+            "proxy-no-rewrite": [
+              1,
+              68,
+              98,
+              20
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-tls-termination-http-upstream-rewrite",
+            {
+              "front": "TLS",
+              "upstream": "HTTP",
+              "request": {
+                "incoming": "/api/probe?expand=items",
+                "host": "d02.test",
+                "upstream": "/probe?expand=items",
+                "status": 200
+              },
+              "body": "ok",
+              "scope": "extra Python proxy to source Boot; not Nginx or production LB"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "proxy-rewrite",
+        "title": "/api를 뺀 upstream은200 ok",
+        "lead": "추가 rewrite 규칙이 /api/probe?expand=items를 /probe?expand=items로 바꿨고 원문 앱의200 ok가 돌아왔습니다.",
+        "code": "target=self.path[4:]if rewrite and self.path.startswith('/api/')else self.path",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "incoming",
+            "/api/probe?expand=items"
+          ],
+          [
+            "upstream",
+            "/probe?expand=items"
+          ],
+          [
+            "status / body",
+            "200 / ok"
+          ],
+          [
+            "관측 Host",
+            "d02.test"
+          ]
+        ],
+        "checks": [
+          "extra-tls-termination-http-upstream-rewrite"
+        ],
+        "runKeys": [
+          "facts.extra-tls-termination-http-upstream-rewrite"
+        ],
+        "image": "D02-proxy",
+        "asset": {
+          "file": "proxy.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "앞단 TLS와 내부 HTTP·path는 어떻게 이어질까요?",
+          "focus": {
+            "proxy-termination": [
+              1,
+              15,
+              98,
+              30
+            ],
+            "proxy-rewrite": [
+              1,
+              46,
+              98,
+              21
+            ],
+            "proxy-no-rewrite": [
+              1,
+              68,
+              98,
+              20
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-tls-termination-http-upstream-rewrite",
+            {
+              "front": "TLS",
+              "upstream": "HTTP",
+              "request": {
+                "incoming": "/api/probe?expand=items",
+                "host": "d02.test",
+                "upstream": "/probe?expand=items",
+                "status": 200
+              },
+              "body": "ok",
+              "scope": "extra Python proxy to source Boot; not Nginx or production LB"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "proxy-no-rewrite",
+        "title": "그대로 /api/probe를 보내면404",
+        "lead": "같은 TLS proxy·원문 앱에서 rewrite를 끄면 /api/probe가 그대로 전달돼404였습니다. TLS·DNS 오류가 아닙니다.",
+        "code": "    status,_=https_get('d02.test','/api/probe',rewrite=False)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "rewrite",
+            "false"
+          ],
+          [
+            "incoming / upstream",
+            "/api/probe / /api/probe"
+          ],
+          [
+            "status",
+            "404"
+          ]
+        ],
+        "checks": [
+          "extra-no-rewrite-reaches-source-404"
+        ],
+        "runKeys": [
+          "facts.extra-no-rewrite-reaches-source-404"
+        ],
+        "image": "D02-proxy",
+        "asset": {
+          "file": "proxy.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "앞단 TLS와 내부 HTTP·path는 어떻게 이어질까요?",
+          "focus": {
+            "proxy-termination": [
+              1,
+              15,
+              98,
+              30
+            ],
+            "proxy-rewrite": [
+              1,
+              46,
+              98,
+              21
+            ],
+            "proxy-no-rewrite": [
+              1,
+              68,
+              98,
+              20
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-no-rewrite-reaches-source-404",
+            {
+              "rewrite": false,
+              "request": {
+                "incoming": "/api/probe",
+                "host": "d02.test",
+                "upstream": "/api/probe",
+                "status": 404
+              },
+              "scope": "same proxy/source app; HTTP404 not a TLS or DNS error"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "app",
+    "question": "원문 컨트롤러에 실제로 닿으면 어떤 응답일까요?",
+    "source": "원문 ProbeApplication.java byte exact + 추가 실행 설정",
+    "sourceNote": "원문 Java는 수정하지 않았습니다. 실제 Java21.0.6·Boot4.1.1·Spring7.0.9·Tomcat11.0.24이며 loopback/port0 추가 인자로 실행했습니다. 원문 Java25·8080 설정 실행은 아닙니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "app-start",
+        "title": "원문 Java · 추가 loopback/port0",
+        "lead": "동일한 원문 Java를 추가 Java21 build에서 컴파일하고 private loopback 앱을 시작했습니다. port0은 OS에 빈 포트 배정을 요청한 설정값입니다.",
+        "code": "    boot=subprocess.Popen([str(JAVA/'bin/java'),'-cp',(project/'classpath.txt').read_text(),\n        'com.example.ProbeApplication','--server.address=127.0.0.1','--server.port=0',\n        '--spring.main.banner-mode=off'],cwd=run,stdout=boot_log,stderr=subprocess.STDOUT)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "sourceJavaByteExact",
+            "true"
+          ],
+          [
+            "Java / Boot",
+            "21.0.6 / 4.1.1"
+          ],
+          [
+            "boundAddress / 추가 server.port",
+            "127.0.0.1 / 0 · 배정 요청 설정"
+          ]
+        ],
+        "checks": [
+          "source-java-unchanged-real-boot-loopback"
+        ],
+        "runKeys": [
+          "facts.source-java-unchanged-real-boot-loopback"
+        ],
+        "image": "D02-app",
+        "asset": {
+          "file": "app-v2.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "원문 컨트롤러에 실제로 닿으면 어떤 응답일까요?",
+          "focus": {
+            "app-start": [
+              41,
+              17,
+              28,
+              77
+            ],
+            "app-probe": [
+              73,
+              18,
+              26,
+              23
+            ],
+            "app-missing": [
+              73,
+              43,
+              26,
+              21
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.source-java-unchanged-real-boot-loopback",
+            {
+              "sourceJavaByteExact": true,
+              "javaVersion": "21.0.6",
+              "bootVersion": "4.1.1",
+              "boundAddress": "127.0.0.1",
+              "scope": "source Java unchanged; extra Java21 Gradle/loopback port0 args, not source Java25/8080 setup"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "app-probe",
+        "title": "GET /probe → 200 ok",
+        "lead": "원문 @GetMapping(\"/probe\")의 실제 HTTP 응답은 status200·bodyok였습니다.",
+        "code": "    @GetMapping(\"/probe\")\n    String probe() { return \"ok\"; }",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "path",
+            "/probe"
+          ],
+          [
+            "실제 status / body",
+            "200 / ok"
+          ]
+        ],
+        "checks": [
+          "source-probe-real-tcp-200-ok"
+        ],
+        "runKeys": [
+          "facts.source-probe-real-tcp-200-ok"
+        ],
+        "image": "D02-app",
+        "asset": {
+          "file": "app-v2.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "원문 컨트롤러에 실제로 닿으면 어떤 응답일까요?",
+          "focus": {
+            "app-start": [
+              41,
+              17,
+              28,
+              77
+            ],
+            "app-probe": [
+              73,
+              18,
+              26,
+              23
+            ],
+            "app-missing": [
+              73,
+              43,
+              26,
+              21
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.source-probe-real-tcp-200-ok",
+            {
+              "status": 200,
+              "body": "ok",
+              "path": "/probe"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "app-missing",
+        "title": "매핑 없는 /not-mapped → 404",
+        "lead": "같은 private 앱에 실제 HTTP 요청이 닿았지만 해당 mapping이 없어404였습니다. 정상 서비스 전체의 도달 보장이 아니라 이 fixture 관측입니다.",
+        "code": "    status,_=http_get(port,'/not-mapped')",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "path",
+            "/not-mapped"
+          ],
+          [
+            "실제 status",
+            "404"
+          ],
+          [
+            "실패 계층",
+            "이 fixture의 HTTP mapping · DNS 실패 아님"
+          ]
+        ],
+        "checks": [
+          "source-missing-route-real-tcp-404"
+        ],
+        "runKeys": [
+          "facts.source-missing-route-real-tcp-404"
+        ],
+        "image": "D02-app",
+        "asset": {
+          "file": "app-v2.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "원문 컨트롤러에 실제로 닿으면 어떤 응답일까요?",
+          "focus": {
+            "app-start": [
+              41,
+              17,
+              28,
+              77
+            ],
+            "app-probe": [
+              73,
+              18,
+              26,
+              23
+            ],
+            "app-missing": [
+              73,
+              43,
+              26,
+              21
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.source-missing-route-real-tcp-404",
+            {
+              "status": 404,
+              "path": "/not-mapped",
+              "scope": "HTTP reached this fixture; not DNS failure"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "bind",
+    "question": "loopback과 wildcard bind가 외부 경로를 만들까요?",
+    "source": "실제 앱 loopback + 원문 bind 개념 모델",
+    "sourceNote": "wildcard bind·외부 도달·firewall·NAT 실험은 없습니다. 0.0.0.0는 bind 개념이며 브라우저 접속 목적지나 외부 허용 증거가 아닙니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "bind-loopback",
+        "title": "실제 앱은127.0.0.1에 bind",
+        "lead": "추가 실행 인자는 원문 앱을 loopback에만 bind했습니다. 외부 컴퓨터 도달 여부를 시험하지 않았습니다.",
+        "code": "'com.example.ProbeApplication','--server.address=127.0.0.1','--server.port=0',",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "실제 boundAddress",
+            "127.0.0.1"
+          ],
+          [
+            "외부 도달 실측",
+            "없음"
+          ]
+        ],
+        "checks": [
+          "source-java-unchanged-real-boot-loopback"
+        ],
+        "runKeys": [
+          "facts.source-java-unchanged-real-boot-loopback"
+        ],
+        "image": "D02-bind",
+        "asset": {
+          "file": "bind.png",
+          "width": 1672,
+          "height": 940,
+          "ready": true,
+          "alt": "loopback과 wildcard bind가 외부 경로를 만들까요?",
+          "focus": {
+            "bind-loopback": [
+              1,
+              15,
+              48,
+              59
+            ],
+            "bind-wildcard": [
+              50,
+              15,
+              49,
+              59
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.source-java-unchanged-real-boot-loopback",
+            {
+              "sourceJavaByteExact": true,
+              "javaVersion": "21.0.6",
+              "bootVersion": "4.1.1",
+              "boundAddress": "127.0.0.1",
+              "scope": "source Java unchanged; extra Java21 Gradle/loopback port0 args, not source Java25/8080 setup"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "bind-wildcard",
+        "title": "0.0.0.0는 모든 IPv4 로컬 인터페이스",
+        "lead": "원문 개념 모델은 wildcardIPv4를 구분하지만 외부 route·firewall 허용을 입증하지 않습니다. 이 설정을 실제 실행한 것이 아닙니다.",
+        "code": "server.address=0.0.0.0",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "모델 wildcardIPv4",
+            "0.0.0.0"
+          ],
+          [
+            "externalReachabilityProven",
+            "false · 원문 개념 모델"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.bind-and-route"
+        ],
+        "image": "D02-bind",
+        "asset": {
+          "file": "bind.png",
+          "width": 1672,
+          "height": 940,
+          "ready": true,
+          "alt": "loopback과 wildcard bind가 외부 경로를 만들까요?",
+          "focus": {
+            "bind-loopback": [
+              1,
+              15,
+              48,
+              59
+            ],
+            "bind-wildcard": [
+              50,
+              15,
+              49,
+              59
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "models.bind-and-route",
+            {
+              "kind": "source-derived concept",
+              "loopback": "127.0.0.1",
+              "wildcardIPv4": "0.0.0.0",
+              "externalReachabilityProven": false,
+              "scope": "no wildcard bind or external/firewall/NAT route experiment"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "transport",
+    "question": "TCP·QUIC와 전달 헤더 신뢰는 어떻게 구분할까요?",
+    "source": "원문 transport·trust 개념 모델",
+    "sourceNote": "QUIC·packet handshake capture·L4/L7 제품·Forwarded trust enforcement는 실행하지 않았습니다. 실제 fixture의 HTTP/TLS 관측으로 이 별도 정책을 보장하지 않습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "transport-protocol",
+        "title": "HTTP1/2 TCP · HTTP3 QUIC/UDP",
+        "lead": "원문 개념은 HTTP1/2와 HTTP3의 전송을 구분합니다. 이 실험은 QUIC 연결을 실행하거나 패킷 handshake를 캡처하지 않았습니다.",
+        "code": "'http1and2':'TCP','http3':'QUIC/UDP'",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "모델 HTTP1and2",
+            "TCP"
+          ],
+          [
+            "모델 HTTP3",
+            "QUIC/UDP"
+          ],
+          [
+            "QUIC 실행",
+            "없음"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.transport-and-trust"
+        ],
+        "image": "D02-transport",
+        "asset": {
+          "file": "transport.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "TCP·QUIC와 전달 헤더 신뢰는 어떻게 구분할까요?",
+          "focus": {
+            "transport-protocol": [
+              1,
+              11,
+              98,
+              49
+            ],
+            "transport-trust": [
+              1,
+              62,
+              98,
+              36
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "models.transport-and-trust",
+            {
+              "kind": "source-derived concept",
+              "http1and2": "TCP",
+              "http3": "QUIC/UDP",
+              "forwardedHeaderTrustedWithoutBoundary": false,
+              "scope": "no QUIC/packet handshake capture/L4 or L7 product/forwarded trust enforcement executed"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "transport-trust",
+        "title": "외부 전달 헤더를 무조건 신뢰하지 않음",
+        "lead": "원문 개념 모델의 forwardedHeaderTrustedWithoutBoundary는false입니다. 실제 프록시 신뢰 경계 설정·헤더 위조 방어를 시험한 결과가 아닙니다.",
+        "code": "'forwardedHeaderTrustedWithoutBoundary':False",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "forwardedHeaderTrustedWithoutBoundary",
+            "false · 원문 개념 모델"
+          ],
+          [
+            "실제 trust enforcement",
+            "미실행"
+          ]
+        ],
+        "checks": [],
+        "runKeys": [
+          "models.transport-and-trust"
+        ],
+        "image": "D02-transport",
+        "asset": {
+          "file": "transport.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "TCP·QUIC와 전달 헤더 신뢰는 어떻게 구분할까요?",
+          "focus": {
+            "transport-protocol": [
+              1,
+              11,
+              98,
+              49
+            ],
+            "transport-trust": [
+              1,
+              62,
+              98,
+              36
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "models.transport-and-trust",
+            {
+              "kind": "source-derived concept",
+              "http1and2": "TCP",
+              "http3": "QUIC/UDP",
+              "forwardedHeaderTrustedWithoutBoundary": false,
+              "scope": "no QUIC/packet handshake capture/L4 or L7 product/forwarded trust enforcement executed"
+            }
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "diagnose",
+    "question": "관측한 오류는 어느 계층의 증거일까요?",
+    "source": "현재 fixture의 실제 관측 비교 / own resource 종료",
+    "sourceNote": "status·timeout만으로 모든 원인을 확정하지 않습니다. 이 fixture에서 본 timeout·TLS 거부·HTTP404를 구분하며 502/503/504·refused를 새 실측으로 만들지 않습니다.",
+    "note": "코드 강조는 설명 위치이며 실시간 실행 줄이 아닙니다. 순서는 각 실제 관측을 읽기 위한 설명이며 원문 전체의 검증 완료를 뜻하지 않습니다.",
+    "stages": [
+      {
+        "id": "diagnose-layers",
+        "title": "timeout · TLS 거부 · HTTP404 구분",
+        "lead": "bind-only timeout, 이름 검증 거부, 실제 앱404는 서로 다른 관측입니다. 하나의 증상에서 firewall 등 전체 원인을 단정하지 않습니다.",
+        "code": "            with context.wrap_socket(tcp,server_hostname=host)as tls:",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "own bind-only 연결",
+            "현재 OS에서 timeout"
+          ],
+          [
+            "잘못된 이름 TLS",
+            "인증서 거부 · handler 추가0"
+          ],
+          [
+            "매핑 없는 HTTP",
+            "/not-mapped → 404"
+          ]
+        ],
+        "checks": [
+          "extra-bound-without-listen-no-tcp-connection",
+          "extra-tls-wrong-name-rejected",
+          "source-missing-route-real-tcp-404"
+        ],
+        "runKeys": [
+          "facts.extra-bound-without-listen-no-tcp-connection",
+          "facts.extra-tls-wrong-name-rejected",
+          "facts.source-missing-route-real-tcp-404"
+        ],
+        "image": "D02-diagnose",
+        "asset": {
+          "file": "diagnose-v2.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "관측한 오류는 어느 계층의 증거일까요?",
+          "focus": {
+            "diagnose-layers": [
+              1,
+              11,
+              46,
+              83
+            ],
+            "diagnose-closed": [
+              65,
+              11,
+              34,
+              83
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.extra-bound-without-listen-no-tcp-connection",
+            {
+              "bound": true,
+              "listening": false,
+              "observedFailure": "timeout",
+              "scope": "this OS/own bound socket; no universal refused-vs-timeout or firewall diagnosis"
+            }
+          ],
+          [
+            "facts.extra-tls-wrong-name-rejected",
+            {
+              "certificateVerificationRejected": true,
+              "httpHandlerCallsAdded": 0,
+              "scope": "verification remains enabled; no HTTP after failed certificate validation"
+            }
+          ],
+          [
+            "facts.source-missing-route-real-tcp-404",
+            {
+              "status": 404,
+              "path": "/not-mapped",
+              "scope": "HTTP reached this fixture; not DNS failure"
+            }
+          ]
+        ]
+      },
+      {
+        "id": "diagnose-closed",
+        "title": "사용한 private resource만 종료",
+        "lead": "추가 Boot process·port와 proxy/DNS thread의 종료를 확인했습니다. 전역 서비스나 시스템 설정을 바꾸는 명령은 없었습니다.",
+        "code": "    for server,thread in reversed(resources):server.shutdown();server.server_close();thread.join(2)",
+        "active": [
+          0
+        ],
+        "values": [
+          [
+            "bootProcessEnded / bootPortClosed",
+            "true / true"
+          ],
+          [
+            "proxyThreadsEnded / dnsThreadEnded",
+            "true / true"
+          ],
+          [
+            "종료 범위",
+            "own resources만"
+          ]
+        ],
+        "checks": [
+          "private-boot-and-proxy-resources-closed"
+        ],
+        "runKeys": [
+          "facts.private-boot-and-proxy-resources-closed"
+        ],
+        "image": "D02-diagnose",
+        "asset": {
+          "file": "diagnose-v2.png",
+          "width": 1672,
+          "height": 941,
+          "ready": true,
+          "alt": "관측한 오류는 어느 계층의 증거일까요?",
+          "focus": {
+            "diagnose-layers": [
+              1,
+              11,
+              46,
+              83
+            ],
+            "diagnose-closed": [
+              65,
+              11,
+              34,
+              83
+            ]
+          }
+        },
+        "runValues": [
+          [
+            "facts.private-boot-and-proxy-resources-closed",
+            {
+              "bootProcessEnded": true,
+              "bootPortClosed": true,
+              "proxyThreadsEnded": true,
+              "dnsThreadEnded": true,
+              "scope": "own resources only; no global process/service commands"
+            }
+          ]
+        ]
+      }
+    ]
+  }
+]

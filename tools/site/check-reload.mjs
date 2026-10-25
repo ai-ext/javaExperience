@@ -1,3 +1,4 @@
+import { CORE_UNITS } from './concept-curriculum.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { arg, loadPlaywright, checkOutput, startCheckServer } from './check-runtime.mjs';
@@ -6,6 +7,7 @@ const { chromium } = loadPlaywright();
 const out = await checkOutput('reload');
 const stage = arg('stage') || 'after';
 export const pages = [['홈','index.html'],['일자 목록','course/spring/README.html'],['일자','course/spring/D05.html'],['지도','course/map.html'],['Java','course/java/J05.html'],['티켓','course/tickets/B01.html'],['출발 자료','course/start/README.html'],['개념','docs/knowledge/README.html'],['서비스 만들기','scenario/README.html'],['실전 미션','practice/MISSIONS.html'],['과정 안내','course/README.html'],['레슨','lessons/README.html'],['구현 티켓','tickets/README.html'],['설정 탭','course/spring/D01.html#step-d01-2'],['저장 설정','course/spring/D05.html#step-d05-2'],['더미 데이터','course/start/dummy/README.html'],['운영 실습','course/start/ops/README.html'],['서비스 상세','scenario/ch0-first-steps/0-1-ts-to-java.html'],['개념 상세','docs/knowledge/P16-json-jackson-practical.html'],['저장 진도 홈','index.html'],['선택 티켓 일자','course/spring/D14.html'],['입력 검증 상세','scenario/ch1-create-post/1-5-validation.html'],['DB 실습 상세','scenario/db-query-journey/db-01-response-to-query.html'],['JWT 상세','scenario/ch10-project/10-4-login-jwt.html']];
+pages.push(['Spring 분야','docs/knowledge/README.html#kc-category-spring'], ...CORE_UNITS.map(unit=>[unit.id,`lessons/concept-core.html?unit=${unit.id}`]), ['개념 원문','docs/knowledge/P16-json-jackson-practical.html?read=1']);
 await fs.mkdir(path.join(out,stage),{recursive:true});
 const server = await startCheckServer();
 const base = server.base;

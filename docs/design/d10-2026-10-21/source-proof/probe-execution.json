@@ -1,0 +1,1046 @@
+{
+  "checks": [
+    "original-thirteen-blocks-preserved-unrun",
+    "additional-sqlite-runtime-boundary",
+    "college-four-relations-fixed-seed",
+    "surrogate-pk-and-two-business-unique-keys",
+    "required-column-not-null-rejections",
+    "course-and-offering-business-rules",
+    "enrollment-pair-fk-and-status-checks",
+    "rejected-writes-preserve-college-seed",
+    "nullable-unique-versus-required-unique-toy",
+    "independent-customer-order-seed",
+    "additional-left-on-intermediate-counts",
+    "right-paid-where-removes-unmatched-customers",
+    "translated-final-having-keeps-paid-customer-only",
+    "translated-exists-has-no-status-filter",
+    "guarded-write-501-one-zero-zero-and-paid-row",
+    "sqlite-wal-uncommitted-change-hidden",
+    "sqlite-wal-commit-visible-to-new-read",
+    "sqlite-wal-read-snapshot-until-transaction-end",
+    "sqlite-begin-immediate-writer-contention-busy",
+    "sqlite-rollback-preserves-previous-state",
+    "guarded-stock-update-one-then-zero",
+    "sqlite-eqp-before-index-observed-scan",
+    "sqlite-eqp-added-index-observed-search",
+    "sqlite-eqp-drop-restore-and-results-match",
+    "all-own-connections-fk-on-and-integrity-clean",
+    "all-owned-sqlite-connections-closed",
+    "own-files-runtime-and-source-fixtures-preserved"
+  ],
+  "facts": {
+    "original-thirteen-blocks-preserved-unrun": {
+      "sourceSHA256": "05e6f3eabfeb1d915d88a79a6cda1da555f05744285247b74539de16a9ee7226",
+      "lines": 449,
+      "blocks": 13,
+      "originalSQLExecuted": false,
+      "originalPostgreSQLMySQLDockerJava25CommandsExecuted": false,
+      "scope": "original PostgreSQL DDL/query and distinct MySQL sample kept as bytes, not run or treated as one equivalent constraint schema"
+    },
+    "additional-sqlite-runtime-boundary": {
+      "python": "3.14.3",
+      "sqlite": "3.53.0",
+      "sqliteOnly": true,
+      "postgresqlMySQLDockerJava25Executed": false,
+      "originalCommandsExecuted": false,
+      "networkOrExistingServiceAccess": false,
+      "scope": "explicitly translated additional own-file SQLite examples, not source PostgreSQL DDL/isolation/EXPLAIN certification"
+    },
+    "college-four-relations-fixed-seed": {
+      "rows": {
+        "student": [
+          [
+            1,
+            "CAMPUS-001",
+            "student-a@example.test",
+            "학생A"
+          ],
+          [
+            2,
+            "CAMPUS-002",
+            "student-b@example.test",
+            "학생B"
+          ]
+        ],
+        "course": [
+          [
+            1,
+            "DB101",
+            "Database Basics"
+          ]
+        ],
+        "offering": [
+          [
+            10,
+            1,
+            "2026-FALL",
+            1
+          ],
+          [
+            11,
+            1,
+            "2026-FALL",
+            2
+          ]
+        ],
+        "enrollment": [
+          [
+            1,
+            10,
+            "2026-09-01T09:00:00Z",
+            "ENROLLED"
+          ]
+        ]
+      },
+      "counts": {
+        "student": 2,
+        "course": 1,
+        "offering": 2,
+        "enrollment": 1
+      },
+      "enrollmentIdentity": [
+        "student_id",
+        "offering_id"
+      ],
+      "businessKeySeparateFromSurrogate": true,
+      "scope": "additional fixed seed; not practice data or PostgreSQL original seed"
+    },
+    "surrogate-pk-and-two-business-unique-keys": {
+      "attempts": [
+        {
+          "case": "student-pk",
+          "rejected": true,
+          "sql": "INSERT INTO student VALUES(?,?,?,?)",
+          "bindings": [
+            1,
+            "CAMPUS-003",
+            "student-c@example.test",
+            "학생C"
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_PRIMARYKEY",
+          "sqliteErrorCode": 1555,
+          "message": "UNIQUE constraint failed: student.id"
+        },
+        {
+          "case": "student-campus-uk",
+          "rejected": true,
+          "sql": "INSERT INTO student VALUES(?,?,?,?)",
+          "bindings": [
+            3,
+            "CAMPUS-001",
+            "student-c@example.test",
+            "학생C"
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_UNIQUE",
+          "sqliteErrorCode": 2067,
+          "message": "UNIQUE constraint failed: student.campus_no"
+        },
+        {
+          "case": "student-email-uk",
+          "rejected": true,
+          "sql": "INSERT INTO student VALUES(?,?,?,?)",
+          "bindings": [
+            3,
+            "CAMPUS-003",
+            "student-a@example.test",
+            "학생C"
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_UNIQUE",
+          "sqliteErrorCode": 2067,
+          "message": "UNIQUE constraint failed: student.email"
+        }
+      ],
+      "scope": "SQLite duplicate PK/campus_no/email checks; surrogate id alone does not enforce business uniqueness"
+    },
+    "required-column-not-null-rejections": {
+      "attempts": [
+        {
+          "case": "student-name-not-null",
+          "rejected": true,
+          "sql": "INSERT INTO student VALUES(?,?,?,?)",
+          "bindings": [
+            3,
+            "CAMPUS-003",
+            "student-c@example.test",
+            null
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_NOTNULL",
+          "sqliteErrorCode": 1299,
+          "message": "NOT NULL constraint failed: student.name"
+        },
+        {
+          "case": "enrollment-time-not-null",
+          "rejected": true,
+          "sql": "INSERT INTO enrollment VALUES(?,?,?,?)",
+          "bindings": [
+            2,
+            11,
+            null,
+            "ENROLLED"
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_NOTNULL",
+          "sqliteErrorCode": 1299,
+          "message": "NOT NULL constraint failed: enrollment.enrolled_at"
+        }
+      ],
+      "scope": "these tested required columns only; no claim of all SQLite/PG type equivalence"
+    },
+    "course-and-offering-business-rules": {
+      "attempts": [
+        {
+          "case": "course-code-uk",
+          "rejected": true,
+          "sql": "INSERT INTO course VALUES(?,?,?)",
+          "bindings": [
+            2,
+            "DB101",
+            "Other title"
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_UNIQUE",
+          "sqliteErrorCode": 2067,
+          "message": "UNIQUE constraint failed: course.course_code"
+        },
+        {
+          "case": "offering-three-column-uk",
+          "rejected": true,
+          "sql": "INSERT INTO offering VALUES(?,?,?,?)",
+          "bindings": [
+            12,
+            1,
+            "2026-FALL",
+            1
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_UNIQUE",
+          "sqliteErrorCode": 2067,
+          "message": "UNIQUE constraint failed: offering.course_id, offering.term_code, offering.section_no"
+        },
+        {
+          "case": "offering-missing-course",
+          "rejected": true,
+          "sql": "INSERT INTO offering VALUES(?,?,?,?)",
+          "bindings": [
+            12,
+            999,
+            "2026-FALL",
+            3
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_FOREIGNKEY",
+          "sqliteErrorCode": 787,
+          "message": "FOREIGN KEY constraint failed"
+        },
+        {
+          "case": "offering-section-zero",
+          "rejected": true,
+          "sql": "INSERT INTO offering VALUES(?,?,?,?)",
+          "bindings": [
+            12,
+            1,
+            "2026-FALL",
+            0
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_CHECK",
+          "sqliteErrorCode": 275,
+          "message": "CHECK constraint failed: section_no > 0"
+        }
+      ],
+      "offeringUniqueColumns": [
+        "course_id",
+        "term_code",
+        "section_no"
+      ]
+    },
+    "enrollment-pair-fk-and-status-checks": {
+      "attempts": [
+        {
+          "case": "enrollment-duplicate-pair",
+          "rejected": true,
+          "sql": "INSERT INTO enrollment VALUES(?,?,?,?)",
+          "bindings": [
+            1,
+            10,
+            "2026-09-02T09:00:00Z",
+            "ENROLLED"
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_PRIMARYKEY",
+          "sqliteErrorCode": 1555,
+          "message": "UNIQUE constraint failed: enrollment.student_id, enrollment.offering_id"
+        },
+        {
+          "case": "enrollment-missing-student",
+          "rejected": true,
+          "sql": "INSERT INTO enrollment VALUES(?,?,?,?)",
+          "bindings": [
+            999,
+            10,
+            "2026-09-02T09:00:00Z",
+            "ENROLLED"
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_FOREIGNKEY",
+          "sqliteErrorCode": 787,
+          "message": "FOREIGN KEY constraint failed"
+        },
+        {
+          "case": "enrollment-missing-offering",
+          "rejected": true,
+          "sql": "INSERT INTO enrollment VALUES(?,?,?,?)",
+          "bindings": [
+            2,
+            999,
+            "2026-09-02T09:00:00Z",
+            "ENROLLED"
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_FOREIGNKEY",
+          "sqliteErrorCode": 787,
+          "message": "FOREIGN KEY constraint failed"
+        },
+        {
+          "case": "enrollment-bad-status",
+          "rejected": true,
+          "sql": "INSERT INTO enrollment VALUES(?,?,?,?)",
+          "bindings": [
+            2,
+            11,
+            "2026-09-02T09:00:00Z",
+            "WAITING"
+          ],
+          "sqliteErrorName": "SQLITE_CONSTRAINT_CHECK",
+          "sqliteErrorCode": 275,
+          "message": "CHECK constraint failed: status IN ('ENROLLED', 'DROPPED')"
+        }
+      ],
+      "scope": "same student/offering pair once; missing parent and tested bad status rejected"
+    },
+    "rejected-writes-preserve-college-seed": {
+      "before": {
+        "student": [
+          [
+            1,
+            "CAMPUS-001",
+            "student-a@example.test",
+            "학생A"
+          ],
+          [
+            2,
+            "CAMPUS-002",
+            "student-b@example.test",
+            "학생B"
+          ]
+        ],
+        "course": [
+          [
+            1,
+            "DB101",
+            "Database Basics"
+          ]
+        ],
+        "offering": [
+          [
+            10,
+            1,
+            "2026-FALL",
+            1
+          ],
+          [
+            11,
+            1,
+            "2026-FALL",
+            2
+          ]
+        ],
+        "enrollment": [
+          [
+            1,
+            10,
+            "2026-09-01T09:00:00Z",
+            "ENROLLED"
+          ]
+        ]
+      },
+      "after": {
+        "student": [
+          [
+            1,
+            "CAMPUS-001",
+            "student-a@example.test",
+            "학생A"
+          ],
+          [
+            2,
+            "CAMPUS-002",
+            "student-b@example.test",
+            "학생B"
+          ]
+        ],
+        "course": [
+          [
+            1,
+            "DB101",
+            "Database Basics"
+          ]
+        ],
+        "offering": [
+          [
+            10,
+            1,
+            "2026-FALL",
+            1
+          ],
+          [
+            11,
+            1,
+            "2026-FALL",
+            2
+          ]
+        ],
+        "enrollment": [
+          [
+            1,
+            10,
+            "2026-09-01T09:00:00Z",
+            "ENROLLED"
+          ]
+        ]
+      },
+      "unchanged": true,
+      "trialRollbackSafety": true
+    },
+    "nullable-unique-versus-required-unique-toy": {
+      "nullableRows": [
+        [
+          1,
+          null
+        ],
+        [
+          2,
+          null
+        ]
+      ],
+      "requiredRows": [
+        [
+          1,
+          "alpha"
+        ]
+      ],
+      "nullRejection": {
+        "case": "required-unique-null",
+        "rejected": true,
+        "sql": "INSERT INTO required_unique VALUES(?,?)",
+        "bindings": [
+          2,
+          null
+        ],
+        "sqliteErrorName": "SQLITE_CONSTRAINT_NOTNULL",
+        "sqliteErrorCode": 1299,
+        "message": "NOT NULL constraint failed: required_unique.token"
+      },
+      "duplicateRejection": {
+        "case": "required-unique-duplicate",
+        "rejected": true,
+        "sql": "INSERT INTO required_unique VALUES(?,?)",
+        "bindings": [
+          2,
+          "alpha"
+        ],
+        "sqliteErrorName": "SQLITE_CONSTRAINT_UNIQUE",
+        "sqliteErrorCode": 2067,
+        "message": "UNIQUE constraint failed: required_unique.token"
+      },
+      "scope": "separate SQLite3.53 toy, not student keys and not a cross-product NULL uniqueness rule"
+    },
+    "independent-customer-order-seed": {
+      "customers": [
+        [
+          1,
+          "ada@example.test",
+          "2026-01-01T00:00:00Z"
+        ],
+        [
+          2,
+          "bob@example.test",
+          "2026-01-02T00:00:00Z"
+        ],
+        [
+          3,
+          "cy@example.test",
+          "2026-01-03T00:00:00Z"
+        ]
+      ],
+      "orders": [
+        [
+          10,
+          1,
+          "PAID",
+          125,
+          "2026-09-02T10:00:00Z"
+        ],
+        [
+          11,
+          1,
+          "PAID",
+          75,
+          "2026-08-20T10:00:00Z"
+        ],
+        [
+          12,
+          1,
+          "PENDING",
+          50,
+          "2026-09-03T10:00:00Z"
+        ],
+        [
+          20,
+          2,
+          "CANCELLED",
+          25,
+          "2026-09-04T10:00:00Z"
+        ]
+      ],
+      "scope": "independent additional SQLite fixed ISO seed; original TIMESTAMPTZ/DATE arithmetic and DECIMAL precision unrun"
+    },
+    "additional-left-on-intermediate-counts": {
+      "rows": [
+        [
+          1,
+          "ada@example.test",
+          2,
+          2,
+          200
+        ],
+        [
+          2,
+          "bob@example.test",
+          1,
+          0,
+          0
+        ],
+        [
+          3,
+          "cy@example.test",
+          1,
+          0,
+          0
+        ]
+      ],
+      "columns": [
+        "id",
+        "email",
+        "count_star",
+        "order_count",
+        "paid_total"
+      ],
+      "cutoff": "2026-01-01T00:00:00Z",
+      "scope": "additional intermediate/query variant: original HAVING removed and COUNT(*) added; unmatched customers remain; not original final HAVING result"
+    },
+    "right-paid-where-removes-unmatched-customers": {
+      "rows": [
+        [
+          1,
+          "ada@example.test",
+          2,
+          2,
+          200
+        ]
+      ],
+      "scope": "additional SQLite comparison variant; moving right PAID condition to WHERE removes null-extended rows"
+    },
+    "translated-final-having-keeps-paid-customer-only": {
+      "rows": [
+        [
+          1,
+          "ada@example.test",
+          2,
+          200
+        ]
+      ],
+      "columns": [
+        "id",
+        "email",
+        "order_count",
+        "paid_total"
+      ],
+      "scope": "SQLite translation of original final HAVING>=1 query; customer1 only; fixed ISO bind replaces PostgreSQL DATE literal"
+    },
+    "translated-exists-has-no-status-filter": {
+      "rows": [
+        [
+          1,
+          "ada@example.test"
+        ],
+        [
+          2,
+          "bob@example.test"
+        ]
+      ],
+      "cutoff": "2026-09-01T00:00:00Z",
+      "statusPredicatePresent": false,
+      "observerIDOrderAdded": true,
+      "scope": "SQLite fixed ISO comparison; customer2 qualifies via CANCELLED order; no PostgreSQL timestamp arithmetic executed"
+    },
+    "guarded-write-501-one-zero-zero-and-paid-row": {
+      "updateRowcounts": [
+        1,
+        0
+      ],
+      "deleteRowcount": 0,
+      "row501": [
+        [
+          501,
+          1,
+          "PAID",
+          25000,
+          "2026-10-01T12:00:00Z"
+        ]
+      ],
+      "scope": "additional SQLite translation; explicit fixed ISO replaces source CURRENT_TIMESTAMP; SQLite cursor rowcounts, not MySQL affected-row mode"
+    },
+    "sqlite-wal-uncommitted-change-hidden": {
+      "journalModes": {
+        "writer": "wal",
+        "observer": "wal"
+      },
+      "sameOwnDatabaseFile": true,
+      "writerUncommittedValue": 20,
+      "otherConnectionValue": 10,
+      "scope": "controlled two-connection SQLite WAL case, not PostgreSQL/MySQL isolation or row-lock certification"
+    },
+    "sqlite-wal-commit-visible-to-new-read": {
+      "otherConnectionNewRead": 20,
+      "previousUncommittedRead": 10,
+      "writerCommitCompleted": true
+    },
+    "sqlite-wal-read-snapshot-until-transaction-end": {
+      "readerFirst": 20,
+      "readerAfterOtherCommit": 20,
+      "readerAfterTransactionEndNewRead": 30,
+      "scope": "SQLite WAL read snapshot only; no PostgreSQL READ COMMITTED/InnoDB REPEATABLE READ execution"
+    },
+    "sqlite-begin-immediate-writer-contention-busy": {
+      "secondWriterError": {
+        "name": "SQLITE_BUSY",
+        "code": 5,
+        "message": "database is locked"
+      },
+      "timeoutSeconds": 0,
+      "writerUncommittedValue": 40,
+      "otherConnectionRead": 30,
+      "scope": "SQLite single-writer contention, not a row lock, PostgreSQL deadlock or waiting-time measurement"
+    },
+    "sqlite-rollback-preserves-previous-state": {
+      "writerObserverAfterRollback": [
+        30,
+        30
+      ],
+      "uncommitted40Persisted": false
+    },
+    "guarded-stock-update-one-then-zero": {
+      "initialStock": 5,
+      "requestedQuantityEach": 3,
+      "rowcounts": [
+        1,
+        0
+      ],
+      "finalOtherConnectionQuantity": 2,
+      "scope": "two sequential guarded statements in own writer transaction; not a concurrent load/oversell proof"
+    },
+    "sqlite-eqp-before-index-observed-scan": {
+      "seedRows": 512,
+      "querySQL": "-- 추가 disposable SQLite 표의 같은 SELECT. PG DATE/INTERVAL 실행이 아니다.\nSELECT id, status FROM orders\nWHERE customer_id = ? AND created_at >= ?\nORDER BY created_at, id;\n",
+      "bindings": [
+        1,
+        "2026-09-15T00:00:00Z"
+      ],
+      "observed": {
+        "phase": "before-index",
+        "eqpRawTuples": [
+          [
+            3,
+            0,
+            216,
+            "SCAN orders"
+          ],
+          [
+            15,
+            0,
+            0,
+            "USE TEMP B-TREE FOR ORDER BY"
+          ]
+        ],
+        "results": [
+          [
+            1016,
+            "PAID"
+          ],
+          [
+            1128,
+            "PAID"
+          ],
+          [
+            1240,
+            "PENDING"
+          ],
+          [
+            1352,
+            "PAID"
+          ],
+          [
+            1464,
+            "PAID"
+          ],
+          [
+            1048,
+            "PENDING"
+          ],
+          [
+            1160,
+            "PAID"
+          ],
+          [
+            1272,
+            "PAID"
+          ],
+          [
+            1384,
+            "PENDING"
+          ],
+          [
+            1496,
+            "PAID"
+          ],
+          [
+            1080,
+            "PAID"
+          ],
+          [
+            1192,
+            "PENDING"
+          ],
+          [
+            1304,
+            "PAID"
+          ],
+          [
+            1416,
+            "PAID"
+          ]
+        ],
+        "indexNames": []
+      },
+      "scope": "actual SQLite3.53 EQP tuples only; no PostgreSQL cost/ms/EXPLAIN ANALYZE/physical examined-row claim"
+    },
+    "sqlite-eqp-added-index-observed-search": {
+      "observed": {
+        "phase": "after-index",
+        "eqpRawTuples": [
+          [
+            4,
+            0,
+            51,
+            "SEARCH orders USING INDEX orders_customer_created_idx (customer_id=? AND created_at>?)"
+          ]
+        ],
+        "results": [
+          [
+            1016,
+            "PAID"
+          ],
+          [
+            1128,
+            "PAID"
+          ],
+          [
+            1240,
+            "PENDING"
+          ],
+          [
+            1352,
+            "PAID"
+          ],
+          [
+            1464,
+            "PAID"
+          ],
+          [
+            1048,
+            "PENDING"
+          ],
+          [
+            1160,
+            "PAID"
+          ],
+          [
+            1272,
+            "PAID"
+          ],
+          [
+            1384,
+            "PENDING"
+          ],
+          [
+            1496,
+            "PAID"
+          ],
+          [
+            1080,
+            "PAID"
+          ],
+          [
+            1192,
+            "PENDING"
+          ],
+          [
+            1304,
+            "PAID"
+          ],
+          [
+            1416,
+            "PAID"
+          ]
+        ],
+        "indexNames": [
+          "orders_customer_created_idx"
+        ]
+      },
+      "sameResultsAsBefore": true,
+      "optimizerHintUsed": false,
+      "scope": "this SQLite data/version chose SEARCH; no INDEXED BY, PostgreSQL plan or speed inference"
+    },
+    "sqlite-eqp-drop-restore-and-results-match": {
+      "afterDrop": {
+        "phase": "after-drop",
+        "eqpRawTuples": [
+          [
+            3,
+            0,
+            216,
+            "SCAN orders"
+          ],
+          [
+            15,
+            0,
+            0,
+            "USE TEMP B-TREE FOR ORDER BY"
+          ]
+        ],
+        "results": [
+          [
+            1016,
+            "PAID"
+          ],
+          [
+            1128,
+            "PAID"
+          ],
+          [
+            1240,
+            "PENDING"
+          ],
+          [
+            1352,
+            "PAID"
+          ],
+          [
+            1464,
+            "PAID"
+          ],
+          [
+            1048,
+            "PENDING"
+          ],
+          [
+            1160,
+            "PAID"
+          ],
+          [
+            1272,
+            "PAID"
+          ],
+          [
+            1384,
+            "PENDING"
+          ],
+          [
+            1496,
+            "PAID"
+          ],
+          [
+            1080,
+            "PAID"
+          ],
+          [
+            1192,
+            "PENDING"
+          ],
+          [
+            1304,
+            "PAID"
+          ],
+          [
+            1416,
+            "PAID"
+          ]
+        ],
+        "indexNames": []
+      },
+      "afterRestore": {
+        "phase": "after-restore",
+        "eqpRawTuples": [
+          [
+            4,
+            0,
+            51,
+            "SEARCH orders USING INDEX orders_customer_created_idx (customer_id=? AND created_at>?)"
+          ]
+        ],
+        "results": [
+          [
+            1016,
+            "PAID"
+          ],
+          [
+            1128,
+            "PAID"
+          ],
+          [
+            1240,
+            "PENDING"
+          ],
+          [
+            1352,
+            "PAID"
+          ],
+          [
+            1464,
+            "PAID"
+          ],
+          [
+            1048,
+            "PENDING"
+          ],
+          [
+            1160,
+            "PAID"
+          ],
+          [
+            1272,
+            "PAID"
+          ],
+          [
+            1384,
+            "PENDING"
+          ],
+          [
+            1496,
+            "PAID"
+          ],
+          [
+            1080,
+            "PAID"
+          ],
+          [
+            1192,
+            "PENDING"
+          ],
+          [
+            1304,
+            "PAID"
+          ],
+          [
+            1416,
+            "PAID"
+          ]
+        ],
+        "indexNames": [
+          "orders_customer_created_idx"
+        ]
+      },
+      "allFourResultsIdentical": true,
+      "scope": "own disposable SQLite index drop/restore only; cached_statements=0 avoids stale prepared EQP; no MySQL invisible index or performance measurement"
+    },
+    "all-own-connections-fk-on-and-integrity-clean": {
+      "foreignKeysPragma": {
+        "college": 1,
+        "commerce": 1,
+        "writer": 1,
+        "observer": 1,
+        "plans": 1
+      },
+      "foreignKeyCheck": {
+        "college": [],
+        "commerce": [],
+        "writer": [],
+        "observer": [],
+        "plans": []
+      },
+      "integrity": {
+        "college": "ok",
+        "commerce": "ok",
+        "writer": "ok",
+        "observer": "ok",
+        "plans": "ok"
+      },
+      "databaseFiles": 4,
+      "connections": 5,
+      "scope": "these own SQLite files/connections only; no existing database checked"
+    },
+    "all-owned-sqlite-connections-closed": {
+      "closedAliases": {
+        "college": true,
+        "commerce": true,
+        "writer": true,
+        "observer": true,
+        "plans": true
+      },
+      "allOwnedConnectionsClosed": true,
+      "longRunningProcessesOrServicePortsStarted": 0,
+      "existingServicesOrPracticeTouched": false
+    },
+    "own-files-runtime-and-source-fixtures-preserved": {
+      "runMode": "0700",
+      "fixtureFiles": [
+        {
+          "file": "college-sqlite.sql",
+          "sha256": "49959a53613e0ae8bb558c8bab576fa596778316dc5bd3a2eaf1b6deb938cd71"
+        },
+        {
+          "file": "commerce-sqlite.sql",
+          "sha256": "2425a4fd79f3585f779adfbff57c70c51c4a1830c800075e8d56d98610730d90"
+        },
+        {
+          "file": "exists-recent.sql",
+          "sha256": "c0bd0acb11bb90c5469c59085608bfa567bb87cf534e00aa69f24dfa99f425e4"
+        },
+        {
+          "file": "having-paid.sql",
+          "sha256": "b69b6604a64c23f65e2cf429949c0b620996f5fa6c22aa828733386c5acdaace"
+        },
+        {
+          "file": "left-on-paid.sql",
+          "sha256": "49fbec83301aec88608afc2b3e26f9a6c453f6eee95d44f0487027ba3578521a"
+        },
+        {
+          "file": "plan-query.sql",
+          "sha256": "45f50cc95516dbade5403f161127607b2dc51b342d8bdb21f5186635d4038b6d"
+        },
+        {
+          "file": "seeds.json",
+          "sha256": "c1f4644c7ed14e1fc451e2f34ffba43553de224e2505173576025502f5ed9f37"
+        },
+        {
+          "file": "sqlite_probe.py",
+          "sha256": "60d2858b64d483374c491676fc67817433758015677631b8fcbee1b508e572c0"
+        },
+        {
+          "file": "where-paid.sql",
+          "sha256": "5a3dd74e40946dcb3b0440fda3a6e743a1dc5912dc6f9ddf093b93a0a887b295"
+        }
+      ],
+      "allFixtureSHA256Matched": true,
+      "sourceSHA256": "05e6f3eabfeb1d915d88a79a6cda1da555f05744285247b74539de16a9ee7226",
+      "ownDatabaseFiles": 4,
+      "allOwnedConnectionsClosed": true,
+      "networkOrExistingServiceAccess": false,
+      "practiceOrLearnerSourceModified": false
+    }
+  },
+  "models": {}
+}

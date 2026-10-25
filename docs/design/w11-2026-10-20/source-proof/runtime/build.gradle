@@ -1,0 +1,46 @@
+plugins { id 'java' }
+repositories { mavenCentral() }
+java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+dependencies {
+ implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.1')
+ implementation 'org.springframework:spring-context'
+ implementation 'org.springframework:spring-jdbc'
+ implementation 'org.springframework:spring-tx'
+ implementation 'org.springframework:spring-web'
+ implementation 'com.h2database:h2'
+ implementation 'tools.jackson.core:jackson-databind'
+}
+sourceSets {
+ variantB { java.srcDirs=['../original/common','../original/variantB','../probe'] }
+ variantC { java.srcDirs=['../original/common','../original/variantC','../probe','../probeC'] }
+}
+configurations {
+ variantBImplementation.extendsFrom implementation
+ variantBRuntimeOnly.extendsFrom runtimeOnly
+ variantCImplementation.extendsFrom implementation
+ variantCRuntimeOnly.extendsFrom runtimeOnly
+}
+tasks.register('recordDependencies') {
+ doLast {
+  def rows=configurations.runtimeClasspath.resolvedConfiguration.resolvedArtifacts.collect {
+   [coordinate:it.moduleVersion.id.toString(),file:it.file.absolutePath,sha256:java.security.MessageDigest.getInstance('SHA-256').digest(it.file.bytes).encodeHex().toString()]
+  }
+  file('../dependencies.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(rows))+'\n'
+ }
+}
+['B','C'].each { variant ->
+ tasks.register('run'+variant,JavaExec) {
+  dependsOn tasks.named('variant'+variant+'Classes')
+  classpath=sourceSets['variant'+variant].runtimeClasspath
+  mainClass='W11Proof'
+  args=[file('../').absolutePath,variant]
+ }
+}
+tasks.register('runProof') {
+ dependsOn 'runB','runC'
+ doLast {
+  def parser=new groovy.json.JsonSlurper()
+  def result=[variantB:parser.parse(file('../variant-B.json')),variantC:parser.parse(file('../variant-C.json'))]
+  file('../execution.json').text=groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(result))+'\n'
+ }
+}
