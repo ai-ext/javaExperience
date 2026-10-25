@@ -25,7 +25,8 @@ import { renderConfigConceptScenes } from './config-concept-scenes.mjs';
 import { renderMissionVisual } from './mission-visual.mjs';
 import { renderMissionDetails } from './mission-detail-visual.mjs';
 import { renderHomeVisual } from './home-visual.mjs';
-import { renderSiteNavigation, renderCatalogHeading, catalogPageTitle } from './site-navigation.mjs';
+import { renderNavigationCatalog } from './navigation-catalog.mjs';
+import { renderSiteNavigation, renderSiteBreadcrumb, renderCatalogHeading, catalogPageTitle } from './site-navigation.mjs';
 import { TASKS as HOME_TASKS } from './home-state.mjs';
 import { renderLessonAtlas } from './lesson-atlas.mjs';
 import { renderDbIndexExperiment } from './db-index-experiment.mjs';
@@ -609,12 +610,14 @@ function page({ abs, title, body, hasMermaid, hasDbIndexExperiment }) {
     if (!marker) throw new Error('course/map.md에 지도 자리(<!-- course-map: … -->)가 없다');
     body = body.replace(marker[0], renderCourseMap(COURSE));
   }
+  body = renderNavigationCatalog(rel(abs), body, COURSE);
   body = renderCourseOutline(rel(abs), body);
   body = renderCatalogHeading(rel(abs), body);
   if (abs === path.join(ROOT, 'README.md')) body = renderCourseHome(COURSE) + renderHomeReference(renderHomeVisual(ROOT, abs, body));
   body = renderContentKinds(rel(abs), body);
   body = renderSemanticColors(body);
   crumbs = renderContentKinds(rel(abs), crumbs);
+  if (!crumbs) crumbs = renderSiteBreadcrumb(rel(abs));
   const mermaid = hasMermaid
     ? `<script type="module">import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.esm.min.mjs';
 const css = getComputedStyle(document.documentElement);
@@ -645,7 +648,8 @@ ${['course-tokens.css', 'course-content.css', 'contrast.css', 'course-navigation
 </head>
 <body${isHome ? ' class="home-page"' : isCourse ? ' class="course-page"' : abs === path.join(DOC_DIR, 'README.md') ? ' class="knowledge-catalog-page"' : path.basename(abs) === 'P16-json-jackson-practical.md' ? ' class="knowledge-detail-page"' : ''}${abs === path.join(ROOT, 'scenario/ch0-first-steps/0-1-ts-to-java.md') ? ' class="first-java-page"' : abs === path.join(ROOT, 'scenario/ch0-first-steps/0-2-annotations.md') ? ' class="first-java-page annotation-page"' : abs === path.join(ROOT, 'scenario/ch0-first-steps/0-3-request-four-places.md') ? ' class="first-java-page request-places-page"' : abs === path.join(ROOT, 'scenario/ch0-first-steps/0-4-dto-rules.md') ? ' class="first-java-page profile-dto-page"' : abs === path.join(ROOT, 'scenario/ch0-first-steps/0-5-read-stack-trace.md') ? ' class="first-java-page member-debug-page"' : abs === path.join(ROOT, 'scenario/ch0-first-steps/0-6-gradle-and-yml.md') ? ' class="first-java-page config-page"' : abs === path.join(ROOT, 'scenario/ch1-create-post/1-1-receive-request.md') ? ' class="first-api-page"' : abs === path.join(ROOT, 'scenario/ch1-create-post/1-2-dto-response.md') ? ' class="first-db-page"' : abs === path.join(ROOT, 'scenario/ch1-create-post/1-3-service-layer.md') ? ' class="first-tx-page"' : abs === path.join(ROOT, 'scenario/ch1-create-post/1-4-save-to-db.md') ? ' class="post-mapping-page"' : abs === path.join(ROOT, 'scenario/ch1-create-post/1-5-validation.md') ? ' class="validation-page"' : abs === path.join(ROOT, 'scenario/ch1-create-post/1-6-token-auth.md') ? ' class="token-author-page"' : abs === path.join(ROOT, 'scenario/ch10-project/10-4-login-jwt.md') ? ' class="jwt-login-page"' : abs === path.join(ROOT, 'scenario/labs/l15-session-auth/README.md') ? ' class="session-lab-page"' : abs === path.join(ROOT, 'scenario/labs/l16-interface-implementations/README.md') ? ' class="interface-lab-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/db-01-response-to-query.md') ? ' class="db01-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/db-02-select-cursor.md') ? ' class="db02-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/db-03-detail-join.md') ? ' class="db03-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/db-04-tag-filter-and-exists.md') ? ' class="db04-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/db-05-aggregate-fanout.md') ? ' class="db05-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/db-06-exists-not-exists.md') ? ' class="db06-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/DB-07-same-api-five-query-styles.md') ? ' class="db07-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/DB-08-explain-hypothesis.md') ? ' class="db08-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/DB-09-explain-analyze.md') ? ' class="db09-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/DB-10-performance-fixture.md') ? ' class="db10-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/DB-11-index-lifecycle.md') ? ' class="db11-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/db-12-join-exists-explain.md') ? ' class="db12-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/db-13-list-api-n-plus-one.md') ? ' class="db13-focused-page"' : abs === path.join(ROOT, 'scenario/db-query-journey/db-14-live-schema-to-slow-query.md') ? ' class="db14-focused-page"' : abs === path.join(ROOT, 'scenario/labs/l12-query-methods/README.md') ? ' class="l12-focused-page"' : abs === path.join(ROOT, 'docs/knowledge/P02-mvc-layered-architecture.md') ? ' class="p02-focused-page"' : ''}>
 ${renderSiteNavigation(rel(abs))}
-<main${hasDbIndexExperiment ? ' class="db-index-main"' : abs.startsWith(`${DOC_DIR}${path.sep}`) && /^[A-Z]\d{2}-.*\.md$/.test(path.basename(abs)) ? ' class="knowledge-main"' : ''}>
+<a class="site-skip" href="#site-main">본문으로 건너뛰기</a>
+<main id="site-main"${hasDbIndexExperiment ? ' class="db-index-main"' : abs.startsWith(`${DOC_DIR}${path.sep}`) && /^[A-Z]\d{2}-.*\.md$/.test(path.basename(abs)) ? ' class="knowledge-main"' : ''}>
 ${crumbs}
 ${body}
 ${pager}

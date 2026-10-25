@@ -83,7 +83,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   if (win.location.hash) revealOriginal(win.location.hash);
   if (root.dataset.ready) return;
   root.dataset.ready = 'true';
-  const $ = (selector) => root.querySelector(selector);
+  const $ = (selector) => root.querySelector(selector) || doc.querySelector('.page-sidebar')?.querySelector(selector);
   const input = $('#knowledge-search-input');
   const rows = [...root.querySelectorAll('[data-kc-document]')];
   const aliases = new Map();
@@ -180,7 +180,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
         reason.textContent = aliases.has(raw) || [row.dataset.kcQuestion, row.querySelector('h3 a')?.textContent].some((question) => normalize(question) === raw) ? '등록된 질문과 일치' : words.every((word) => normalize(row.dataset.kcTitle || row.querySelector('.kc-source')?.textContent).includes(word)) ? '문서 제목과 일치' : '소제목과 일치';
       }
     }
-    for (const button of root.querySelectorAll('button[data-kc-category]')) {
+    for (const button of doc.querySelectorAll('button[data-kc-category]')) {
       const selected = button.dataset.kcCategory === entry.categoryId;
       button.setAttribute('aria-pressed', String(selected)); button.tabIndex = selected ? 0 : -1;
     }
@@ -189,7 +189,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     $('[data-kc-hero-title]').textContent = entry.queryRaw ? '개념 검색' : '막힌 개념을, 값의 변화로 이해하세요.';
     for (const part of root.querySelectorAll('[data-kc-discovery]')) part.hidden = Boolean(entry.queryRaw);
     $('[data-kc-context]').hidden = Boolean(entry.queryRaw) || !context;
-    const label = $(`[data-kc-category="${entry.categoryId}"]`)?.dataset.kcLabel || '전체';
+    const label = $(`button[data-kc-category="${entry.categoryId}"]`)?.dataset.kcLabel || '전체';
     $('[data-kc-results-title]').textContent = entry.queryRaw ? `${entry.queryRaw} 검색 결과 ${filtered.length}개` : `${label} · ${filtered.length}개 문서`;
     $('[data-kc-results-basis]').textContent = entry.queryRaw ? '문서 제목·소제목에서 찾았습니다.' : show.length < filtered.length ? `먼저 살펴볼 질문 ${show.length}개입니다.` : '문서를 선택해 개념을 살펴보세요.';
     $('[data-kc-empty]').hidden = filtered.length > 0;

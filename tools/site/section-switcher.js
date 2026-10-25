@@ -10,7 +10,7 @@
     measureHeader(); window.addEventListener('resize',measureHeader);
     if (siteHeader && window.ResizeObserver) new ResizeObserver(measureHeader).observe(siteHeader);
     if (main.querySelector('[data-day-page]')) return;
-    var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts'));
+    var menus = Array.from(main.querySelectorAll('.guide-index, .exercise-route, .knowledge-page-steps, .lesson-atlas, .request-steps, .mission-visual nav, .mission-visual-shortcuts, .journey-chapter-nav'));
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {
       if (!panel) return null;
@@ -88,9 +88,15 @@
     if (menus.some(function(menu) { return menu.matches('.knowledge-page-steps,.lesson-atlas,.request-steps'); })) {
       main.querySelectorAll(':scope > section,:scope > article,:scope > details,:scope > div,.knowledge-chapter,.lesson-scene,.api-request').forEach(addPanel);
     }
+    main.querySelectorAll('.first-java-journey,.first-api-journey,.first-db-journey,.p02-focused,.jpa-focused,.mybatis-focused,.tx-why-focused').forEach(function (panel,index) {
+      panel.id ||= 'learning-scenes-' + index; entry(panel.id,'핵심 장면',addPanel(panel));
+    });
+    if (!entries.length) {
+      main.querySelectorAll(':scope > h2').forEach(function (heading) { entry(heading.id,heading.textContent,owner(heading)); });
+    }
     if (!entries.length) return;
     var nav = document.createElement('nav'); nav.className = 'section-switcher';
-    nav.setAttribute('aria-label','이 페이지 내용 선택'); nav.setAttribute('role','tablist');
+    nav.setAttribute('aria-label','이 페이지 내용 선택'); nav.setAttribute('role','tablist'); nav.setAttribute('aria-orientation','vertical');
     var all = {id:'section-all',label:'전체',panel:null,phase:''};
     entries.unshift(all);
     entries.forEach(function (item,index) {
@@ -99,13 +105,38 @@
       if (item.panel) button.setAttribute('aria-controls',item.panel.id);
       button.addEventListener('click',function () { choose(item,true); });
       button.addEventListener('keydown',function (event) {
-        var next = event.key === 'ArrowRight' ? (index + 1) % entries.length : event.key === 'ArrowLeft' ? (index + entries.length - 1) % entries.length : event.key === 'Home' ? 0 : event.key === 'End' ? entries.length - 1 : null;
+        var next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % entries.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + entries.length - 1) % entries.length : event.key === 'Home' ? 0 : event.key === 'End' ? entries.length - 1 : null;
         if (next === null) return; event.preventDefault(); choose(entries[next],true); entries[next].button.focus({preventScroll:true});
       });
       item.button = button; nav.append(button);
     });
-    main.prepend(nav); main.classList.add('has-section-switcher');
+    var layout = document.createElement('div'); layout.className = 'page-navigation-layout';
+    var sidebar = document.createElement('aside'); sidebar.className = 'page-sidebar'; sidebar.setAttribute('aria-label','페이지 탐색');
+    var caption = document.createElement('p'); caption.className = 'page-sidebar-caption'; caption.textContent = '이 페이지';
+    sidebar.append(caption,nav);
+    var content = document.createElement('div'); content.className = 'page-navigation-content';
+    content.append.apply(content,Array.from(main.childNodes)); layout.append(sidebar,content); main.append(layout);
+    main.classList.add('has-section-switcher');
+    var filters = [];
+    content.querySelectorAll('.kc-filters,.visual-catalog-controls,.cm-relation-tabs,.cm-relation-filters,.first-java-rail').forEach(function (control) {
+      if (control.parentElement.closest('.kc-filters,.visual-catalog-controls')) return;
+      var group = document.createElement('section'); group.className = 'page-sidebar-filters';
+      var ownerPanel = control.closest('[data-section-panel]');
+      if(control.matches('.kc-filters')) ownerPanel = main.querySelector('.kc-browse');
+      var label = document.createElement('p'); label.className = 'page-sidebar-caption';
+      label.textContent = control.matches('.kc-filters') ? '개념 분야' : control.matches('.visual-catalog-controls') ? '단계 찾기' : '연결 목록';
+      group.append(label,control); sidebar.append(group); filters.push({group:group,panel:ownerPanel});
+      if(control.matches('.first-java-rail')) {
+        label.textContent = '학습 장면';
+        control.addEventListener('click',function () { if(ownerPanel) { var view=entries.find(function(candidate) { return candidate.panel === ownerPanel; }); if(view) paint(view); } },true);
+      }
+      if (control.matches('.cm-relation-tabs')) {
+        control.setAttribute('aria-orientation','vertical');
+        control.addEventListener('click',function () { var view = entries.find(function (candidate) { return candidate.id === 'course-relations-view'; }); if(view) { paint(view); align(); } });
+      }
+    });
     menus.forEach(function (menu) { menu.hidden = true; menu.dataset.replacedBySections = ''; });
+    main.querySelectorAll('.journey-learning-nav').forEach(function (menu) { menu.hidden = true; menu.dataset.replacedBySections = ''; });
     var active = all;
     function paint(item) {
       active = item;
@@ -113,6 +144,7 @@
         panel.hidden = item.panel ? panel !== item.panel && !panel.contains(item.panel) && !item.panel.contains(panel) : originalHidden.get(panel);
       });
       main.querySelectorAll('.schedule-card[data-phase]').forEach(function (card) { card.hidden = !!item.phase && card.dataset.phase !== item.phase; });
+      filters.forEach(function (filter) { filter.group.hidden = !!item.panel && !!filter.panel && filter.panel !== item.panel && !filter.panel.contains(item.panel) && !item.panel.contains(filter.panel); });
       entries.forEach(function (candidate) {
         var selected = candidate === item;
         candidate.button.setAttribute('aria-selected',String(selected)); candidate.button.tabIndex = selected ? 0 : -1;
@@ -126,17 +158,13 @@
       main.querySelectorAll('.exercise-work-grid').forEach(function (grid) { grid.hidden = !Array.from(grid.children).some(function(child) { return !child.hidden; }); });
     }
     function align() {
-      var header = document.querySelector('.site-topbar');
-      var top = header ? header.getBoundingClientRect().height : 0;
-      // 내용을 바꾼 뒤에도 다음 메뉴를 같은 위치에서 선택할 수 있게 보정한다.
-      if (window.scrollY > nav.offsetTop - top) window.scrollTo({top:Math.max(0,window.scrollY + nav.getBoundingClientRect().top - top),behavior:'instant'});
+      // 본문이 짧아지거나 깊이 읽은 뒤 전환해도 본문 시작점까지만 즉시 이동한다.
+      var start = Math.max(0,window.scrollY + content.getBoundingClientRect().top - 20);
+      if (window.scrollY > start) window.scrollTo({top:start,behavior:'instant'});
     }
     function choose(item,push) {
       paint(item);
       if (push && window.location.hash !== '#' + encodeURIComponent(item.id)) history.pushState(history.state,'','#' + encodeURIComponent(item.id));
-      var menuBox = nav.getBoundingClientRect(), buttonBox = item.button.getBoundingClientRect();
-      if (buttonBox.right > menuBox.right) nav.scrollLeft += buttonBox.right - menuBox.right + 8;
-      else if (buttonBox.left < menuBox.left) nav.scrollLeft -= menuBox.left - buttonBox.left + 8;
       align();
     }
     function reveal(scroll) {

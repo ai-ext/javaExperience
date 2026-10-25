@@ -12,7 +12,7 @@ document.querySelectorAll('.first-java-journey').forEach((journey) => {
     }
     panels.forEach((panel) => { panel.hidden = panel !== active; });
     journey.dataset.firstJavaCurrent = String(index);
-    journey.querySelectorAll('.first-java-rail [data-first-java-go]').forEach((button) => {
+    document.querySelectorAll('.first-java-rail [data-first-java-go]').forEach((button) => {
       button.setAttribute('aria-current', Number(button.dataset.firstJavaGo) === index ? 'step' : 'false');
     });
     if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });

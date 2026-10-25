@@ -90,3 +90,13 @@ test('구현 예시로 용어를 바꿀 때 한국어 조사와 기존 앵커를
  assert.match(doc.querySelector('p:last-child').textContent,/구현 예시는 하나가 아니다. 구현 예시를 비교한다. 구현 예시가 아니다. 구현 예시와 비교한다. 구현 예시로 본다. 구현 예시라고 부른다. 구현 예시나 대안을 비교한다./);
  doc.defaultView.close();
 });
+
+test('Java·티켓 페이지의 종류는 기존 머리와 중복해서 출력하지 않는다', () => {
+  const html='<article class="exercise-sheet"><header class="exercise-head"><p class="exercise-kind"><b>B01</b> 과제 · 2단계 티켓</p><h1 id="ticket-title">B01. 받은 증상</h1></header><section class="exercise-section"><h2>재현</h2><p>확인할 값</p></section></article>';
+  const result=renderContentKinds('course/tickets/B01.md',html);
+  const doc=new JSDOM(result).window.document;
+  assert.equal(doc.querySelectorAll('.exercise-kind').length,0);
+  assert.equal(doc.querySelectorAll('.content-page-kind').length,1);
+  assert.equal(doc.querySelector('#ticket-title').textContent,'B01. 받은 증상');
+  assert.equal(renderContentKinds('course/tickets/B01.md',result),result);
+});

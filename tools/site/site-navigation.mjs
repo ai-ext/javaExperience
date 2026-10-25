@@ -2,41 +2,38 @@ import path from 'node:path';
 
 const spaces = [
   { label: '홈', target: 'index.html' },
-  { label: '과정 v2 · 일정', target: 'course/spring/README.html' },
-  { label: '과정 지도', target: 'course/map.html' },
-  { label: '서비스 만들기', target: 'scenario/README.html' },
-  { label: '실전 미션', target: 'practice/MISSIONS.html' },
-  { label: '개념 학습', target: 'docs/knowledge/README.html' },
+  { label: '과정', target: 'course/spring/README.html' },
+  { label: '지도', target: 'course/map.html' },
+  { label: '자료', target: 'course/resources.html' },
+  { label: '이전 과정', target: 'course/archive.html' },
 ];
 
 // 문서 제목 대신 소속 폴더로 판별한다. 예외 문서를 홈으로 표시하지 않는다.
 export function siteSection(sourcePath) {
   if (sourcePath === 'README.md') return '홈';
-  if (sourcePath === 'course/map.md') return '과정 지도';
-  if (sourcePath.startsWith('course/')) return '과정 v2 · 일정';
-  if (sourcePath.startsWith('scenario/')) return '서비스 만들기';
-  if (/^(practice|tickets)\//.test(sourcePath)) return '실전 미션';
-  if (/^(docs\/knowledge|lessons)\//.test(sourcePath)) return '개념 학습';
+  if (sourcePath === 'course/map.md') return '지도';
+  if (sourcePath === 'course/archive.md' || /^(scenario|practice|tickets|lessons)\//.test(sourcePath)) return '이전 과정';
+  if (sourcePath.startsWith('course/spring/')) return '과정';
+  if (sourcePath.startsWith('course/') || sourcePath.startsWith('docs/knowledge/')) return '자료';
   return null;
 }
 
 export function renderSiteNavigation(sourcePath) {
   const current = siteSection(sourcePath);
-  const href = (target) => path.posix.relative(path.posix.dirname(sourcePath), target);
+  const href = target => path.posix.relative(path.posix.dirname(sourcePath), target);
   const study = /^course\/(?:spring\/D\d{2}|java\/J\d{2}|tickets\/)/.test(sourcePath);
-  const items = spaces.map(({ label, target }) => `<a href="${href(target)}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`);
-  const links = items.join('');
-  const setup = current === '홈' ? '<a class="home-header-setup" href="#home-environment">개발 환경 ↗</a>' : '';
-  const courseItems = [
-    ['가이드 · 과정 안내', 'course/README.html', sourcePath === 'course/README.md'],
-    ['일정 · 일자 목록', 'course/spring/README.html', sourcePath.startsWith('course/spring/')],
-    ['연습 · Java', 'index.html#course-java-entry', sourcePath.startsWith('course/java/')],
-    ['과제 · 티켓', 'index.html#course-ticket-entry', sourcePath.startsWith('course/tickets/')],
-    ['참고 · 출발 자료', 'course/start/README.html', sourcePath.startsWith('course/start/')],
-  ];
-  const courseNav = sourcePath.startsWith('course/') || sourcePath === 'README.md'
-    ? `<nav class="course-content-nav" aria-label="과정 콘텐츠 종류">${courseItems.map(([label, target, active]) => `<a href="${href(target)}"${active ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>` : '';
-  return `<header class="topbar site-topbar${study ? ' study-topbar' : ''}"><a class="home-brand" href="${href('index.html')}"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴">${links}</nav>${setup}${courseNav}</header>`;
+  const links = spaces.map(({ label, target }) => `<a href="${href(target)}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`).join('');
+  return `<header class="topbar site-topbar${study ? ' study-topbar' : ''}"><a class="home-brand" href="${href('index.html')}"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴">${links}</nav></header>`;
+}
+
+// 현재 문서 제목은 본문 머리에서 한 번만 읽고, 경로에는 소속 공간만 표시한다.
+export function renderSiteBreadcrumb(sourcePath) {
+  const current = siteSection(sourcePath);
+  if (current === '홈') return '';
+  const href = target => path.posix.relative(path.posix.dirname(sourcePath), target);
+  const space = spaces.find(entry => entry.label === current);
+  const group = space ? `<span aria-hidden="true">›</span> <a href="${href(space.target)}">${space.label}</a>` : '';
+  return `<nav class="site-breadcrumb" aria-label="현재 위치"><a href="${href('index.html')}">홈</a>${group}</nav>`;
 }
 
 const catalogNames = {

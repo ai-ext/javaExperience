@@ -14,7 +14,7 @@ export const CONTENT_KINDS = {
   practice: { icon:'▷', label:'실습', help:'실행하고 관찰' },
   check: { icon:'✓', label:'확인', help:'끝났는지 판단' },
 };
-const badge = (kind, extra='') => `<span class="content-kind ${extra}" data-kind-label="${kind}"><span aria-hidden="true">${CONTENT_KINDS[kind].icon}</span> ${CONTENT_KINDS[kind].label}<small>${CONTENT_KINDS[kind].help}</small></span>`;
+const badge = (kind, extra='') => kind === 'action' ? '' : `<span class="content-kind ${extra}" data-kind-label="${kind}"><span aria-hidden="true">${CONTENT_KINDS[kind].icon}</span> ${CONTENT_KINDS[kind].label}<small>${CONTENT_KINDS[kind].help}</small></span>`;
 function requireText(value, label) { if (typeof value !== 'string' || !value.trim()) throw new Error(`시각 블록: ${label}이 필요하다`); }
 
 // 일자별 SQL 맥락과 파일 범위는 학습 원본에서 가져온다.
@@ -382,7 +382,7 @@ export function renderContentKinds(source,html) {
     word.textContent = word.textContent.replace(/정답(은|을|과|으로|이라고|이나|이(?=\s))/g, (_, particle) => '구현 예시' + ({은:'는',을:'를',과:'와',으로:'로',이라고:'라고',이나:'나',이:'가'})[particle]).replace(/정답/g, '구현 예시').replace(/answer(?:-fix)?\((D\d{2}-\d+)\)/g, '$1').replace(/예시 · 구현 예시/g, '구현 예시');
   }
   const h1=root.querySelector('h1');
-  if(h1){const identity=doc.createElement('p');identity.className='content-page-kind';identity.dataset.contentKind=type.kind;identity.innerHTML=`${badge(type.kind)}<strong>${esc(type.label)}</strong><span>${esc(type.help)}</span>`;h1.before(identity);}
+  if(h1){root.querySelector('.exercise-kind')?.remove();const identity=doc.createElement('p');identity.className='content-page-kind';identity.dataset.contentKind=type.kind;identity.innerHTML=`<strong>${esc(type.label)}</strong><span>${esc(type.help)}</span>`;h1.before(identity);}
   // 핵심 만들 것·규칙은 노출하고 긴 코드·정답만 접는다. 티켓의 접기는 건드리지 않는다.
   if(source.startsWith('course/java/')) {
     for(const section of root.querySelectorAll('.exercise-section')) {

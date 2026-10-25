@@ -1,22 +1,28 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { JSDOM } from 'jsdom';
-import { renderSiteNavigation, siteSection } from './site-navigation.mjs';
+import { renderSiteNavigation, renderSiteBreadcrumb, siteSection } from './site-navigation.mjs';
 
-const labels = ['홈', '과정 v2 · 일정', '과정 지도', '서비스 만들기', '실전 미션', '개념 학습'];
-const destinations = ['index.html', 'course/spring/README.html', 'course/map.html', 'scenario/README.html', 'practice/MISSIONS.html', 'docs/knowledge/README.html'];
+const labels = ['홈', '과정', '지도', '자료', '이전 과정'];
+const destinations = ['index.html', 'course/spring/README.html', 'course/map.html', 'course/resources.html', 'course/archive.html'];
 const examples = [
   ['README.md', '홈'],
-  ['course/spring/D11.md', '과정 v2 · 일정'],
-  ['course/map.md', '과정 지도'],
-  ['scenario/README.md', '서비스 만들기'],
-  ['scenario/ch1-create-post/1-2-dto-response.md', '서비스 만들기'],
-  ['scenario/labs/l12-query-methods/README.md', '서비스 만들기'],
-  ['practice/MISSIONS.md', '실전 미션'],
-  ['tickets/README.md', '실전 미션'],
-  ['docs/knowledge/README.md', '개념 학습'],
-  ['docs/knowledge/P02-mvc-layered-architecture.md', '개념 학습'],
-  ['lessons/nested/example.md', '개념 학습'],
+  ['course/spring/D11.md', '과정'],
+  ['course/map.md', '지도'],
+  ['course/README.md', '자료'],
+  ['course/resources.md', '자료'],
+  ['course/archive.md', '이전 과정'],
+  ['course/java/J01.md', '자료'],
+  ['course/tickets/B01.md', '자료'],
+  ['course/start/dummy/README.md', '자료'],
+  ['scenario/README.md', '이전 과정'],
+  ['scenario/ch1-create-post/1-2-dto-response.md', '이전 과정'],
+  ['scenario/labs/l12-query-methods/README.md', '이전 과정'],
+  ['practice/MISSIONS.md', '이전 과정'],
+  ['tickets/README.md', '이전 과정'],
+  ['docs/knowledge/README.md', '자료'],
+  ['docs/knowledge/P02-mvc-layered-architecture.md', '자료'],
+  ['lessons/nested/example.md', '이전 과정'],
   ['errors.md', null],
 ];
 for (const [source, section] of examples) {
@@ -33,7 +39,18 @@ for (const [source, section] of examples) {
   assert.equal(siteSection(source), section);
   const current = [...nav.querySelectorAll('[aria-current="page"]')];
   assert.deepEqual(current.map((link) => link.textContent), section ? [section] : [], `${source}: 현재 공간만 선택`);
-  assert.equal(Boolean(header.querySelector('.home-header-setup')), source === 'README.md', `${source}: 환경 안내는 홈에만`);
+  assert.equal(links.length, 5, `${source}: 전역 항목은 다섯 개`);
+  assert.equal(header.querySelectorAll('nav').length, 1, `${source}: 전역 메뉴 한 층`);
+  assert.equal(header.querySelector('.course-content-nav,.home-header-setup'), null, `${source}: 보조 전역 메뉴 제거`);
+  const crumb = new JSDOM(renderSiteBreadcrumb(source), {url:pageUrl.href});
+  if (section === '홈') assert.equal(crumb.window.document.querySelector('nav'), null);
+  else {
+    const trail = crumb.window.document.querySelector('nav.site-breadcrumb');
+    assert.equal(trail.getAttribute('aria-label'), '현재 위치');
+    assert.equal(trail.querySelector('a').href, 'https://learn.example/index.html');
+    assert.deepEqual([...trail.querySelectorAll('a')].map(link=>link.textContent), section ? ['홈', section] : ['홈']);
+  }
+  crumb.window.close();
   dom.window.close();
 }
 assert.equal(siteSection('scenario-other/README.md'), null, '폴더 이름 접두어만 같아도 시나리오로 처리하지 않음');
@@ -48,20 +65,22 @@ const css = fs.readFileSync(new URL('site.css', import.meta.url), 'utf8');
 assert.match(css, /\.site-topbar[^{}]*a:focus-visible\s*\{[^}]*outline:/, '키보드 포커스 표시');
 assert.match(css, /\.site-topbar[^{}]*nav[^{}]*\{[^}]*overflow-x:\s*auto/, '긴 메뉴의 가로 탐색 보존');
 assert.match(css, /\.site-topbar[^{}]*\[aria-current="page"\]/, '현재 공간 표시 스타일');
-console.log('공통 메뉴: 공간 분류·이름·상대 경로·현재 표시·홈 전용 환경 안내·빌드 연결 검사 통과');
+console.log('공통 메뉴: 공간 분류·이름·상대 경로·현재 표시·한 층·다섯 항목·경로 표시·빌드 연결 검사 통과');
 
 // 빌드 뒤에는 각 산출물이 공통 메뉴를 실제로 사용했는지 전체 경로에서 확인한다.
 if (process.argv.includes('--generated')) {
   const root = new URL('../../', import.meta.url);
   const sources = ['README.md', 'errors.md'];
   function collect(folder) {
+    if (folder === 'course/days') return;
+    if (folder === 'course/days') return;
     for (const entry of fs.readdirSync(new URL(folder, root), { withFileTypes: true })) {
       const source = `${folder}/${entry.name}`;
       if (entry.isDirectory()) collect(source);
       else if (entry.name.endsWith('.md')) sources.push(source);
     }
   }
-  for (const folder of ['docs/knowledge', 'scenario', 'practice', 'lessons', 'tickets']) collect(folder);
+  for (const folder of ['docs/knowledge', 'scenario', 'practice', 'lessons', 'tickets', 'course']) collect(folder);
   for (const source of sources) {
     const html = fs.readFileSync(new URL(source.replace(/\.md$/, '.html'), root), 'utf8');
     const header = html.match(/<header class="topbar[^"\n]*">[\s\S]*?<\/header>/)?.[0];

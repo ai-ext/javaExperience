@@ -57,7 +57,7 @@
       tab.addEventListener('click', function () { chooseTab(index, false, true); });
       tab.addEventListener('keydown', function (event) {
         var count = tabButtons.length;
-        var next = event.key === 'ArrowRight' ? (index + 1) % count : event.key === 'ArrowLeft' ? (index + count - 1) % count : event.key === 'Home' ? 0 : event.key === 'End' ? count - 1 : null;
+        var next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % count : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + count - 1) % count : event.key === 'Home' ? 0 : event.key === 'End' ? count - 1 : null;
         if (next === null) return; event.preventDefault(); chooseTab(next, true, true);
       });
       tabs.appendChild(tab); tabButtons.push(tab);
