@@ -34,7 +34,7 @@
           ],
           "brief": {
             "purpose": "COMMENT와 MENTION/NEW_POST 알림을 알림함에서 조회하고 읽음·커서 정책과 연결한다.",
-            "task": "기존 notification API를 확장하되 각 생성 원인의 트랜잭션 경계와 중복 방지를 보존한다.",
+            "task": "댓글·멘션·새 글 알림을 알림함에서 읽고, 페이지 이동과 읽음 처리 뒤 건수 변화를 확인합니다.",
             "preconditions": [
               "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다.",
               "12장과 16장은 practice 프로파일; 9-4 알림 스키마/응답을 확인한다. 알림은 회원 본인 범위다."
@@ -58,7 +58,9 @@
               }
             ],
             "policies": [
-              "MENTION은 본문 @닉네임 중 유효·활동 회원, 자기 자신/차단/접근불가/이미 알린 대상 제외; 중복 닉네임은 한 번, 최대 10명. NEW_POST는 글 커밋 후 활동 팔로워에게만. MENTION 댓글 생성 알림은 커밋 뒤 별도 트랜잭션; 새 글 알림은 AFTER_COMMIT."
+              "MENTION은 본문 @닉네임 중 유효·활동 회원, 자기 자신/차단/접근불가/이미 알린 대상 제외; 중복 닉네임은 한 번, 최대 10명. NEW_POST는 글 커밋 후 활동 팔로워에게만. MENTION 댓글 생성 알림은 커밋 뒤 별도 트랜잭션; 새 글 알림은 AFTER_COMMIT.",
+              "같은 transaction에서 원인 데이터가 rollback되면 그 원인의 알림도 남지 않습니다. 새 글 알림은 commit 후 생성되고, 댓글 mention 알림은 원문이 정한 별도 transaction 경계에서 확인합니다.",
+              "알림함은 읽음 여부 필터, cursor 페이지, 읽음 처리와 read-all 결과를 확인합니다. `size=0`은 400이며 notification 행·read_at·unreadCount는 그대로입니다."
             ],
             "inputs": [
               "legacy:12-2:K: POST /api/posts/15/comments; body={\"content\":\"[채점] 멘션 확인 @스프링요정 @스프링요정 @코딩하는고양이 @리팩토링중독 @밤샘개발자 @자바초보탈출 @떠난개발자 @디버깅중님 봐 주세요\"}; case=회원 3이 멘션 댓글; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"K\",\"expect\":{\"status\":201}}]",
@@ -101,12 +103,16 @@
             ]
           },
           "hints": [
-            "created_at이 같은 알림에서 시각만 cursor에 담으면 다음 묶음이 사라질 수 있는 이유는 무엇일까요?",
-            "멘션 문자열 중복·자기 자신·차단·열람 불가 수신자를 어떤 순서로 줄여야 할까요?",
-            "원인 저장이 롤백됐을 때 AFTER_COMMIT 리스너가 호출되지 않는지 어떤 DB 결과로 확인할까요?"
+            "같은 created_at 알림이 여러 건일 때 다음 페이지에서 빠뜨리지 않으려면 cursor에 어떤 정렬 기준이 더 필요할까요?",
+            "댓글 원인 데이터가 rollback됐을 때 notification 행도 남지 않았는지 어떤 전후 조회로 확인할까요?",
+            "중복 @닉네임·자기 자신·차단·비공개 수신자를 제외한 뒤 최대 10명을 세는 순서는 어떻게 되나요?"
           ],
           "recipeIds": [
             "legacy:12-2:K",
+            "legacy:12-2:N2",
+            "legacy:12-3:L5",
+            "legacy:12-3:L6",
+            "legacy:12-3:L7",
             "legacy:12-3:RA",
             "legacy:12-3:A",
             "legacy:12-3:S0",
@@ -179,16 +185,16 @@
           ],
           "brief": {
             "purpose": "글 생성과 좋아요 달성 알림은 원인 데이터 커밋이 완료된 뒤에만 만들고, 같은 milestone은 한 번만 기록한다.",
-            "task": "AFTER_COMMIT 이벤트, 멱등 batch result, 해당 받는 사람/알림 타입 필터를 연결한다.",
+            "task": "새 글과 좋아요 milestone 알림을 만들고, 같은 작업을 다시 실행해도 중복 알림이 생기지 않는지 확인합니다.",
             "preconditions": [
               "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다.",
               "practice 프로파일, V64/V70 알림/like_milestone 스키마, follower·like count 데이터와 원문 Clock을 사용한다."
             ],
             "scenario": [
               {
-                "start": "활성 팔로워가 있는 작성자가 글을 발행하거나 글의 좋아요가 원본 달성 구간에 도달합니다.",
-                "action": "글쓰기 commit 후 알림을 확인하고 같은 달성 처리를 반복 실행합니다.",
-                "result": "NEW_POST는 활성 팔로워 중 차단 관계가 없는 대상에게 가고, 같은 글/달성 구간의 축하 알림은 한 번만 생깁니다.",
+                "start": "기존 post 140의 좋아요 수를 원문 fixture에 맞춰 9로 준비하고 milestone 알림이 없습니다.",
+                "action": "좋아요 수를 10으로 만든 뒤 9로 내리고 다시 10으로 올린 다음 batch를 재실행합니다.",
+                "result": "10 도달 시 알림은 한 번만 생기며 반복 실행 뒤에도 같은 post·milestone 알림은 총 1건입니다.",
                 "after": "글쓰기 rollback에는 새 글 알림이 없고, 달성 기록과 알림은 같은 트랜잭션으로 확정됩니다."
               }
             ],
@@ -203,7 +209,8 @@
               }
             ],
             "policies": [
-              "NEW_POST는 ACTIVE follower만, 양방향 block 제외, 작성자 제외, DRAFT는 publish 때; AFTER_COMMIT. milestone은 실제 post_like 행 수, UNIQUE(post_id,milestone) INSERT 성공 시 알림; 기록과 알림은 한 transaction."
+              "NEW_POST는 ACTIVE follower만, 양방향 block 제외, 작성자 제외, DRAFT는 publish 때; AFTER_COMMIT. milestone은 실제 post_like 행 수, UNIQUE(post_id,milestone) INSERT 성공 시 알림; 기록과 알림은 한 transaction.",
+              "milestone 재현은 실제 좋아요 수 9→10→9→10 순서입니다. 알림은 처음 10회 도달 때만 1건 생성되며 같은 조건의 반복 배치는 중복 알림을 만들지 않습니다."
             ],
             "inputs": [
               "legacy:16-1:P: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 16-1 새 글 알림\",\"content\":\"팔로워에게 알림이 가는지 본다\",\"tags\":[\"java\",\"spring\",\"jpa\",\"mysql\",\"test\"]}; case=회원 4가 새 글; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P\",\"expect\":{\"status\":201}}]",
@@ -255,6 +262,11 @@
             "legacy:16-1:X1",
             "legacy:16-1:F",
             "legacy:15-5:M1",
+            "legacy:15-5:M2",
+            "legacy:15-5:M3",
+            "legacy:15-5:M4",
+            "legacy:15-5:M5",
+            "legacy:15-5:M6",
             "legacy:15-5:M7"
           ],
           "executionChecks": [],

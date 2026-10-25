@@ -28,7 +28,7 @@
           ],
           "brief": {
             "purpose": "정해진 시간 창의 허용량을 넘긴 글쓰기 요청은 429로 거절되고 저장되지 않는다.",
-            "task": "회원/기준 시각에 따른 요청 횟수 산정과 초과 실패를 구현한다.",
+            "task": "같은 회원이 유효한 글을 6번 보내 1~5회 성공과 6회 제한을 구분하고 저장된 글 수를 확인합니다.",
             "preconditions": [
               "시나리오 DB(`community`) — 앱을 기본 프로파일로 띄운다. 이 단계는 실제로 흐르는 1분을 센다(practice의 고정 시계로는 1분이 지나지 않는다).",
               "community 시간 흐르는 환경에서 동일 회원 요청을 실행한다. practice 고정 시계 예외는 15-3 원문과 연결한다."
@@ -55,7 +55,9 @@
               "새 글 등록과 복사 생성에 같은 회원별 60초 창을 적용합니다. 지우지 않은 최근 글 5개까지 허용하고 6번째부터 429입니다.",
               "입력 검증과 금칙어 검사를 통과한 뒤 셉니다. 400 실패 요청은 생성 횟수에 포함하지 않습니다. 읽기·다른 회원·댓글은 영향받지 않습니다.",
               "Retry-After는 창 안의 가장 오래된 글이 60초를 넘길 때까지 올림한 남은 초이며 1~60입니다. 본문 retryAfterSeconds와 맞추고 CORS exposedHeaders에 Retry-After를 노출합니다.",
-              "created_at과 판정 시각은 같은 초 단위의 지금을 사용합니다. 15-3의 Clock 적용 뒤에도 같은 Clock을 쓰며 practice 고정 Clock의 우회 예외를 보존합니다."
+              "created_at과 판정 시각은 같은 초 단위의 지금을 사용합니다. 15-3의 Clock 적용 뒤에도 같은 Clock을 쓰며 practice 고정 Clock의 우회 예외를 보존합니다.",
+              "동일 회원의 1~5번째 유효 작성은 201, 6번째는 429이며 초과 요청은 글·태그를 저장하지 않습니다. Retry-After는 1~60초이고 응답 필드 retryAfterSeconds와 헤더 값이 같습니다. 만료 후 요청은 새 창으로 판정합니다.",
+              "원문 레시피 P에는 6회 반복 실행과 회차별 응답을 연결합니다. 현재 request recipe의 기대 상태 집합만으로 각 회차를 분리 판정할 수 없으면 실행 기록에 회차별 201/429를 남기고, 요청 도구의 repeat 설정 변경은 범위 밖입니다."
             ],
             "inputs": [
               "legacy:13-5:P: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 도배 확인\",\"content\":\"1분 안에 여러 번 쓰기\"}; case=회원 12가 연달아 6번 글쓰기; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#1\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#2\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#3\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#4\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#5\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#6\",\"expect\":{\"status\":429,\"headers\":{\"Retry-After\":{\"matches\":\"^(?:[1-9]|[1-5][0-9]|60)$\",\"equals\":\"{{P#6.body.retryAfterSeconds}}\"},\"Access-Control-Expose-Headers\":{\"matches\":\"Retry-After\"}},\"json\":[{\"path\":\"$.status\",\"equals\":429},{\"path\":\"$.retryAfterSeconds\",\"gte\":1},{\"path\":\"$.retryAfterSeconds\",\"lte\":60}]}},{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"P#6\",\"expect\":{\"status\":429,\"headers\":{\"Retry-After\":{\"matches\":\"^(?:[1-9]|[1-5][0-9]|60)$\",\"equals\":\"{{P#6.body.retryAfterSeconds}}\"},\"Access-Control-Expose-Headers\":{\"matches\":\"Retry-After\"}},\"json\":[{\"path\":\"$.status\",\"equals\":429},{\"path\":\"$.retryAfterSeconds\",\"gte\":1},{\"path\":\"$.retryAfterSeconds\",\"lte\":60}]}}]",
