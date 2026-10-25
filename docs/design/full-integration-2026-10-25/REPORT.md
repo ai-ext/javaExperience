@@ -55,3 +55,5 @@ D23~D30은 학습자가 결정하는 예약 URI·필드가 원본에 고정돼 �
 실제 imagegen 시안 6장 중 4장을 선정했다. 원본 PNG는 외부 백업에 보존하고 동일 1536×1024 캔버스의 JPG quality95/4:4:4로 변환했다. JPEG는 손실 압축이다. 시안은 화면 배치 참고이며 계약 정본이 아니다. 이미지·해시·프롬프트는 `docs/design/service-consolidation-2026-10-25/`에 있다.
 
 새 화면의 최종 native PC·360px 캡처, overflow·메뉴 좌표·키보드/스크롤, 선택 시안과의 대조, 새 요청 도구의 native 호출은 브라우저 연결 복구 후 수행해야 한다. 관련 parity 4행은 `implemented`로 두고 `verified`로 올리지 않았다. 기존 장부의 상태·근거를 임의 승격하지 않았으며 새 service 수집 5,333행은 모두 미검토다.
+
+최종 소스 구현 커밋은 `8b144f50856e79dfe30f8a0e1216e7acedf50698`이며, 이후 생성 일치 검사에서도 HTML 차이0을 확인했다. 복원 확인과 최종 보관 대상은 `/Users/ds/backups/javaExperience/course-learning-integration-final-20261025/manifest.json`에서 확인한다.
