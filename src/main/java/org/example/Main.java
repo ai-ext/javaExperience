@@ -1,6 +1,6 @@
 package org.example;
 
-import org.springframework.boot.SpringApplication;
+import com.company.totaladmin.TotalAdminApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 // @SpringBootConfiguration + @EnableAutoConfiguration + @ComponentScan 을 합친 어노테이션
@@ -8,6 +8,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class Main {
     public static void main(String[] args) {
-        SpringApplication.run(Main.class, args);
+        TotalAdminApplication.main(args);
     }
 }
