@@ -117,8 +117,17 @@ assert.equal(JSON.parse(browse.window.localStorage.getItem(PROGRESS_KEY)).active
 assert.equal(browse.$('.learning-progress-bar button').hidden, false); browse.close();
 for (const task of Object.values(TASKS)) {
   const lesson = page(task.href);
+  if (task.functionalId) {
+    lesson.window.eval(fs.readFileSync(new URL('tools/site/functional-scenario.js', root), 'utf8'));
+    lesson.doc.dispatchEvent(new lesson.window.Event('DOMContentLoaded'));
+  }
   initLearning(lesson.doc, lesson.window);
-  assert.ok(lesson.$('.learning-progress-bar'), `${task.id} 진행 연결`);
+  if (task.functionalId) {
+    assert.equal(lesson.$('.learning-progress-bar'), null, `${task.id}: 기존 단계 진도를 중복 표시하지 않음`);
+    assert.ok(lesson.$('[data-fw-home-status]'), `${task.id}: 기능별 진도 연결`);
+    lesson.$('[data-fw-begin]').click();
+    assert.equal(JSON.parse(lesson.window.localStorage.getItem(PROGRESS_KEY)).active, task.id);
+  } else assert.ok(lesson.$('.learning-progress-bar'), `${task.id} 진행 연결`);
   lesson.close();
 }
 console.log('홈 DOM: 선택/취소·예시 입력·패널 복귀·이어하기·장면 복원·수동 완료·6개 과제 연결 통과');

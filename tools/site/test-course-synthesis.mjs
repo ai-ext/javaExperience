@@ -11,7 +11,7 @@ const read = p => fs.readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8'
 const script = read('tools/site/course.js');
 const KEY = 'javaexperience.course.progress.v1';
 
-test('선택 워밍업도 세 장면을 이동하며 원문·앵커·확인 기록을 지킨다', async () => {
+test('선택 워밍업도 세 장면을 이동하며 원문·앵커·확인 기록을 지킨다', {timeout:10000}, async () => {
   const root = new URL('../../', import.meta.url).pathname;
   const { roadmap } = loadCourseSources();
   const original = marked.parse(renderD00(roadmap, root))
@@ -36,11 +36,13 @@ test('선택 워밍업도 세 장면을 이동하며 원문·앵커·확인 기�
   await new Promise(resolve => dom.window.addEventListener('load', resolve));
   const visible = () => panels.filter(panel => !panel.hidden);
   assert.deepEqual(visible(), [panels[0]]);
+  // 공통 내비게이션은 pushState로 주소와 장면을 동기 전환하므로 native hashchange를 기다리지 않는다.
   doc.querySelector('.step-next').click();
-  await new Promise(resolve => dom.window.setTimeout(resolve, 10));
+  assert.equal(dom.window.location.hash, '#' + panels[1].id, '다음 순서 주소도 함께 갱신한다');
   assert.deepEqual(visible(), [panels[1]]);
+  const anchorHashChange = new Promise(resolve => dom.window.addEventListener('hashchange', resolve, { once: true }));
   dom.window.location.hash = '#오늘-할-것';
-  await new Promise(resolve => dom.window.setTimeout(resolve, 10));
+  await anchorHashChange;
   assert.deepEqual(visible(), [panels[0]], '기존 내부 앵커로 이동해도 소유 장면을 연다');
   doc.querySelector('[data-day-expand]').click();
   assert.equal(visible().length, 3);
@@ -264,8 +266,10 @@ test('실행안 4: D11 선택은 기존 진도를 보존하고 D14·홈에 같�
 test('실행안 5: 어디서나 일자 목록·지도로 이동하고 D11 준비 기록은 진도와 분리된다', async () => {
   for (const from of ['README.md','course/java/J09.md','scenario/ch1-create-post/1-1-project-setup.md']) {
     const doc = new JSDOM(renderSiteNavigation(from) + renderSectionNavigation(from), {url:`https://learn.test/${from}`}).window.document;
-    assert.ok([...doc.querySelectorAll('a')].some(a => a.href === 'https://learn.test/course/spring/README.html'));
-    if(from.startsWith('course/')) assert.ok([...doc.querySelectorAll('.section-navigation a')].some(a => a.href === 'https://learn.test/course/map.html'));
+    // 일자 목록은 서비스 사이드바에, 과정 지도는 독립 상단 메뉴에 둔다.
+    assert.ok([...doc.querySelectorAll('a')].some(a => a.href === 'https://learn.test/scenario/README.html'));
+    if(from !== 'README.md') assert.ok([...doc.querySelectorAll('.section-navigation a')].some(a => a.href === 'https://learn.test/course/spring/README.html'));
+    assert.ok([...doc.querySelectorAll('.site-topbar nav a')].some(a => a.href === 'https://learn.test/course/map.html'));
     assert.equal(doc.querySelectorAll('.site-topbar nav a').length,5);
   }
   const page = await open('course/spring/D11.html');

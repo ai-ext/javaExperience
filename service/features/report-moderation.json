@@ -1,0 +1,292 @@
+{
+  "version": 1,
+  "id": "report-moderation",
+  "title": "신고를 받고 운영자가 글 숨기기",
+  "summary": "회원 신고를 저장하고 관리자에게 신고 목록을 제공해 검토 대상을 찾게 합니다.",
+  "difficulty": "중급",
+  "group": "운영과 안전",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "report",
+      "title": "신고 접수와 관리자 목록 연결하기"
+    },
+    {
+      "id": "verify",
+      "title": "권한과 숨김 이후 상태 함께 확인하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "report",
+          "title": "신고 접수와 관리자 목록 연결하기",
+          "sourceUnits": [
+            "course:D10-1",
+            "course:D10-2"
+          ],
+          "brief": {
+            "purpose": "회원 신고를 저장하고 관리자에게 신고 목록을 제공해 검토 대상을 찾게 합니다.",
+            "task": "같은 회원의 같은 글 중복 신고를 막고 신고 등록 뒤 ADMIN 목록에 나타나는지 USER와 ADMIN 권한을 비교하세요.",
+            "preconditions": [
+              "ACTIVE 게시글 P-101, USER 회원 A/B, ADMIN token을 준비한다. A는 P-101을 아직 신고하지 않았다.",
+              "D10 ReportServiceTest의 같은 회원·같은 글 duplicate 규칙과 실제 source recipe를 연결한다."
+            ],
+            "scenario": [
+              {
+                "start": "ACTIVE P-101에 USER A/B가 있고 기존 신고는 0건이다.",
+                "action": "A가 POST /api/posts/101/reports를 보낸다. A로 같은 요청을 다시 보내고 B로 한 번 신고한다. ADMIN과 USER token으로 GET /api/admin/reports를 각각 호출한다.",
+                "result": "A 첫 신고 201, A 중복 신고 409 `/errors/duplicate`, B 신고 201이다. ADMIN 목록은 200이고 USER 목록은 403이다.",
+                "after": "DB report는 회원·글 조합별 한 건만 존재하고 관리 목록은 신고 2건을 표시한다. 실패한 duplicate나 USER 권한 요청으로 report 상태가 더 생기지 않는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "report(post_id, reporter_member_id)",
+                "reason": "신고 대상과 신고자를 외래키로 묶고 동일 조합 중복을 제약한다."
+              },
+              {
+                "name": "report reason/status/created_at",
+                "reason": "관리자가 신고를 분류·처리하고 시간순으로 검토하는 데 필요한 사건 정보를 보존한다."
+              },
+              {
+                "name": "ADMIN/USER security principal",
+                "reason": "관리자 목록의 200/403을 JWT 역할에 따라 분리한다."
+              },
+              {
+                "name": "CursorPage<ReportResponse>",
+                "reason": "관리 목록에서 items와 nextCursor를 읽고 다건 신고를 다음 페이지로 연결한다."
+              }
+            ],
+            "policies": [
+              "같은 회원이 같은 글을 다시 신고하면 409이며 존재하지 않는 대상은 정상 신고로 저장하지 않습니다.",
+              "GET /api/admin/reports는 ADMIN 200, USER 403입니다. 인증 없음과 권한 부족도 별도로 확인합니다.",
+              "데이터베이스의 대상 참조와 UNIQUE 불변식을 설계 메모와 실행 증거로 남깁니다.",
+              "원문 완료 기준: `ReportServiceTest` 통과: 같은 회원이 같은 글을 다시 신고하면 `/errors/duplicate` 예외",
+              "원문 완료 기준: 설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+              "원문 완료 기준: DB 불변식 확인: 같은 회원·같은 글 신고의 두 번째 INSERT와 존재하지 않는 대상 참조를 거부한다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다.",
+              "원문 완료 기준: `POST /api/posts/{postId}/reports` → 201, 다시 → 409",
+              "원문 완료 기준: ADMIN 토큰으로 `GET /api/admin/reports` → 200, USER 토큰 → 403",
+              "원문 완료 기준: `POST /api/admin/posts/{postId}/hide` → 200, 이후 `GET /api/posts/{postId}` → 404, 연결한 신고는 `RESOLVED`, 인기글에서도 바로 빠진다"
+            ],
+            "inputs": [
+              "USER A: POST /api/posts/101/reports JSON은 recipe의 reason sample을 사용하고 유효 token을 포함한다. 기대 첫 201; 같은 회원/글 중복 409.",
+              "USER B는 같은 post에 신고해도 별도 reporter라면 201이다.",
+              "GET /api/admin/reports: ADMIN Bearer → 200 `{items,nextCursor}`; USER Bearer → 403 `/errors/forbidden`; token 없음은 401."
+            ],
+            "success": [
+              "P-101 신고 0건에서 USER A 첫 POST → 201; 같은 A+post 재요청 → 409 `/errors/duplicate`; USER B 신고 → 201. report row는 조합당 1개다.",
+              "ADMIN GET /api/admin/reports → 200 CursorPage `{items,nextCursor}`의 목록에 A/B 두 건; USER GET → 403.",
+              "없는 post 신고는 404이며 report row가 생성되지 않는다."
+            ],
+            "failures": [
+              {
+                "when": "USER A가 같은 P-101에 두 번째 신고",
+                "result": "409 `/errors/duplicate`.",
+                "unchanged": "A/P-101 조합 row는 한 건이고 created report count는 증가하지 않는다."
+              },
+              {
+                "when": "USER token으로 GET /api/admin/reports",
+                "result": "403 `/errors/forbidden`; token 누락은 401.",
+                "unchanged": "신고 목록·상태가 바뀌지 않고 응답은 관리자 데이터를 공개하지 않는다."
+              },
+              {
+                "when": "존재하지 않는 postId 신고",
+                "result": "404 not found.",
+                "unchanged": "report row나 없는 post FK가 남지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "같은 글에 회원별 신고",
+                "start": "P-101 ACTIVE, 신고 row 없음. A와 B는 다른 USER다.",
+                "action": "A 신고, A 중복 신고, B 신고 순서로 보낸다.",
+                "result": "201, 409, 201이며 DB에 reporter A/B 각각 한 행만 생긴다."
+              },
+              {
+                "title": "관리자 목록 권한",
+                "start": "신고 2건이 저장돼 있다.",
+                "action": "같은 GET /api/admin/reports를 ADMIN과 USER token으로 각각 호출한다.",
+                "result": "ADMIN 200에 두 신고, USER 403, 저장 상태 불변."
+              }
+            ],
+            "work": [
+              "report table의 post/member FK와 UNIQUE(post_id,reporter_id)를 설계하고 직접 중복 INSERT를 거부한다.",
+              "동일 회원 duplicate와 다른 회원 신고를 각각 실행하고 관리자 경로에 역할 보안을 적용한다.",
+              "HTTP 결과·report row·관리 목록 cursor를 함께 확인한다."
+            ],
+            "done": [
+              "A의 최초 신고 201, 같은 조합 409, B의 신고 201을 확인했다.",
+              "ADMIN 목록 200에 두 신고가 있고 USER 403/무 token 401임을 확인했다.",
+              "외래키·UNIQUE 제약 및 잘못된 postId 404 뒤 무저장 근거를 남겼다."
+            ]
+          },
+          "hints": [
+            "같은 post에 A와 B가 신고한 경우 중복을 판정하는 UNIQUE 키에 회원 ID가 필요한 이유는 무엇인가요?",
+            "관리 API에서 무인증 401과 USER 403은 각각 어느 보안 판단 뒤에 반환되나요?",
+            "존재하지 않는 post를 신고할 때 service 검증만으로 충분한지 FK는 어떤 보존 역할을 하나요?",
+            "중복 409 응답만 확인하지 말고 DB에서 어떤 row 수를 비교해야 하나요?"
+          ],
+          "recipeIds": [
+            "board:post-report:normal",
+            "board:admin-reports:normal",
+            "board:post-detail:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D10-1 · 신고 정보와 신고 서비스 설계 — 데이터 요구사항 §6-8을 만족하도록 테이블을 직접 설계·생성",
+              "href": "course/spring/D10.html#step-d10-1"
+            },
+            {
+              "label": "course:D10-2 · 신고 API와 관리자 신고 목록·글 숨김 (`SecurityConfig`에 `@EnableMethodSecurity`, `AdminService`에 `@PreAuthorize`)",
+              "href": "course/spring/D10.html#step-d10-2"
+            }
+          ]
+        },
+        {
+          "id": "verify",
+          "title": "권한과 숨김 이후 상태 함께 확인하기",
+          "sourceUnits": [
+            "course:D10-6"
+          ],
+          "brief": {
+            "purpose": "메서드 권한 테스트와 실제 Testcontainers 통합 흐름으로 신고부터 숨김 결과까지 연결합니다.",
+            "task": "기존 신고→숨김→감사 로그 흐름을 테스트해 USER 차단과 ADMIN 권한을 확인하세요. 운영 관찰 항목은 요청된 근거 자료로 기록하고 로컬 임시 설정을 복원합니다.",
+            "preconditions": [
+              "Testcontainers MySQL과 ADMIN/USER token을 준비하고 테스트 메서드에 `@Transactional`을 두지 않는다.",
+              "ACTIVE 신고 대상 post, 신고 1건, popular cache 및 audit 조회가 가능한 관찰 데이터를 만든다. D10-6의 테스트 기준을 따른다."
+            ],
+            "scenario": [
+              {
+                "start": "P-101 ACTIVE, report R-1 OPEN, 인기글 cache에 P-101 포함, audit HIDE_POST row 0인 상태다.",
+                "action": "AdminControllerTest에서 USER로 reports GET을 호출한다. 통합에서는 ADMIN 숨김 POST /api/admin/posts/101/hide 후 GET detail, GET popular, GET audit logs를 재조회한다.",
+                "result": "USER 관리자 목록은 403. ADMIN hide는 200; report R-1은 RESOLVED, detail GET은 404, popular GET은 200이지만 P-101을 제외하며 audit에 HIDE_POST 1건이 있다.",
+                "after": "테스트 transaction을 test method가 감싸지 않았기 때문에 commit 이후 API 별도 요청에서도 숨김·신고·감사·캐시 결과가 보이는지 확인한다. thread dump/metrics/slow log/EXPLAIN ANALYZE의 로컬 관찰 및 설정 복원 기록도 분리한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "ADMIN/USER token과 응답 status",
+                "reason": "권한 단위 테스트가 허용된 역할만 통과시키는지 비교한다."
+              },
+              {
+                "name": "post ACTIVE→HIDDEN, report OPEN→RESOLVED",
+                "reason": "숨김이 글 공개 상태와 연결 신고 상태를 함께 바꿨는지 보존한다."
+              },
+              {
+                "name": "audit action HIDE_POST",
+                "reason": "운영자가 어떤 글에 어떤 조치를 했는지 기록하는 append-only 이력을 확인한다."
+              },
+              {
+                "name": "popular cache와 thread/metric/query evidence",
+                "reason": "커밋 뒤 cache 무효화 및 D10-6 관찰 요구를 각각 시험한다."
+              }
+            ],
+            "policies": [
+              "AdminControllerTest의 USER 요청은 403이어야 합니다. AdminFlowIntegrationTest는 Testcontainers MySQL을 사용하고 테스트 메서드에 @Transactional을 붙이지 않습니다.",
+              "기존 D10-6의 운영 관찰 체크리스트를 삭제하거나 다른 기능의 완료 기준으로 흡수하지 않습니다.",
+              "원문 완료 기준: `AdminControllerTest` 통과 (`@WebMvcTest`: USER 토큰으로 `GET /api/admin/reports` → 403)",
+              "원문 완료 기준: `AdminFlowIntegrationTest` 통과 (Testcontainers MySQL, 테스트 메서드에 `@Transactional` 없이 신고 → 숨김 → 감사 로그)",
+              "원문 완료 기준: 내 서버의 스레드 덤프·메트릭·slow log·EXPLAIN ANALYZE를 한 번씩 관찰하고 각각 해석 한 문장과 로컬 임시 설정 복원 기록을 제출한다"
+            ],
+            "inputs": [
+              "AdminControllerTest: USER token으로 GET /api/admin/reports; 기대 403. 인증 필터/security가 test slice에 포함됐는지 확인한다.",
+              "통합 흐름: 신고→ADMIN POST /api/admin/posts/101/hide → GET /api/posts/101, GET /api/posts/popular, GET /api/admin/audit-logs.",
+              "Testcontainers MySQL, 테스트 method @Transactional 없음. 운영 관찰 항목: thread dump, metrics, slow log, EXPLAIN ANALYZE 각각 한 번과 임시 설정 복원 기록."
+            ],
+            "success": [
+              "AdminControllerTest USER GET /api/admin/reports → 403.",
+              "Testcontainers MySQL 통합: report OPEN 1건 + post ACTIVE → admin hide 200; post HIDDEN, report RESOLVED, detail GET 404, popular GET 200에서 post 제외, audit HIDE_POST 1건.",
+              "통합 테스트 method에 @Transactional 없음. thread dump/metrics/slow log/EXPLAIN ANALYZE 관찰 설명과 로컬 설정 복원을 기록한다."
+            ],
+            "failures": [
+              {
+                "when": "USER가 admin reports/hide 권한을 사용",
+                "result": "403.",
+                "unchanged": "P-101 ACTIVE, R-1 OPEN, popular 포함, audit HIDE_POST row 0으로 유지한다."
+              },
+              {
+                "when": "hide 요청은 200이나 다음 요청에서 detail이 계속 200/popular에 계속 포함",
+                "result": "통합 흐름이 실패한다. detail은 404이고 popular cache는 commit 직후 P-101을 빼야 한다.",
+                "unchanged": "HIDDEN/RESOLVED 변경과 audit 기록이 partial commit되지 않도록 transaction 결과를 대조한다."
+              },
+              {
+                "when": "@Transactional test method 안에서만 hide 결과를 읽음",
+                "result": "테스트 종료 전 rollback/공유 persistence context에 의존해 실제 commit 이후 상태를 검증하지 못한다.",
+                "unchanged": "테스트를 실제 transaction 밖 별도 요청으로 실행한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "권한과 숨김 통합 흐름",
+                "start": "P-101 ACTIVE, R-1 OPEN, popular에서 보이고 audit HIDE_POST는 0건.",
+                "action": "USER 권한 test 뒤 ADMIN hide 200을 보내고 새 transaction/request에서 세 GET을 실행한다.",
+                "result": "USER 403; hide 200; detail 404; popular 200에서 제거; report RESOLVED; audit 1건."
+              },
+              {
+                "title": "커밋 전후 확인",
+                "start": "hide transaction이 시작됐지만 아직 commit 전인 로그 타임라인이다.",
+                "action": "commit event와 이후 popular 조회를 request ID/시각으로 정렬한다.",
+                "result": "cache eviction은 commit 뒤이며 rollback 실행에서는 기존 ACTIVE/cache 상태와 audit 부재가 유지된다."
+              }
+            ],
+            "work": [
+              "Controller slice test에 실제 권한 경로가 포함되는지 확인하고 USER 403 테스트를 둔다.",
+              "Testcontainers 통합 시나리오에서 신고, hide, report resolution, audit insert, cache eviction을 각각 읽어 본다.",
+              "요청 ID 로그와 운영 관찰 산출물을 분리해 남기고 로컬 임시 설정을 복원한다."
+            ],
+            "done": [
+              "USER admin list 403 test와 Testcontainers 기반 commit 후 통합 결과를 확인했다.",
+              "ADMIN hide 뒤 post 404, popular 제외, report RESOLVED, audit HIDE_POST 1건을 확인했다.",
+              "thread dump·metrics·slow log·EXPLAIN ANALYZE 네 관찰과 temporary config 복원을 기록했다."
+            ]
+          },
+          "hints": [
+            "`@WebMvcTest`에서 security filter가 빠지면 USER 403 검증은 어떤 경로를 놓치나요?",
+            "테스트 method의 @Transactional이 hide 결과를 rollback시키면 다음 독립 요청에서 무엇이 달라지나요?",
+            "post status, report state, audit insert, cache eviction 중 commit 이후 확인해야 할 항목은 무엇인가요?",
+            "hide 200을 받았는데 popular 결과에 글이 남으면 transaction과 cache log를 어떤 시간 순서로 비교하나요?"
+          ],
+          "recipeIds": [
+            "board:post-detail:normal",
+            "board:post-popular:normal",
+            "board:admin-reports:normal",
+            "board:admin-hide:normal"
+          ],
+          "executionChecks": [
+            {
+              "title": "권한 slice test",
+              "command": "./gradlew test --tests \"*AdminControllerTest\"",
+              "expected": "USER 토큰 신고 목록 조회가 403인지 확인한다.",
+              "record": "테스트 결과와 실제 보안 필터가 포함됐는지 기록한다."
+            },
+            {
+              "title": "통합 흐름",
+              "command": "./gradlew test --tests \"*AdminFlowIntegrationTest\"",
+              "expected": "Testcontainers MySQL에서 신고→숨김→감사 로그 흐름이 연결되는지 확인한다.",
+              "record": "통합 테스트 결과와 트랜잭션/DB 관찰을 기록한다."
+            }
+          ],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D10-6 · 관리자 권한 슬라이스 테스트와 신고→숨김→감사 로그 통합 테스트",
+              "href": "course/spring/D10.html#step-d10-6"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

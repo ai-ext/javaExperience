@@ -3,6 +3,8 @@ import { renderSectionNavigation } from './site-navigation.mjs';
 import { JSDOM } from 'jsdom';
 import { initCoreLearning } from './core-learning.js';
 import { initKnowledgeCatalog } from './knowledge-catalog-controller.mjs';
+import { mountServiceFeaturePages } from './service-feature-client.mjs';
+import { mountServiceRequestTools } from './service-request-client.mjs';
 const reader = fs.readFileSync(new URL('./knowledge-reader.js', import.meta.url),'utf8');
 const switcher = fs.readFileSync(new URL('./section-switcher.js', import.meta.url),'utf8');
 // 런타임과 같은 탐색 규칙으로 레이아웃을 먼저 확정한다.
@@ -31,6 +33,11 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
     win.matchMedia=()=>({matches:false});
     const script=fs.readFileSync(new URL('./course-map.js',import.meta.url),'utf8').replace("var tables = document.querySelector('.cm-tables');",'var tables = null;');
     win.eval(script);
+  }
+  // 서비스 원본 renderer의 JS 없는 전체 열람 계약은 보존하고, 배포 HTML만 런타임 첫 상태로 만든다.
+  if(doc.querySelector('[data-sf-catalog],[data-sf-feature]')) {
+    mountServiceFeaturePages(doc);
+    mountServiceRequestTools(doc);
   }
   win.eval(switcher);doc.dispatchEvent(new win.Event('DOMContentLoaded'));
   const main=doc.querySelector('main');
@@ -75,20 +82,22 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
     const owner=node.closest('[data-day-panel],[data-section-panel]');
     if(owner)panelMap[node.id]=owner.id;
   }
+  const knowledgeCategories=[...new Set([...doc.querySelectorAll('button[data-kc-category]')].map(button=>button.dataset.kcCategory))];
+  const servicePanels=[...doc.querySelectorAll('[data-sf-stage-panel]')].map(e=>({id:e.id,variant:e.dataset.sfVariant,stage:e.dataset.sfStage}));
   const dayPanels=[...doc.querySelectorAll('.day-stepper-main > [data-day-panel]')].map(e=>({id:e.id,display:e.matches('.day-stage-wrap')?'grid':'block',initial:!e.hidden}));
   const prepare=doc.createElement('script');
-  prepare.textContent=`(${prepareFirstPaint.toString()})(${JSON.stringify({panelMap,dayPanels})});`;
+  prepare.textContent=`(${prepareFirstPaint.toString()})(${JSON.stringify({panelMap,dayPanels,servicePanels,knowledgeCategories})});`;
   doc.head.append(prepare);
-  const release=doc.createElement('script');release.textContent="document.getElementById('first-paint-state')?.remove();";doc.body.append(release);
+  const release=doc.createElement('script');release.textContent="document.getElementById('first-paint-state')?.stopEarlySelection?.();document.getElementById('first-paint-state')?.remove();";doc.body.append(release);
   const fallback=doc.createElement('noscript');
-  const fallbackStyle=doc.createElement('style');fallbackStyle.textContent='body main [data-day-panel][hidden],body main [data-wrap-panel][hidden],body main [data-section-panel][hidden],body main [data-config-panel][hidden]{display:block!important}body .section-switcher,body .day-wrap-tabs,body [data-day-expand]{display:none!important}';fallback.append(fallbackStyle);
+  const fallbackStyle=doc.createElement('style');fallbackStyle.textContent='body main [data-day-panel][hidden],body main [data-wrap-panel][hidden],body main [data-section-panel][hidden],body main [data-config-panel][hidden],body main [data-sf-stage-panel][hidden],body main [data-sf-aside-stage][hidden],body main [data-sf-group-cards][hidden],body main [data-sf-api-rows][hidden]{display:block!important}body .section-switcher,body .day-wrap-tabs,body [data-day-expand]{display:none!important}';fallback.append(fallbackStyle);
   doc.head.append(fallback);
   // 교육 예시의 구간 경계는 같은 글자로 표시하되 실제 병합 마커와 구분한다.
   const result=dom.serialize().replace(/^[ \t]+$/gm,'').replace(/^={7}$/gm,'&#61;======');win.close();return result;
 }
 
 // head에서 실행된다. 런타임이 같은 선택을 인계받은 뒤 임시 CSS만 제거한다.
-function prepareFirstPaint({panelMap,dayPanels}) {
+function prepareFirstPaint({panelMap,dayPanels,servicePanels,knowledgeCategories}) {
   const root=document.documentElement;
   root.classList.add('js');
   let format='yml';try {if(localStorage.getItem('javaexperience.course.config-format.v1')==='properties')format='properties';}catch{}
@@ -96,6 +105,32 @@ function prepareFirstPaint({panelMap,dayPanels}) {
   let id='';try{id=decodeURIComponent(location.hash.slice(1));}catch{}
   const style=document.createElement('style');style.id='first-paint-state';
   const active=panelMap[id]||dayPanels.find(p=>p.initial)?.id;
+  const category=id.startsWith('kc-category-')?id.slice('kc-category-'.length):null;
+  if(category && knowledgeCategories.includes(category) && panelMap['kc-browse-view']) {
+    // 큰 문서는 body 끝의 controller보다 먼저 페인트될 수 있어 분야 패널과 선택 표시를 먼저 인계한다.
+    const target='kc-browse-view';
+    style.textContent+=`html.js body main [data-section-panel]:not(#${target}):not(:has(#${target})):not(#${target} [data-section-panel]){display:none!important}html.js body main #${target}{display:block!important}`;
+    const select=()=>{
+      for(const button of document.querySelectorAll('.section-switcher [data-section-target]')) {
+        const selected=button.dataset.sectionTarget===target;
+        button.setAttribute('aria-selected',String(selected));button.tabIndex=selected?0:-1;
+      }
+      for(const button of document.querySelectorAll('button[data-kc-category]')) {
+        const selected=button.dataset.kcCategory===category;
+        button.setAttribute('aria-pressed',String(selected));button.tabIndex=selected?0:-1;
+      }
+    };
+    const observer=new MutationObserver(select);
+    observer.observe(document,{childList:true,subtree:true});
+    style.stopEarlySelection=()=>observer.disconnect();
+    select();
+  }
+  if(servicePanels.length){
+    const params=new URLSearchParams(location.search);
+    const selected=servicePanels.find(p=>p.id===id)||servicePanels.find(p=>p.variant===params.get('variant')&&p.stage===params.get('stage'))||servicePanels[0];
+    style.textContent+=servicePanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===selected.id?'block':'none'}!important}`).join('');
+    style.textContent+=`html.js body main [data-sf-aside-stage]{display:none!important}html.js body main [data-sf-aside-stage][data-sf-variant="${CSS.escape(selected.variant)}"][data-sf-stage="${CSS.escape(selected.stage)}"]{display:block!important}`;
+  }
   if(dayPanels.length)style.textContent+=dayPanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===active?p.display:'none'}!important}`).join('');
   // 설정 형식은 CSS가 첫 페인트부터, controller가 DOM·키보드 상태를 이어받는다.
   style.textContent+=`html.js body main [data-config-panel]{display:none!important}html.js body main [data-config-panel="${format}"]{display:block!important}`;

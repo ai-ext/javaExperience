@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "id": "db-result-integrity",
+  "title": "JOIN과 집계에서도 빠지거나 늘지 않는 결과 만들기",
+  "summary": "선택 정보가없는행도보존하고여러일대다관계의행곱셈이집계를왜곡하지않게합니다.",
+  "difficulty": "중급",
+  "group": "조회와 성능",
+  "prerequisites": [
+    "db-list-queries"
+  ],
+  "stages": [
+    {
+      "id": "joins",
+      "title": "선택 정보·집계·존재 조건을 정확하게 조립하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "practice",
+      "project": "practice",
+      "label": "DB 비교 실습 · 연결 대상은 각 단계에 표시",
+      "stages": [
+        {
+          "id": "joins",
+          "title": "선택 정보·집계·존재 조건을 정확하게 조립하기",
+          "sourceUnits": [
+            "support:scenario/db-query-journey/db-03-detail-join.md",
+            "support:scenario/db-query-journey/db-05-aggregate-fanout.md",
+            "support:scenario/db-query-journey/db-06-exists-not-exists.md"
+          ],
+          "brief": {
+            "purpose": "선택 정보가없는행도보존하고여러일대다관계의행곱셈이집계를왜곡하지않게합니다.",
+            "task": "상세의 필수/선택 JOIN, 좋아요 2개·댓글 3개의 합성 집계, 좋아요를 눌렀지만 북마크하지 않은 글의 존재 조건을 직접 SELECT로 검증하세요.",
+            "preconditions": [
+              "상세·합성 CTE는 원문 community 연결을, 좋아요/북마크 M9-6은 practice 연결을 사용합니다.",
+              "원문 합성 id 41/42와 71/72/73은 실제 게시글 집계가 아닌 설명용 데이터입니다."
+            ],
+            "scenario": [
+              {
+                "start": "글 한 개에 좋아요 2개·살아 있는 댓글 3개가 있고, 다른 글은 태그나 댓글이 없습니다.",
+                "action": "두관계를직접JOIN한6행을보고관계별선집계결과2/3과비교합니다. 회원12의좋아요-북마크조건을EXISTS/NOT EXISTS/LEFT JOIN으로비교합니다.",
+                "result": "선택 정보가 없는 글이 사라지지 않고 좋아요 수 2·댓글 수 3이 맞으며, 각 존재 조건의 글 id와 순서가 같습니다.",
+                "after": "NOT IN의NULL조건과실제NOT NULL제약을구분하고읽기전용결과를기록합니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "필수 작성자와 선택 태그/댓글",
+                "reason": "JOIN 종류에 따른 행 보존을 판정합니다."
+              },
+              {
+                "name": "관계별 집계와 존재 여부",
+                "reason": "2×3 입력 행을 각각 2/3 결과와 구분합니다."
+              }
+            ],
+            "policies": [
+              "COUNT(DISTINCT)로 수를 고쳐도 SUM·가중치 합이 자동으로 수정되지는 않습니다.",
+              "practice seed/인덱스는수정하지않습니다.",
+              "합성 6행을 실제 데이터 측정 결과라고 표시하지 않습니다."
+            ],
+            "inputs": [
+              "합성 좋아요 2/댓글 3·태그 없는 글·회원 12·좋아요/북마크 관계·실제 NULL 제약"
+            ],
+            "success": [
+              "선택 정보가 없는 글이 사라지지 않고 좋아요 수 2·댓글 수 3이 맞으며, 각 존재 조건의 글 id와 순서가 같습니다."
+            ],
+            "failures": [
+              {
+                "when": "직접 JOIN 집계가 6/6이 되거나 태그 없는 글이 누락",
+                "result": "관계별 행 수와 필터 위치를 분리해 정확한 결과로 수정합니다.",
+                "unchanged": "실습 읽기는 기존 관계나 seed를 바꾸지 않습니다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "같은 대상의 전후 비교",
+                "start": "글 한 개에 좋아요 2개·살아 있는 댓글 3개가 있고, 다른 글은 태그나 댓글이 없습니다.",
+                "action": "두관계를직접JOIN한6행을보고관계별선집계결과2/3과비교합니다. 회원12의좋아요-북마크조건을EXISTS/NOT EXISTS/LEFT JOIN으로비교합니다.",
+                "result": "NOT IN의NULL조건과실제NOT NULL제약을구분하고읽기전용결과를기록합니다."
+              }
+            ],
+            "work": [
+              "상세의 필수/선택 JOIN, 좋아요 2개·댓글 3개의 합성 집계, 좋아요를 눌렀지만 북마크하지 않은 글의 존재 조건을 직접 SELECT로 검증하세요."
+            ],
+            "done": [
+              "NOT IN의NULL조건과실제NOT NULL제약을구분하고읽기전용결과를기록합니다."
+            ]
+          },
+          "hints": [
+            "좋아요 2개와 댓글 3개를 JOIN하면 왜 6쌍이 생기나요?",
+            "선택 정보가 없는 글을 남기려면 조건을 WHERE와 ON 중 어디에 두어야 할까요?",
+            "NOT IN비교집합에NULL이있을수있는지실제스키마에서확인했나요?"
+          ],
+          "recipeIds": [],
+          "executionChecks": [
+            {
+              "title": "선택 정보·집계·존재 조건을 정확하게 조립하기 · 실행 확인",
+              "command": "# 원문 합성 CTE와 관계별 집계 SELECT 실행\n# practice에서 EXISTS/NOT EXISTS/LEFT JOIN의 id·순서 비교",
+              "expected": "NOT IN의NULL조건과실제NOT NULL제약을구분하고읽기전용결과를기록합니다.",
+              "record": "연결구분·합성6쌍·집계2/3·선택행보존·세쿼리id/순서·실제NULL제약을 기록합니다."
+            }
+          ],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "DB-03. 상세 API의 JOIN — 필수 정보와 선택 정보 · 기초→중급",
+              "href": "scenario/db-query-journey/db-03-detail-join.html"
+            },
+            {
+              "label": "DB-05. 좋아요와 댓글을 함께 세기 — 1:N JOIN 곱셈 · 중급",
+              "href": "scenario/db-query-journey/db-05-aggregate-fanout.html"
+            },
+            {
+              "label": "DB-06. 좋아요는 했지만 북마크하지 않은 글 — IN·EXISTS·NOT EXISTS · 중급",
+              "href": "scenario/db-query-journey/db-06-exists-not-exists.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

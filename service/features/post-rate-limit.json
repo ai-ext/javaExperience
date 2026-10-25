@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "id": "post-rate-limit",
+  "title": "짧은 시간의 반복 글쓰기 제한하기",
+  "summary": "정해진 시간 창의 허용량을 넘긴 글쓰기 요청은 429로 거절되고 저장되지 않는다.",
+  "difficulty": "중급",
+  "group": "운영과 안전",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "limit",
+      "title": "허용량 초과 쓰기는 저장 없이 거절하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "limit",
+          "title": "허용량 초과 쓰기는 저장 없이 거절하기",
+          "sourceUnits": [
+            "legacy:13-5"
+          ],
+          "brief": {
+            "purpose": "정해진 시간 창의 허용량을 넘긴 글쓰기 요청은 429로 거절되고 저장되지 않는다.",
+            "task": "회원/기준 시각에 따른 요청 횟수 산정과 초과 실패를 구현한다.",
+            "preconditions": [
+              "시나리오 DB(`community`) — 앱을 기본 프로파일로 띄운다. 이 단계는 실제로 흐르는 1분을 센다(practice의 고정 시계로는 1분이 지나지 않는다).",
+              "community 시간 흐르는 환경에서 동일 회원 요청을 실행한다. practice 고정 시계 예외는 15-3 원문과 연결한다."
+            ],
+            "scenario": [
+              {
+                "start": "한 회원의 쓰기 요청을 같은 시간 구간에 반복합니다. 다른 회원도 별도로 요청합니다.",
+                "action": "원본에 정한 허용량 경계 직전·경계·초과 요청과 실패 입력을 보냅니다.",
+                "result": "허용 요청만 저장되고 초과 요청은 429로 거절됩니다. 회원별 사용량을 서로 섞지 않습니다.",
+                "after": "정확한 시간 구간·허용량·실패 요청 차감 규칙은 아래 업무 정책을 따르며 고정 Clock 실습의 예외를 실운영 정책으로 확대하지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "member별 요청 시각과 POST 결과",
+                "reason": "원문에서 정한 제한 창·횟수·429 경계를 재현한다."
+              },
+              {
+                "name": "post 생성 행과 시도 카운터",
+                "reason": "초과 응답에서 글이 생기지 않았는지와 실패 시도 집계를 분리한다."
+              }
+            ],
+            "policies": [
+              "새 글 등록과 복사 생성에 같은 회원별 60초 창을 적용합니다. 지우지 않은 최근 글 5개까지 허용하고 6번째부터 429입니다.",
+              "입력 검증과 금칙어 검사를 통과한 뒤 셉니다. 400 실패 요청은 생성 횟수에 포함하지 않습니다. 읽기·다른 회원·댓글은 영향받지 않습니다.",
+              "Retry-After는 창 안의 가장 오래된 글이 60초를 넘길 때까지 올림한 남은 초이며 1~60입니다. 본문 retryAfterSeconds와 맞추고 CORS exposedHeaders에 Retry-After를 노출합니다.",
+              "created_at과 판정 시각은 같은 초 단위의 지금을 사용합니다. 15-3의 Clock 적용 뒤에도 같은 Clock을 쓰며 practice 고정 Clock의 우회 예외를 보존합니다."
+            ],
+            "inputs": [
+              "legacy:13-5:P: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 도배 확인\",\"content\":\"1분 안에 여러 번 쓰기\"}; case=회원 12가 연달아 6번 글쓰기; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#1\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#2\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#3\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#4\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#5\",\"expect\":{\"status\":201}},{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P#6\",\"expect\":{\"status\":429,\"headers\":{\"Retry-After\":{\"matches\":\"^(?:[1-9]|[1-5][0-9]|60)$\",\"equals\":\"{{P#6.body.retryAfterSeconds}}\"},\"Access-Control-Expose-Headers\":{\"matches\":\"Retry-After\"}},\"json\":[{\"path\":\"$.status\",\"equals\":429},{\"path\":\"$.retryAfterSeconds\",\"gte\":1},{\"path\":\"$.retryAfterSeconds\",\"lte\":60}]}},{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"P#6\",\"expect\":{\"status\":429,\"headers\":{\"Retry-After\":{\"matches\":\"^(?:[1-9]|[1-5][0-9]|60)$\",\"equals\":\"{{P#6.body.retryAfterSeconds}}\"},\"Access-Control-Expose-Headers\":{\"matches\":\"Retry-After\"}},\"json\":[{\"path\":\"$.status\",\"equals\":429},{\"path\":\"$.retryAfterSeconds\",\"gte\":1},{\"path\":\"$.retryAfterSeconds\",\"lte\":60}]}}]",
+              "legacy:13-5:Q2: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 도배 확인\",\"content\":\"1분 안에 여러 번 쓰기\"}; case=또 쓰기; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"Q2\",\"expect\":{\"status\":429,\"headers\":{\"Retry-After\":{\"present\":true}}}}]",
+              "legacy:13-5:V: POST /api/posts; body={\"boardSlug\":\"free\",\"content\":\"제목 없음\"}; case=회원 12의 잘못된 글(제목 없음); source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"V\",\"expect\":{\"status\":400,\"json\":[{\"path\":\"$.errors[*].field\",\"contains\":\"title\"}]}}]",
+              "legacy:13-5:G: GET /api/posts/2; case=막힌 동안 읽기; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"G\",\"expect\":{\"status\":200}}]",
+              "legacy:13-5:O: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 도배 확인 — 다른 회원\",\"content\":\"영향 없음\"}; case=다른 회원(13)의 글쓰기; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"O\",\"expect\":{\"status\":201}}]"
+            ],
+            "success": [
+              "member 12의 최근 60초 미삭제 글이 0~4개일 때 P#1~P#5는 각각 201, P#6는 429 및 Retry-After/retryAfterSeconds 1~60.",
+              "다른 회원의 글 생성 201 및 제한 회원의 GET 200; 잘못된 요청은 400이 429보다 먼저다."
+            ],
+            "failures": [
+              {
+                "when": "POST /api/posts 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 429 — 원문 check의 실패 응답",
+                "unchanged": "post/tag 데이터는 그대로 둔다; 시도 창 차감 여부는 원문 13-5 규칙대로 별도 기록한다."
+              },
+              {
+                "when": "POST /api/posts · [교육용 fixture · legacy:13-5:P] 회원 12가 연달아 6번 글쓰기",
+                "result": "HTTP 429 (P#6, P#6); $.status equals 429; $.retryAfterSeconds gte 1; $.retryAfterSeconds lte 60; header Retry-After {\"matches\": \"^(?:[1-9]|[1-5][0-9]|60)$\", \"equals\": \"{{P#6.body.retryAfterSeconds}}\"}; header Access-Control-Expose-Headers {\"matches\": \"Retry-After\"}",
+                "unchanged": "초과 POST는 post/tag를 추가하지 않고 기존 5개 미삭제 글을 보존한다."
+              },
+              {
+                "when": "POST /api/posts · [교육용 fixture · legacy:13-5:Q2] 또 쓰기",
+                "result": "HTTP 429 (Q2); header Retry-After {\"present\": true}",
+                "unchanged": "초과 POST는 post/tag를 추가하지 않고 기존 5개 미삭제 글을 보존한다."
+              },
+              {
+                "when": "POST /api/posts · [교육용 fixture · legacy:13-5:V] 회원 12의 잘못된 글(제목 없음)",
+                "result": "HTTP 400 (V); $.errors[*].field contains \"title\"",
+                "unchanged": "초과 POST는 post/tag를 추가하지 않고 기존 5개 미삭제 글을 보존한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "한 회원의 쓰기 요청을 같은 시간 구간에 반복합니다. 다른 회원도 별도로 요청합니다.",
+                "action": "원본에 정한 허용량 경계 직전·경계·초과 요청과 실패 입력을 보냅니다.",
+                "result": "정확한 시간 구간·허용량·실패 요청 차감 규칙은 아래 업무 정책을 따르며 고정 Clock 실습의 예외를 실운영 정책으로 확대하지 않습니다."
+              }
+            ],
+            "work": [
+              "시계·카운트 조회·저장 순서를 명확히 하고 요청 성공/실패에서 제한 집계 규칙을 보존한다."
+            ],
+            "done": [
+              "허용 요청만 저장되고 초과 요청은 429로 거절됩니다. 회원별 사용량을 서로 섞지 않습니다.",
+              "정확한 시간 구간·허용량·실패 요청 차감 규칙은 아래 업무 정책을 따르며 고정 Clock 실습의 예외를 실운영 정책으로 확대하지 않습니다.",
+              "POST /api/posts 입력이 원문 실패 check 조건에 해당 → HTTP 429 — 원문 check의 실패 응답 post/tag 데이터는 그대로 둔다; 시도 창 차감 여부는 원문 13-5 규칙대로 별도 기록한다.",
+              "POST /api/posts · [교육용 fixture · legacy:13-5:P] 회원 12가 연달아 6번 글쓰기 → HTTP 429 (P#6, P#6); $.status equals 429; $.retryAfterSeconds gte 1; $.retryAfterSeconds lte 60; header Retry-After {\"matches\": \"^(?:[1-9]|[1-5][0-9]|60)$\", \"equals\": \"{{P#6.body.retryAfterSeconds}}\"}; header Access-Control-Expose-Headers {\"matches\": \"Retry-After\"} 초과 POST는 post/tag를 추가하지 않고 기존 5개 미삭제 글을 보존한다."
+            ]
+          },
+          "hints": [
+            "요청 횟수를 셀 때 실패한 입력도 차감할지 원문은 어떻게 정하나요?",
+            "고정된 practice Clock으로 한 분을 기다려도 시간이 흐르지 않는 상황을 후속 예약 발행 단계가 어떻게 처리하나요?",
+            "초과 요청에서 글 저장부터 실행한 뒤 되돌리는 방식은 어떤 부수 데이터 위험을 만들까요?"
+          ],
+          "recipeIds": [
+            "legacy:13-5:P",
+            "legacy:13-5:Q2",
+            "legacy:13-5:V",
+            "legacy:13-5:G",
+            "legacy:13-5:O"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "13-5-rate-limit.html",
+              "href": "/scenario/ch13-operations/13-5-rate-limit.html"
+            },
+            {
+              "label": "S06-rest-api-clients.html",
+              "href": "/docs/knowledge/S06-rest-api-clients.html"
+            },
+            {
+              "label": "W20-time-timezone.html",
+              "href": "/docs/knowledge/W20-time-timezone.html"
+            },
+            {
+              "label": "R05-index-btree.html",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            },
+            {
+              "label": "F3-cors.html",
+              "href": "/lessons/F3-cors.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

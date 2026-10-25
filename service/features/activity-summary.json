@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "id": "activity-summary",
+  "title": "회원별 글·댓글·좋아요 활동 요약하기",
+  "summary": "8-1 회원별 게시글·댓글·받은 좋아요·누른 좋아요를 집계하고 활동 없는 회원도 0으로 포함한다.",
+  "difficulty": "중급",
+  "prerequisites": [
+    "comments",
+    "likes"
+  ],
+  "stages": [
+    {
+      "id": "summary",
+      "title": "활동이 없는 회원도 올바르게 집계하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "summary",
+          "title": "활동이 없는 회원도 올바르게 집계하기",
+          "sourceUnits": [
+            "legacy:8-1"
+          ],
+          "brief": {
+            "purpose": "8-1 회원별 게시글·댓글·받은 좋아요·누른 좋아요를 집계하고 활동 없는 회원도 0으로 포함한다.",
+            "task": "practice DB에 작성된 SQL 먼저 실행한 뒤 GET /api/stats/member-activity를 호출해 member별 네 집계를 비교한다.",
+            "preconditions": [
+              "CloudBeaver에서 `practice` Java 학습 DB를 선택한다.",
+              "삭제된 글·댓글과 post_like row를 포함하는 8-1 fixture를 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "member 전체 목록과 posts/comments/post_like rows를 독립 집계해 기록한다.",
+                "action": "sql/8-1-member-activity.sql을 먼저 실행하고 GET /api/stats/member-activity로 JSON을 읽는다.",
+                "result": "200 response에서 posts, comments, likesReceived, likesGiven은 SQL 기준과 같고 활동이 없는 member도 네 count 0으로 남는다.",
+                "after": "한 번에 여러 1:N 테이블을 join한 잘못된 곱집계와 대조하고 soft-delete 조건을 다시 검사한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "member id/nickname 전체",
+                "reason": "0 activity member를 포함한 기준 집합."
+              },
+              {
+                "name": "post author/status/deleted_at",
+                "reason": "활성 게시글 수 filter."
+              },
+              {
+                "name": "comment author/post/deleted_at",
+                "reason": "comment 및 상위 글이 모두 미삭제인지 확인."
+              },
+              {
+                "name": "post_like.member_id와 post_like.post_id",
+                "reason": "누른 좋아요·받은 좋아요를 구분하고 cache count 오류 방지."
+              }
+            ],
+            "policies": [
+              "member를 기준으로 시작해 활동 없는 회원도 유지하고 집계 null을 0으로 나타낸다.",
+              "likesReceived는 deleted 아닌 회원 authored post에 연결된 post_like rows; `post.like_count` column은 source of truth가 아니다. likesGiven은 해당 member의 relation rows.",
+              "comment count는 comment 자체와 원글이 모두 미삭제여야 한다. posts는 PUBLISHED/nondeleted.",
+              "여러 collection을 동시에 join해 row multiplication을 발생시키지 않는다."
+            ],
+            "inputs": [
+              "GET /api/stats/member-activity (no query).",
+              "SQL reference: sql/8-1-member-activity.sql.",
+              "member별 direct count를 각 relation에서 다시 계산."
+            ],
+            "success": [
+              "모든 member가 나타나며 activity 없는 member는 네 값이 0이다.",
+              "likesReceived/likesGiven/posts/comments는 원문 정의와 맞고 response와 SQL 결과가 동일하다."
+            ],
+            "failures": [
+              {
+                "when": "post×comment×like collection을 한번에 join하여 COUNT",
+                "result": "잘못된 곱집계와 source SQL 숫자가 어긋난다.",
+                "unchanged": "조회이므로 데이터 변화 없음."
+              },
+              {
+                "when": "deleted comment 또는 deleted parent post 포함",
+                "result": "comment count가 source 기준보다 커진다.",
+                "unchanged": "원본 rows unchanged."
+              }
+            ],
+            "examples": [
+              {
+                "title": "활동 회원",
+                "start": "source SQL이 member id와 4개 count를 계산함",
+                "action": "GET /api/stats/member-activity",
+                "result": "200; 각 member의 4개 값이 SQL과 일치"
+              },
+              {
+                "title": "활동 없는 회원",
+                "start": "member row 존재, authored post/comment/like relation 없음",
+                "action": "같은 endpoint",
+                "result": "200; 해당 member가 보이고 posts/comments/likesReceived/likesGiven 모두 0"
+              },
+              {
+                "title": "count cache 비교",
+                "start": "post.like_count와 실제 post_like row 수가 다른 글",
+                "action": "likesReceived 계산과 relation query 비교",
+                "result": "요약은 post_like row 수를 기준으로 한다"
+              }
+            ],
+            "work": [
+              "SQL 먼저 실행해 member id별 결과를 기록한다.",
+              "HTTP JSON을 id로 join해 하나씩 비교한다.",
+              "multi-join alternative에서 중복 row가 생기는 이유를 fixture cardinality로 설명한다."
+            ],
+            "done": [
+              "0 activity 회원이 결과에 남았다.",
+              "각 count의 soft-delete와 relation 기준을 확인했다.",
+              "실제 post_like rows로 likesReceived를 계산했다."
+            ],
+            "hints": [
+              "세 개의 1:N 관계를 동시에 join하면 활동 없는 회원 row와 count가 어떻게 변할 수 있나요?",
+              "likesReceived를 `post.like_count`에서 읽으면 어느 데이터 불일치가 집계에 그대로 전파되나요?",
+              "댓글의 원글도 soft delete일 때 count에서 제외하려면 어떤 join 조건이 필요한가요?"
+            ]
+          },
+          "hints": [
+            "세 개의 1:N 관계를 동시에 join하면 활동 없는 회원 row와 count가 어떻게 변할 수 있나요?",
+            "likesReceived를 `post.like_count`에서 읽으면 어느 데이터 불일치가 집계에 그대로 전파되나요?",
+            "댓글의 원글도 soft delete일 때 count에서 제외하려면 어떤 join 조건이 필요한가요?"
+          ],
+          "recipeIds": [
+            "legacy:8-1:A"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:8-1 · 회원별 활동 요약 — LEFT JOIN과 집계",
+              "href": "/scenario/ch8-query-deep/8-1-activity-summary.html"
+            },
+            {
+              "label": "../../docs/knowledge/R04-sql-crud-join.md",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            },
+            {
+              "label": "../../docs/knowledge/W03-db-access-comparison.md",
+              "href": "/docs/knowledge/W03-db-access-comparison.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:8-1 · 회원별 활동 요약 — LEFT JOIN과 집계",
+              "href": "/scenario/ch8-query-deep/8-1-activity-summary.html"
+            },
+            {
+              "label": "../../practice/MISSIONS.md",
+              "href": "/practice/MISSIONS.html"
+            },
+            {
+              "label": "../../docs/knowledge/R04-sql-crud-join.md",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            },
+            {
+              "label": "../../docs/knowledge/W03-db-access-comparison.md",
+              "href": "/docs/knowledge/W03-db-access-comparison.html"
+            },
+            {
+              "label": "../../docs/knowledge/W05-jpa-vs-mybatis-strategy.md",
+              "href": "/docs/knowledge/W05-jpa-vs-mybatis-strategy.html"
+            },
+            {
+              "label": "../../docs/knowledge/S10-spring-data-query.md",
+              "href": "/docs/knowledge/S10-spring-data-query.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "조회와 성능",
+  "status": "authored"
+}

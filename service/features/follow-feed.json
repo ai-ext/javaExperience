@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "id": "follow-feed",
+  "title": "팔로우한 사람의 글 이어 보기",
+  "summary": "팔로우 관계는 멱등하게 유지하고 내 피드는 팔로우 대상과 내 글 중 뮤트·비공개 제외 글을 보여 준다.",
+  "difficulty": "중급",
+  "group": "게시글과 소통",
+  "prerequisites": [
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "feed",
+      "title": "팔로우·뮤트 조건을 피드에 적용하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "feed",
+          "title": "팔로우·뮤트 조건을 피드에 적용하기",
+          "sourceUnits": [
+            "legacy:12-4",
+            "legacy:12-5"
+          ],
+          "brief": {
+            "purpose": "팔로우 관계는 멱등하게 유지하고 내 피드는 팔로우 대상과 내 글 중 뮤트·비공개 제외 글을 보여 준다.",
+            "task": "팔로우/언팔로우와 사용자별 뮤트 조건을 피드 조회에 연결한다.",
+            "preconditions": [
+              "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다.",
+              "practice 프로파일에서 팔로우·차단·회원 상태가 준비되어 있다."
+            ],
+            "scenario": [
+              {
+                "start": "김자바가 다른 활성 회원을 팔로우하고 일부 팔로우 대상은 뮤트했습니다.",
+                "action": "팔로우를 설정·재요청하고 피드를 커서로 읽은 뒤 한 대상을 뮤트합니다.",
+                "result": "피드에는 나와 팔로우 대상의 볼 수 있는 글만 보이며 뮤트한 대상은 빠집니다. 팔로우 관계는 그대로입니다.",
+                "after": "자기 팔로우는 400·없는/탈퇴 회원은 404·차단 관계 팔로우는 403이며, 반복 설정으로 관계가 중복되지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "follow(follower_id, followee_id)",
+                "reason": "팔로우 멱등성과 follower count를 비교한다."
+              },
+              {
+                "name": "mute 관계와 post visibility",
+                "reason": "피드에서만 숨기는 조건을 차단/공개 정책과 구분한다."
+              }
+            ],
+            "policies": [
+              "PUT/DELETE /api/members/{id}/follow는 멱등이며 응답은 요청 후 followerCount를 COUNT한다. self=400, 없는/탈퇴 회원=404, 양방향 block follow=403; block 중 언팔로우는 허용한다.",
+              "feed는 (나 + followees) 글을 최신순 cursor로 읽고 차단 관계·뮤트 대상·볼 수 없는 글을 제외한다. mute는 follow를 끊지 않고 다른 사용자에게 공개하지 않는다.",
+              "size 1~50, 기본 20; 자기 자신 뮤트 400, 없는 대상 404. follower/mute rows는 회원별로 분리한다."
+            ],
+            "inputs": [
+              "legacy:12-4:F0: DELETE /api/members/6/follow; case=처음 상태로(언팔로우); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"F0\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.memberId\",\"equals\":6},{\"path\":\"$.following\",\"equals\":false},{\"path\":\"$.followerCount\",\"type\":\"number\"}]}}]",
+              "legacy:12-4:F1: PUT /api/members/6/follow; case=팔로우; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"F1\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.following\",\"equals\":true},{\"path\":\"$.followerCount\",\"equals\":\"{{F0.body.followerCount + 1}}\"}]}}]",
+              "legacy:12-4:F2: PUT /api/members/6/follow; case=또 팔로우; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"F2\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.following\",\"equals\":true},{\"path\":\"$.followerCount\",\"equals\":\"{{F0.body.followerCount + 1}}\"}]}}]",
+              "legacy:12-4:FB: PUT /api/members/7/follow; case=나를 차단한 회원(7); source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"FB\",\"expect\":{\"status\":403}}]",
+              "legacy:12-5:M: PUT /api/members/7/mute; case=회원 7 뮤트; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"M\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$\",\"equals\":{\"memberId\":7,\"muted\":true}}]}}]",
+              "legacy:12-5:A1: GET /api/me/feed?size=2; case=피드 첫 묶음; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"A1\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.items[*].id\",\"equals\":[145,101]},{\"path\":\"$.items[1].author\",\"equals\":{\"id\":7,\"nickname\":\"리액트에서왔어요\"}},{\"path\":\"$.items[0].excerpt\",\"type\":\"string\"},{\"path\":\"$.nextCursor\",\"type\":\"string\"}]}}]",
+              "legacy:12-5:A2: GET /api/me/feed?size=2&cursor={{A1.body.nextCursor}}; case=피드 다음 묶음; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"A2\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.items[*].id\",\"equals\":[91,44]},{\"path\":\"$.nextCursor\",\"type\":\"null\"}]}}]"
+            ],
+            "success": [
+              "동시 재요청에도 관계 1행, 요청 후 followerCount, feed 대상 집합이 일치."
+            ],
+            "failures": [
+              {
+                "when": "PUT /api/members/7/follow 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 403 — 원문 check의 실패 응답",
+                "unchanged": "follow/mute 행 및 follower count를 실패 전 그대로 보존한다."
+              },
+              {
+                "when": "PUT /api/members/7/follow · [교육용 fixture · legacy:12-4:FB] 나를 차단한 회원(7)",
+                "result": "HTTP 403 (FB)",
+                "unchanged": "follow/mute 관계와 followerCount는 실패 전 그대로다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "김자바가 다른 활성 회원을 팔로우하고 일부 팔로우 대상은 뮤트했습니다.",
+                "action": "팔로우를 설정·재요청하고 피드를 커서로 읽은 뒤 한 대상을 뮤트합니다.",
+                "result": "자기 팔로우는 400·없는/탈퇴 회원은 404·차단 관계 팔로우는 403이며, 반복 설정으로 관계가 중복되지 않습니다."
+              }
+            ],
+            "work": [
+              "관계 쓰기 규칙과 읽기 feed의 visibility/mute 제외 조건을 구분한다."
+            ],
+            "done": [
+              "피드에는 나와 팔로우 대상의 볼 수 있는 글만 보이며 뮤트한 대상은 빠집니다. 팔로우 관계는 그대로입니다.",
+              "자기 팔로우는 400·없는/탈퇴 회원은 404·차단 관계 팔로우는 403이며, 반복 설정으로 관계가 중복되지 않습니다.",
+              "PUT /api/members/7/follow 입력이 원문 실패 check 조건에 해당 → HTTP 403 — 원문 check의 실패 응답 follow/mute 행 및 follower count를 실패 전 그대로 보존한다.",
+              "PUT /api/members/7/follow · [교육용 fixture · legacy:12-4:FB] 나를 차단한 회원(7) → HTTP 403 (FB) follow/mute 관계와 followerCount는 실패 전 그대로다."
+            ]
+          },
+          "hints": [
+            "follow를 INSERT하기 전에 exists를 확인하는 것만으로 동시 중복 요청을 막을 수 있을까요?",
+            "차단 관계는 팔로우와 언팔로우에서 왜 같은 정책으로 처리하면 안 될까요?",
+            "뮤트한 사람의 글을 피드에서 제외하되 상대에게 상태를 노출하지 않으려면 어떤 데이터 경계가 필요할까요?"
+          ],
+          "recipeIds": [
+            "legacy:12-4:F0",
+            "legacy:12-4:F1",
+            "legacy:12-4:F2",
+            "legacy:12-4:FB",
+            "legacy:12-5:M",
+            "legacy:12-5:A1",
+            "legacy:12-5:A2"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "12-4-follow.html",
+              "href": "/scenario/ch12-community-features/12-4-follow.html"
+            },
+            {
+              "label": "P18-concurrency-inventory.html",
+              "href": "/docs/knowledge/P18-concurrency-inventory.html"
+            },
+            {
+              "label": "S08-transactions.html",
+              "href": "/docs/knowledge/S08-transactions.html"
+            },
+            {
+              "label": "H1-concurrency-taste.html",
+              "href": "/lessons/H1-concurrency-taste.html"
+            },
+            {
+              "label": "S06-rest-api-clients.html",
+              "href": "/docs/knowledge/S06-rest-api-clients.html"
+            },
+            {
+              "label": "12-5-feed-mute.html",
+              "href": "/scenario/ch12-community-features/12-5-feed-mute.html"
+            },
+            {
+              "label": "012-following-feed-api.html",
+              "href": "/tickets/012-following-feed-api.html"
+            },
+            {
+              "label": "W15-paging-offset-vs-cursor.html",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            },
+            {
+              "label": "R04-sql-crud-join.html",
+              "href": "/docs/knowledge/R04-sql-crud-join.html"
+            },
+            {
+              "label": "G2-access-rules-in-one-place.html",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "J1-reading-explain.html",
+              "href": "/lessons/J1-reading-explain.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

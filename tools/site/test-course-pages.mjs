@@ -5,7 +5,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { JSDOM } from 'jsdom';
-import { loadCourse, shortTitle, mapNodes, findInjectedLinkErrors, renderTicketSelection } from './course-pages.mjs';
+import { loadCourse, shortTitle, mapNodes, findInjectedLinkErrors, renderTicketSelection, renderCourseHome, renderHomeReference } from './course-pages.mjs';
 import { maskedNodes, MASK_LABEL } from './course-flow.mjs';
 
 const root = new URL('../../', import.meta.url);
@@ -42,6 +42,22 @@ async function open(file, { saved, brokenStorage = false, script = courseScript,
   await new Promise((resolve) => (window.document.readyState === 'complete' ? resolve() : window.addEventListener('load', resolve)));
   return { window, doc: window.document, $: (s) => window.document.querySelector(s), $$: (s) => [...window.document.querySelectorAll(s)] };
 }
+
+// 홈 배치는 디자인 브랜치를 유지한다. 통합 기능과 기존 일자는 새 메뉴 및 같은 저장값으로 연결한다.
+await test('홈은 통합 기능 진입과 기존 일자 기록을 분리해 연결한다', () => {
+  const home = new JSDOM(renderCourseHome(course), { url: 'https://learn.example/README.html' }).window.document;
+  assert.equal(home.querySelector('h1').textContent.trim(), '오늘 만들고, 결과로 확인하세요.');
+  assert.ok(home.querySelector('.ch-menu-guide a[href="scenario/README.html"]'), '기능 목록 대표 진입');
+  assert.ok(home.querySelector('.ch-menu-guide a[href="course/map.html"]'), '독립 과정 지도 진입');
+  assert.ok(home.querySelector('[data-today-open][href="course/spring/D01.html"]'), '기존 일자 주소 보존');
+  assert.equal(home.querySelector('.ch-progress'), null, '홈에 일자 진도를 중복 나열하지 않는다');
+  const days = JSON.parse(home.querySelector('#course-days-data').textContent);
+  assert.equal(days.length, course.days.length, '이어하기가 쓰는 일자 데이터는 보존한다');
+  const choices = JSON.parse(home.querySelector('#course-choice-data').textContent);
+  assert.ok(choices.length > 0, '선택 티켓 기록의 원본 후보 보존');
+  const reference = new JSDOM(renderHomeReference('<h1 id="home-title">게시판</h1>')).window.document;
+  assert.equal(reference.querySelector('#home-title').tagName, 'H2');
+});
 
 await test('이 날 데이터: 원본 날짜 집합·본문·버튼·복사·Blob 다운로드가 일치한다', async () => {
   const actual = [];
@@ -200,7 +216,8 @@ await test('P10: 홈은 전체 진도를 복제하지 않고 오늘 일자와 �
   assert.equal(home.$('[data-progress-summary]'), null);
   assert.ok(home.$('[data-today-id]'));
   assert.ok(home.$('[data-today-steps]'));
-  assert.ok(home.$('.ch-course-links a[href="course/map.html"]'));
+  // 지도는 참고 링크가 아니라 독립 상단 메뉴와 대주제 안내에서 진입한다.
+  assert.ok(home.$('.ch-menu-guide a[href="course/map.html"]'));
 });
 await test('R4-08: PC 지도에 노드·연결선 범례와 모든 연결 흐름을 남긴다', async () => {
   const map = await open('course/map.html', { script: mapScript });

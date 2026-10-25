@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "id": "monthly-archive",
+  "title": "월별 글 수와 해당 월의 글 보여 주기",
+  "summary": "게시글 수를 연·월별로 묶고 해당 월 글은 동일한 시간 경계로 조회한다.",
+  "difficulty": "중급",
+  "group": "조회와 성능",
+  "prerequisites": [
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "archive",
+      "title": "연·월 경계를 기준으로 목록 묶기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "archive",
+          "title": "연·월 경계를 기준으로 목록 묶기",
+          "sourceUnits": [
+            "legacy:14-7"
+          ],
+          "brief": {
+            "purpose": "게시글 수를 연·월별로 묶고 해당 월 글은 동일한 시간 경계로 조회한다.",
+            "task": "월 아카이브 집계와 월별 목록을 구현한다.",
+            "preconditions": [
+              "시나리오 DB(`community`) — 앱을 기본 프로파일로 띄운다.",
+              "community Clock/timezone과 공개 게시글 기준을 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "같은 게시판에 2026년 9월 30일 글과 10월 1일 글이 있습니다.",
+                "action": "월별 글 수와 2026년 9월 목록을 각각 요청합니다.",
+                "result": "월 집계는 글이 있는 달부터 최신순이며 9월 목록은 9월 1일 00:00 이상·10월 1일 00:00 미만입니다.",
+                "after": "0월은 400, 없는 게시판은 404이고 공개 범위·삭제·상태 조건은 기존 목록과 같습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "published_at 월 구간 [2026-09-01,2026-10-01)",
+                "reason": "9월 30일 포함과 10월 1일 제외를 동일 목록/count 조건으로 검증한다."
+              },
+              {
+                "name": "free board 비로그인/이스프링 visibility",
+                "reason": "비로그인 9월 count=9, 이스프링은 FOLLOWERS 게시글 6을 더해 10이 된다."
+              }
+            ],
+            "policies": [
+              "GET /api/boards/{slug}/archive는 글이 있는 달의 수를 최신 달부터 반환한다. GET /api/boards/{slug}/archive/{year}/{month}는 2-2 목록 필드를 그대로 쓴다.",
+              "월 목록 범위는 [첫날 00:00, 다음 달 첫날 00:00); 2026년 9월 30일 글은 포함, 10월 1일 글은 제외한다. 사용자의 공개 권한과 삭제/status 조건은 2-2와 같다.",
+              "year 2000~2100, month 1~12, page>=0 기본 0, size 1~50 기본10. 빈 page/size 또는 int 초과 400, 없는 board 404."
+            ],
+            "inputs": [
+              "legacy:14-7:A1: GET /api/boards/free/archive; case=월별 글 수(비로그인); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"A1\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.months\",\"contains\":{\"year\":2026,\"month\":9,\"count\":9}},{\"path\":\"$.months[*].month\",\"notContains\":8}]},\"note\":\"글이 있는 달만 나온다. 9월은 공개 글 9개(팔로워 공개·임시저장·삭제·숨김 제외)\"}]",
+              "legacy:14-7:A3: GET /api/boards/free/archive/2026/9?size=20; case=2026년 9월 글(비로그인); source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"A3\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.totalElements\",\"equals\":9},{\"path\":\"$.items[*].id\",\"equals\":[17,16,15,14,13,12,9,5,4]}]},\"note\":\"9월 30일 09:00 글(17)은 들어가고 10월 1일 09:00 글(18)은 안 들어간다\"}]",
+              "legacy:14-7:A8: GET /api/boards/free/archive/2026/0; case=잘못된 입력 — 0월; source expected/status checks=[{\"id\":\"C8\",\"pointer\":\"/checks/7\",\"request\":\"A8\",\"expect\":{\"status\":400},\"note\":\"범위 밖·문자·빈 값·int 초과 연·월·page·size는 400 — 500이 아니다\"}]",
+              "legacy:14-7:A9: GET /api/boards/nope/archive; case=없는 게시판의 아카이브; source expected/status checks=[{\"id\":\"C9\",\"pointer\":\"/checks/8\",\"request\":\"A9\",\"expect\":{\"status\":404}}]",
+              "legacy:14-7:A7: GET /api/boards/free/archive/2000/1; case=경계값 안쪽 — 2000년 1월; source expected/status checks=[{\"id\":\"C7\",\"pointer\":\"/checks/6\",\"request\":\"A7\",\"expect\":{\"status\":200}}]"
+            ],
+            "success": [
+              "2026년 9월 비로그인 count=9, 목록 totalElements=9, id=[17,16,15,14,13,12,9,5,4].",
+              "이스프링 기준 count=10, 9월 글 없음은 HTTP 200 + 빈 목록이다."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/boards/free/archive/2026/0 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "GET 요청은 post 행/published_at을 변경하지 않는다."
+              },
+              {
+                "when": "GET /api/boards/free/archive/2026/0 · [교육용 fixture · legacy:14-7:A8] 잘못된 입력 — 0월",
+                "result": "HTTP 400 (A8)",
+                "unchanged": "GET은 post/published_at 행을 바꾸지 않는다."
+              },
+              {
+                "when": "GET /api/boards/nope/archive · [교육용 fixture · legacy:14-7:A9] 없는 게시판의 아카이브",
+                "result": "HTTP 404 (A9)",
+                "unchanged": "GET은 post/published_at 행을 바꾸지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "같은 게시판에 2026년 9월 30일 글과 10월 1일 글이 있습니다.",
+                "action": "월별 글 수와 2026년 9월 목록을 각각 요청합니다.",
+                "result": "0월은 400, 없는 게시판은 404이고 공개 범위·삭제·상태 조건은 기존 목록과 같습니다."
+              }
+            ],
+            "work": [
+              "날짜를 문자열 prefix로 자르지 않고 월 구간 시작·다음 달 시작으로 조회한다."
+            ],
+            "done": [
+              "월 집계는 글이 있는 달부터 최신순이며 9월 목록은 9월 1일 00:00 이상·10월 1일 00:00 미만입니다.",
+              "0월은 400, 없는 게시판은 404이고 공개 범위·삭제·상태 조건은 기존 목록과 같습니다.",
+              "GET /api/boards/free/archive/2026/0 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 GET 요청은 post 행/published_at을 변경하지 않는다.",
+              "GET /api/boards/free/archive/2026/0 · [교육용 fixture · legacy:14-7:A8] 잘못된 입력 — 0월 → HTTP 400 (A8) GET은 post/published_at 행을 바꾸지 않는다."
+            ]
+          },
+          "hints": [
+            "월의 마지막 날짜를 직접 계산하는 대신 다음 달 시작을 exclusive end로 잡으면 어떤 경계 버그가 줄어들까요?",
+            "DB DATETIME과 응답 월 기준 시간대가 다를 때 같은 글이 어떤 월에 들어갈지 어떻게 결정해야 할까요?",
+            "월별 count와 상세 목록의 공개 정책을 다르게 두면 어떤 화면 모순이 생길까요?"
+          ],
+          "recipeIds": [
+            "legacy:14-7:A1",
+            "legacy:14-7:A3",
+            "legacy:14-7:A8",
+            "legacy:14-7:A9",
+            "legacy:14-7:A7"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "14-7-monthly-archive.html",
+              "href": "/scenario/ch14-more-with-posts/14-7-monthly-archive.html"
+            },
+            {
+              "label": "R05-index-btree.html",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            },
+            {
+              "label": "J1-reading-explain.html",
+              "href": "/lessons/J1-reading-explain.html"
+            },
+            {
+              "label": "W20-time-timezone.html",
+              "href": "/docs/knowledge/W20-time-timezone.html"
+            },
+            {
+              "label": "G1-paging-and-sorting.html",
+              "href": "/lessons/G1-paging-and-sorting.html"
+            },
+            {
+              "label": "G2-access-rules-in-one-place.html",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

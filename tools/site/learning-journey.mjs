@@ -120,7 +120,7 @@ export function renderLearningJourney(manifest, catalog, levelHref) {
     <div class="journey-browser" id="journey-all-apis"><div class="journey-browser-head"><div><p class="journey-eyebrow">API EXPLORER</p><h3>구현할 API 찾아보기</h3><p>기능을 펼쳐 경로를 고르세요. 각 경로는 해당 단계의 Controller·Service·Repository 흐름으로 이어집니다.</p></div><a href="#api-map-title">전체 구조도 보기 ↗</a></div><div class="journey-controls"><label>API 검색 <input type="search" data-journey-search placeholder="경로·기능·단계 검색" autocomplete="off"></label><label>HTTP 메서드 <select data-journey-method><option value="all">전체</option><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select></label></div><p class="journey-result" data-journey-result aria-live="polite">${routesCount}개 API</p><div class="journey-projects">${routeMarkup}</div></div>
   </section><script>
   (() => {
-    const root = document.querySelector('main');
+    const root = document.querySelector('.learning-journey');
     const search = root.querySelector('[data-journey-search]');
     const method = root.querySelector('[data-journey-method]');
     const endpoints = [...root.querySelectorAll('.journey-endpoint')];

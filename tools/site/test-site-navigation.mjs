@@ -3,19 +3,21 @@ import fs from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { renderSiteNavigation, renderSiteBreadcrumb, siteSection } from './site-navigation.mjs';
 
-const labels = ['홈', '45일 과정', '서비스 만들기', '실전 미션', '개념 학습'];
-const destinations = ['index.html', 'course/spring/README.html', 'scenario/README.html', 'practice/MISSIONS.html', 'docs/knowledge/README.html'];
+// 사용자 결정: 일자 과정은 서비스 참고로 이동하고 지도는 독립 대주제로 유지한다.
+const labels = ['홈', '과정 지도', '서비스 만들기', '실전 미션', '개념 학습'];
+const destinations = ['index.html', 'course/map.html', 'scenario/README.html', 'practice/MISSIONS.html', 'docs/knowledge/README.html'];
 const examples = [
-  ['README.md', '홈'], ['course/spring/D11.md', '45일 과정'], ['course/map.md', '45일 과정'],
-  ['course/README.md', '45일 과정'], ['course/resources.md', '45일 과정'], ['course/archive.md', '45일 과정'],
-  ['course/java/README.md', '45일 과정'], ['course/java/J01.md', '45일 과정'],
-  ['course/tickets/README.md', '45일 과정'], ['course/tickets/B01.md', '45일 과정'],
-  ['course/start/dummy/README.md', '45일 과정'], ['scenario/README.md', '서비스 만들기'],
+  ['README.md', '홈'], ['course/spring/D11.md', '서비스 만들기'], ['course/map.md', '과정 지도'],
+  ['course/README.md', '서비스 만들기'], ['course/resources.md', '서비스 만들기'], ['course/archive.md', '서비스 만들기'],
+  ['course/java/README.md', '서비스 만들기'], ['course/java/J01.md', '서비스 만들기'],
+  ['course/tickets/README.md', '서비스 만들기'], ['course/tickets/B01.md', '서비스 만들기'],
+  ['course/start/dummy/README.md', '서비스 만들기'], ['scenario/README.md', '서비스 만들기'],
   ['scenario/ch1-create-post/1-2-dto-response.md', '서비스 만들기'],
+  ['scenario/features/posts-create-read.md', '서비스 만들기'],
   ['scenario/labs/l12-query-methods/README.md', '서비스 만들기'], ['practice/MISSIONS.md', '실전 미션'],
   ['tickets/README.md', '서비스 만들기'], ['tickets/001-board-list-api.md', '서비스 만들기'],
   ['docs/knowledge/README.md', '개념 학습'], ['docs/knowledge/P02-mvc-layered-architecture.md', '개념 학습'],
-  ['lessons/concept-core.md', '개념 학습'], ['docs/knowledge/S01-ioc-di.md', '개념 학습'], ['lessons/nested/example.md', '개념 학습'], ['course/spec-v2.md', '45일 과정'], ['errors.md', null],
+  ['lessons/concept-core.md', '개념 학습'], ['docs/knowledge/S01-ioc-di.md', '개념 학습'], ['lessons/nested/example.md', '개념 학습'], ['course/spec-v2.md', '서비스 만들기'], ['errors.md', null],
 ];
 for (const [source, section] of examples) {
   const pageUrl = new URL(source, 'https://learn.example/');

@@ -3,25 +3,33 @@ import { CORE_UNITS, DOMAINS } from './concept-curriculum.mjs';
 
 export const siteDestinations = [
   { label: '홈', target: 'index.html', description: '오늘 할 일과 과정의 전체 흐름을 확인합니다.' },
-  { label: '45일 과정', target: 'course/spring/README.html', description: 'Java → Spring → 채점으로 직접 만들고, 티켓과 설계·운영까지 이어갑니다. 매일 공부할 때 엽니다.' },
-  { label: '서비스 만들기', target: 'scenario/README.html', description: '게시판 API를 기능 하나씩 구현합니다. 요청·응답·DB 결과를 연결해 연습할 때 엽니다.' },
-  { label: '실전 미션', target: 'practice/MISSIONS.html', description: '주어진 데이터와 조건으로 문제를 풉니다. 스스로 조회·쿼리를 해결해 볼 때 엽니다.' },
-  { label: '개념 학습', target: 'docs/knowledge/README.html', description: 'Java·Spring·DB 원리를 살펴봅니다. 구현 중 왜 그렇게 동작하는지 궁금할 때 읽습니다.' },
+  { label: '과정 지도', target: 'course/map.html', description: '일자·Java·티켓과 필요한 지식의 연결을 확인합니다.' },
+  { label: '서비스 만들기', target: 'scenario/README.html', description: '기능을 고르고 요구사항·힌트·요청 도구로 직접 구현합니다.' },
+  { label: '실전 미션', target: 'practice/MISSIONS.html', description: '주어진 데이터와 조건으로 조회·쿼리 문제를 해결합니다.' },
+  { label: '개념 학습', target: 'docs/knowledge/README.html', description: 'Java·Spring·DB 원리를 살펴봅니다.' },
 ];
+// 일자 과정의 URL과 저장 진도는 유지하고 서비스 만들기의 참고 메뉴로 연결한다.
 export const courseDestinations = [
-  {label:'일자 목록',target:'course/spring/README.html'},
-  {label:'과정 지도',target:'course/map.html'},
-  {label:'과정 안내',target:'course/README.html'},
+  {label:'기능 목록',target:'scenario/README.html'},
+  {label:'단계별 시안',target:'scenario/README.html#visual-catalog'},
+  {label:'API EXPLORER',target:'scenario/README.html#journey-all-apis'},
+  {label:'일자 목록',target:'course/spring/README.html',reference:true},
   {label:'Java',target:'course/java/README.html'},
   {label:'티켓',target:'course/tickets/README.html'},
   {label:'출발 자료',target:'course/start/README.html'},
-  {label:'더미 데이터',target:'course/start/dummy/README.html'},
-  {label:'운영 실습',target:'course/start/ops/README.html'},
+  {label:'더미 데이터',target:'course/start/dummy/README.html',child:true},
+  {label:'운영 실습',target:'course/start/ops/README.html',child:true},
+  {label:'과정 안내',target:'course/README.html'},
+];
+export const mapDestinations = [
+  {label:'관계 지도',target:'course/map.html#course-map-view'},
+  {label:'연결 목록',target:'course/map.html#course-relations-view'},
 ];
 const spaces = siteDestinations;
 export function siteSection(sourcePath) {
   if (sourcePath === 'README.md') return '홈';
-  if (sourcePath.startsWith('course/')) return '45일 과정';
+  if (sourcePath === 'course/map.md') return '과정 지도';
+  if (sourcePath.startsWith('course/')) return '서비스 만들기';
   if (sourcePath.startsWith('docs/knowledge/')) return '개념 학습';
   if (sourcePath.startsWith('scenario/') || sourcePath.startsWith('tickets/')) return '서비스 만들기';
   if (sourcePath.startsWith('practice/')) return '실전 미션';
@@ -32,8 +40,8 @@ export function renderSectionNavigation(sourcePath) {
   const current=siteSection(sourcePath);
   const groups={
     '홈':[{label:'오늘 할 일',target:'index.html#course-home-title'},{label:'과정 전체 설명',target:'index.html#home-course-overview'},{label:'대주제 안내',target:'index.html#home-menus'}],
-    '45일 과정':courseDestinations,
-    '서비스 만들기':[{label:'서비스 만들기',target:'scenario/README.html'},{label:'구현 티켓',target:'tickets/README.html'}],
+    '과정 지도':mapDestinations,
+    '서비스 만들기':courseDestinations,
     '실전 미션':[{label:'미션 목록',target:'practice/MISSIONS.html'}],
     '개념 학습':[
       {label:'개념 목록',target:'docs/knowledge/README.html'},
@@ -47,8 +55,9 @@ export function renderSectionNavigation(sourcePath) {
   const exact=entries.find(e=>e.target===target);
   const baseTarget=value=>value.split(/[?#]/)[0];
   const coreDefault=target==='lessons/concept-core.html' ? entries.find(e=>e.target==='lessons/concept-core.html?unit=C01') : null;
-  const active=exact || coreDefault || entries.filter(e=>e.target===baseTarget(e.target)).sort((a,b)=>b.target.length-a.target.length).find(e=>target.startsWith(path.posix.dirname(e.target)+'/'));
-  return `<p class="page-sidebar-caption">${current||'학습 안내'}</p><nav class="section-navigation" aria-label="${current||'학습'} 영역">${entries.map(e=>`<a href="${path.posix.relative(path.posix.dirname(sourcePath),e.target)}"${e===active?' aria-current="page"':''}>${e.label}</a>`).join('')}</nav>`;
+  const mapDefault=current==='과정 지도' ? entries[0] : null;
+  const active=exact || coreDefault || mapDefault || entries.filter(e=>e.target===baseTarget(e.target)).sort((a,b)=>b.target.length-a.target.length).find(e=>target.startsWith(path.posix.dirname(e.target)+'/'));
+  return `<p class="page-sidebar-caption">${current||'학습 안내'}</p><nav class="section-navigation" aria-label="${current||'학습'} 영역">${entries.map(e=>`${e.reference ? '<p class="page-sidebar-caption section-navigation-reference">참고</p>' : ''}<a${e.child ? ' class="section-navigation-child"' : ''} href="${path.posix.relative(path.posix.dirname(sourcePath),e.target)}"${e===active?' aria-current="page"':''}>${e.label}</a>`).join('')}</nav>`;
 }
 
 export function renderSiteNavigation(sourcePath) {

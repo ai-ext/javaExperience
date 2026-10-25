@@ -1,0 +1,208 @@
+{
+  "version": 1,
+  "id": "flush-observation",
+  "title": "저장 직후 SQL 조회 결과 확인하기",
+  "summary": "10-12 JPA write와 MyBatis read가 같은 transaction/connection에서 flush 전후에 언제 보이는지 실제 SQL과 응답으로 확인한다.",
+  "difficulty": "고급",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "flush",
+      "title": "같은 트랜잭션의 JPA 쓰기와 SQL 읽기 비교하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "project-v1",
+      "project": "project-v1",
+      "label": "project-v1 · 명세 프로젝트",
+      "stages": [
+        {
+          "id": "flush",
+          "title": "같은 트랜잭션의 JPA 쓰기와 SQL 읽기 비교하기",
+          "sourceUnits": [
+            "legacy:10-12"
+          ],
+          "brief": {
+            "purpose": "10-12 JPA write와 MyBatis read가 같은 transaction/connection에서 flush 전후에 언제 보이는지 실제 SQL과 응답으로 확인한다.",
+            "task": "POST/PUT 뒤 MyBatis listItem이 새 값을 반환하는지, flush 없는 경로는 이전 값이 보이는지, rollback/별도 connection은 다른 시점인지 구분한다.",
+            "preconditions": [
+              "10-7 listItem fields를 확인하고 project-v1 post39 또는 실제 capture id를 사용한다.",
+              "같은 transaction에서 JPA와 MyBatis가 함께 실행되도록 실습 설정을 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "post39 title old, tags [check,flush], visibility PUBLIC 상태와 SQL log 기록.",
+                "action": "PUT /api/v1/posts/39 title=\"[채점] 10-12 수정 후\", tags=[after], visibility=PRIVATE; flush 있는 실행과 flush 생략 실행을 비교한다.",
+                "result": "flush 뒤 same transaction MyBatis listItem은 수정 title/tags/visibility를 읽는다. flush 생략 대조 경로는 mapper read에서 old title/tags가 나타날 수 있다. API 200 response body detail/listItem이 같은 값인지 확인.",
+                "after": "flush는 commit이 아니다. 외부 DB client는 commit 전 값을 못 보고 rollback 뒤에는 row 이전값으로 남는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post39 title/tags/visibility old and new values",
+                "reason": "JPA entity, MyBatis listItem, DB observation 비교."
+              },
+              {
+                "name": "SQL log ordering UPDATE then SELECT",
+                "reason": "flush가 mapper read 전에 변경을 DB로 보냈는지 확인."
+              },
+              {
+                "name": "transaction identity/connection and commit/rollback markers",
+                "reason": "same transaction visibility와 외부 connection 분리."
+              },
+              {
+                "name": "listItem fields id/title/visibility/viewCount/likeCount/author/tags/createdAt",
+                "reason": "GET list item과 POST/PUT response shape equality."
+              }
+            ],
+            "policies": [
+              "10-12는 JPA write → explicit flush → MyBatis card query in same transaction. Flush sends pending SQL but does not commit.",
+              "POST and PUT response `data.listItem` must match GET /api/v1/posts list item shape.",
+              "Invalid title/tags is validated before persist/flush, returns 400 ApiResponse and writes nothing.",
+              "Same transaction connection can observe flushed write; another DB client cannot observe before commit; rollback undoes DB update."
+            ],
+            "inputs": [
+              "PUT /api/v1/posts/39 title=\"[채점] 10-12 수정 후\", tags=[\"after\"], visibility=\"PRIVATE\".",
+              "Control request without flush on disposable test code: expected mapper old title/tags `check`,`flush`; JPA response detail new values.",
+              "Invalid title blank or tags beyond 5 / blank tag; rollback observation."
+            ],
+            "success": [
+              "flush path 200; detail/listItem title [채점] 10-12 수정 후, tags [after], visibility PRIVATE.",
+              "flush SQL UPDATE precedes MyBatis SELECT; same transaction sees new values.",
+              "API response `listItem` matches list item fields."
+            ],
+            "failures": [
+              {
+                "when": "flush omitted before MyBatis read",
+                "result": "mapper listItem may return prior title/tags while JPA detail shows new values.",
+                "unchanged": "no commit yet; later flush behavior is recorded separately."
+              },
+              {
+                "when": "validation fails before flush",
+                "result": "400 VALIDATION_FAILED.",
+                "unchanged": "post39 old title/tags/visibility and SQL update count unchanged."
+              },
+              {
+                "when": "transaction rollback after flush",
+                "result": "rollback completes without commit.",
+                "unchanged": "external fresh connection after rollback reads old title/tags."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Flush before read",
+                "start": "post39 old title and tags [check,flush]",
+                "action": "PUT title=[채점] 10-12 수정 후, tags=[after], visibility=PRIVATE",
+                "result": "200; MyBatis listItem reads new values after flush; commit still pending"
+              },
+              {
+                "title": "Read before flush control",
+                "start": "same old row and update request in disposable run",
+                "action": "execute mapper SELECT before JPA flush",
+                "result": "listItem may show old title/tags while JPA detail has new state"
+              },
+              {
+                "title": "Rollback after flush",
+                "start": "new values flushed but transaction uncommitted",
+                "action": "force documented transaction rollback and read from fresh connection",
+                "result": "old values visible from fresh connection"
+              }
+            ],
+            "work": [
+              "Capture Hibernate and MyBatis SQL log timestamps/order.",
+              "Compare JPA response detail with listItem; query DB from same and separate connection at stated moments.",
+              "Record persist, flush, commit, rollback as separate events."
+            ],
+            "done": [
+              "Same transaction mapper sees flushed write.",
+              "Flush not mislabeled commit; external connection and rollback observations are recorded.",
+              "POST/PUT response listItem contract and invalid-input no-write confirmed."
+            ],
+            "hints": [
+              "If JPA detail is new but MyBatis listItem is old, which database operation should appear before the mapper SELECT?",
+              "After flush but before commit, should an unrelated database connection see the uncommitted row?",
+              "When rollback follows flush, what value should a fresh connection observe after transaction end?"
+            ]
+          },
+          "hints": [
+            "If JPA detail is new but MyBatis listItem is old, which database operation should appear before the mapper SELECT?",
+            "After flush but before commit, should an unrelated database connection see the uncommitted row?",
+            "When rollback follows flush, what value should a fresh connection observe after transaction end?"
+          ],
+          "recipeIds": [
+            "legacy:10-12:L",
+            "legacy:10-12:P",
+            "legacy:10-12:U",
+            "legacy:10-12:I",
+            "legacy:10-12:G",
+            "legacy:10-12:V1",
+            "legacy:10-12:V2",
+            "legacy:10-12:V3",
+            "legacy:10-12:V4"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:10-12 · JPA로 쓰고 같은 트랜잭션에서 MyBatis로 읽기 — flush (선택)",
+              "href": "/scenario/ch10-project/10-12-jpa-mybatis-flush.html"
+            },
+            {
+              "label": "../../lessons/E5-mybatis-first-steps.md",
+              "href": "/lessons/E5-mybatis-first-steps.html"
+            },
+            {
+              "label": "../../lessons/G3-first-transaction.md",
+              "href": "/lessons/G3-first-transaction.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:10-12 · JPA로 쓰고 같은 트랜잭션에서 MyBatis로 읽기 — flush (선택)",
+              "href": "/scenario/ch10-project/10-12-jpa-mybatis-flush.html"
+            },
+            {
+              "label": "../../lessons/E5-mybatis-first-steps.md",
+              "href": "/lessons/E5-mybatis-first-steps.html"
+            },
+            {
+              "label": "../../lessons/G3-first-transaction.md",
+              "href": "/lessons/G3-first-transaction.html"
+            },
+            {
+              "label": "../../lessons/E3-what-is-jpa.md",
+              "href": "/lessons/E3-what-is-jpa.html"
+            },
+            {
+              "label": "../../docs/knowledge/W05-jpa-vs-mybatis-strategy.md",
+              "href": "/docs/knowledge/W05-jpa-vs-mybatis-strategy.html"
+            },
+            {
+              "label": "../../docs/knowledge/S09-jpa-hibernate.md",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            },
+            {
+              "label": "../../docs/knowledge/S08-transactions.md",
+              "href": "/docs/knowledge/S08-transactions.html"
+            },
+            {
+              "label": "../../docs/knowledge/W16-id-generation.md",
+              "href": "/docs/knowledge/W16-id-generation.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "데이터 정합성",
+  "status": "authored"
+}

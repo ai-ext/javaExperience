@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "id": "async-dispatch",
+  "title": "느린 알림을 글쓰기 응답과 분리하기",
+  "summary": "커밋 후 푸시 작업은 제한된 executor로 넘기고 실패 푸시가 글쓰기 응답을 바꾸지 않는다.",
+  "difficulty": "고급",
+  "group": "자동화와 작업",
+  "prerequisites": [
+    "notifications"
+  ],
+  "stages": [
+    {
+      "id": "async",
+      "title": "제한된 실행기로 알림 보내고 포화 처리하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "async",
+          "title": "제한된 실행기로 알림 보내고 포화 처리하기",
+          "sourceUnits": [
+            "legacy:16-2"
+          ],
+          "brief": {
+            "purpose": "커밋 후 푸시 작업은 제한된 executor로 넘기고 실패 푸시가 글쓰기 응답을 바꾸지 않는다.",
+            "task": "이벤트 listener 비동기 전송, 실패 상태 기록, 큐 포화 응답 정책을 구현한다.",
+            "preconditions": [
+              "학습용 DB(`practice`) — 앱을 `practice` 프로파일로 띄운다.",
+              "practice DB에서 follower 15명, 회원 26 실패, FakePushSender delay=150ms; notification executor를 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "교육용 fake push는 수신자 15명·delay 150ms·실패 회원 26으로 설정돼 있습니다.",
+                "action": "새 글을 등록하고 HTTP 응답과 별도 알림 처리 완료 상태를 차례로 확인합니다.",
+                "result": "글은 201로 먼저 저장되고 push 완료 후 SENT 14·FAILED 1입니다. 회원 26 실패 뒤에도 다른 회원 발송을 계속합니다.",
+                "after": "제한된 실행기를 쓰며 글의 commit 후 처리합니다. 알림 실패가 이미 성공한 글과 201을 취소하지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "notification.push_status, member_id",
+                "reason": "푸시별 SENT/FAILED를 회원 단위로 분리한다."
+              },
+              {
+                "name": "delayMs=150, failMemberIds=[26], recipients=15",
+                "reason": "원문 fake push의 지연·실패 회원·처리 수를 재현한다."
+              }
+            ],
+            "policies": [
+              "AFTER_COMMIT 후 별도 제한 executor로 넘긴다. fake push fixture는 delayMs=150, failMemberIds=[26], 대상 15명; 글 작성 HTTP 201은 푸시와 무관하게 유지한다.",
+              "푸시 완료 뒤 notification 15건 중 SENT 14, FAILED 1; 회원 26 예외 뒤 다음 recipient 전송은 계속한다. push_status는 SENT/FAILED, 비대상 또는 진행 중 NULL.",
+              "가짜 설정은 ADMIN PUT /api/admin/fake-push; delay 0~5000ms와 failMemberIds 배열은 source field/type/range 정책 그대로."
+            ],
+            "inputs": [
+              "legacy:16-2:T6: PUT /api/admin/fake-push; body={\"delayMs\":150,\"failMemberIds\":[26]}; case=지연 150ms · 회원 26 실패로 설정; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"T6\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.delayMs\",\"equals\":150},{\"path\":\"$.failMemberIds\",\"equals\":[26]}]}}]",
+              "legacy:16-2:T0: PUT /api/admin/fake-push; body={\"delayMs\":150}; case=운영자 아님(회원 2); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"T0\",\"expect\":{\"status\":403}}]",
+              "legacy:16-2:T1: PUT /api/admin/fake-push; body={\"delayMs\":-1}; case=잘못된 입력 — 지연 -1; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"T1\",\"expect\":{\"status\":400,\"json\":[{\"path\":\"$.errors[*].field\",\"contains\":\"delayMs\"}]}}]",
+              "legacy:16-2:P: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 16-2 비동기 알림\",\"content\":\"푸시를 기다리지 않는다\"}; case=회원 3이 새 글(팔로워 15명에게 푸시); source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"P\",\"expect\":{\"status\":201,\"headers\":{\"Server-Timing\":{\"matches\":\"^app;dur=\\\\d{1,3}$\"}}}}]",
+              "legacy:16-2:G: GET /api/posts/{{P.body.id}}; case=방금 쓴 글 조회; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"G\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.id\",\"equals\":\"{{P.body.id}}\"}]}}]"
+            ],
+            "success": [
+              "글 생성은 201 및 정상 DB commit, 처리 뒤 14/1 상태."
+            ],
+            "failures": [
+              {
+                "when": "PUT /api/admin/fake-push 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 403 — 원문 check의 실패 응답",
+                "unchanged": "커밋된 post/HTTP 201은 유지하고 개별 푸시 실패만 FAILED로 기록하며 후속 수신자를 계속 처리한다."
+              },
+              {
+                "when": "PUT /api/admin/fake-push · [교육용 fixture · legacy:16-2:T0] 운영자 아님(회원 2)",
+                "result": "HTTP 403 (T0)",
+                "unchanged": "post는 commit된 HTTP 201로 유지되고 푸시 실패만 FAILED; 후속 recipient는 계속 처리한다."
+              },
+              {
+                "when": "PUT /api/admin/fake-push · [교육용 fixture · legacy:16-2:T1] 잘못된 입력 — 지연 -1",
+                "result": "HTTP 400 (T1); $.errors[*].field contains \"delayMs\"",
+                "unchanged": "post는 commit된 HTTP 201로 유지되고 푸시 실패만 FAILED; 후속 recipient는 계속 처리한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "교육용 fake push는 수신자 15명·delay 150ms·실패 회원 26으로 설정돼 있습니다.",
+                "action": "새 글을 등록하고 HTTP 응답과 별도 알림 처리 완료 상태를 차례로 확인합니다.",
+                "result": "제한된 실행기를 쓰며 글의 commit 후 처리합니다. 알림 실패가 이미 성공한 글과 201을 취소하지 않습니다."
+              }
+            ],
+            "work": [
+              "비동기 경계/실행기 한도/회원별 try-catch와 status 저장을 구현하고 호출 thread와 notify thread를 로그로 구분한다."
+            ],
+            "done": [
+              "글은 201로 먼저 저장되고 push 완료 후 SENT 14·FAILED 1입니다. 회원 26 실패 뒤에도 다른 회원 발송을 계속합니다.",
+              "제한된 실행기를 쓰며 글의 commit 후 처리합니다. 알림 실패가 이미 성공한 글과 201을 취소하지 않습니다.",
+              "PUT /api/admin/fake-push 입력이 원문 실패 check 조건에 해당 → HTTP 403 — 원문 check의 실패 응답 커밋된 post/HTTP 201은 유지하고 개별 푸시 실패만 FAILED로 기록하며 후속 수신자를 계속 처리한다.",
+              "PUT /api/admin/fake-push · [교육용 fixture · legacy:16-2:T0] 운영자 아님(회원 2) → HTTP 403 (T0) post는 commit된 HTTP 201로 유지되고 푸시 실패만 FAILED; 후속 recipient는 계속 처리한다."
+            ]
+          },
+          "hints": [
+            "@Async 메서드를 같은 객체에서 this로 호출하면 왜 실행기를 거치지 않을 수 있을까요?",
+            "한 회원 푸시가 실패했을 때 루프 전체를 중단하지 않으려면 예외 처리 범위는 어디여야 할까요?",
+            "큐가 포화되어 작업을 수용하지 못하면 글쓰기 트랜잭션은 이미 커밋됐는지 어떤 값으로 판단할까요?"
+          ],
+          "recipeIds": [
+            "legacy:16-2:T6",
+            "legacy:16-2:T0",
+            "legacy:16-2:T1",
+            "legacy:16-2:P",
+            "legacy:16-2:G"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "16-2-async-notification.html",
+              "href": "/scenario/ch16-events-async-cache/16-2-async-notification.html"
+            },
+            {
+              "label": "S15-async-scheduling-batch.html",
+              "href": "/docs/knowledge/S15-async-scheduling-batch.html"
+            },
+            {
+              "label": "W14-sync-async-blocking.html",
+              "href": "/docs/knowledge/W14-sync-async-blocking.html"
+            },
+            {
+              "label": "W25-spring-multithreading.html",
+              "href": "/docs/knowledge/W25-spring-multithreading.html"
+            },
+            {
+              "label": "S08-transactions.html",
+              "href": "/docs/knowledge/S08-transactions.html"
+            },
+            {
+              "label": "F3-cors.html",
+              "href": "/lessons/F3-cors.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

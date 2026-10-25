@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "id": "transaction-consistency",
+  "title": "실패해도 주문과 포인트 상태 맞추기",
+  "summary": "구매 실패와 동일 멱등 키 동시 요청에서 주문·재고·포인트·쿠폰 상태를 한 결과로 맞춥니다.",
+  "difficulty": "고급",
+  "group": "데이터 정합성",
+  "prerequisites": [
+    "points-coupon-shop"
+  ],
+  "stages": [
+    {
+      "id": "rollback",
+      "title": "실패와 같은 키 경쟁에서도 상태 일치시키기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "rollback",
+          "title": "실패와 같은 키 경쟁에서도 상태 일치시키기",
+          "sourceUnits": [
+            "course:D12-3",
+            "course:D13-1",
+            "support:course/tickets/B03.md"
+          ],
+          "brief": {
+            "purpose": "구매 실패와 동일 멱등 키 동시 요청에서 주문·재고·포인트·쿠폰 상태를 한 결과로 맞춥니다.",
+            "task": "B03의 rollback 안 됨·예상치 못한 rollback 두 증상을 각각 재현한 뒤 트랜잭션 로그와 주문 테스트로 수정하세요. 같은 회원·키 동시 주문 결과도 확인합니다.",
+            "preconditions": [
+              "B03은 D12의 필수 증상 재현과 D13의 같은 key 동시 주문까지 연결되는 필수 ticket이다. 실제 shop order와 point/coupon/stock fixture를 사용한다.",
+              "동일 회원·멱등 key는 8~64자 영문/숫자/하이픈, quantity는 1~10이다. 트랜잭션 로그 `org.springframework.transaction` DEBUG를 켠다."
+            ],
+            "scenario": [
+              {
+                "start": "격리 fixture 회원 balance=2,000, item1 price=500/stock=10, coupon 미사용 상태다. 같은 회원이 아직 쓰지 않은 key `order-0001`을 사용할 예정이다.",
+                "action": "D12 B03의 rollback 안 됨(마지막 포인트 차감 실패)과 rollback 됨(참여 transaction이 rollback-only) 증상을 각각 재현한다. 수정 뒤 같은 key/body를 두 thread에서 동시에 POST /api/shop/orders로 보낸다. 이어 같은 key에 quantity=2를 보낸다.",
+                "result": "수정된 동시 요청은 둘 다 HTTP 201을 받을 수 있고 같은 주문 결과를 재생한다. DB에는 주문 1건, stock 10→9, balance 2,000→1,500, 지출 500 1건만 반영된다. 같은 key 다른 body는 422다.",
+                "after": "주문 실패 주입 뒤에는 order row·stock·balance·coupon 사용이 모두 시작값으로 rollback된다. transaction log에서 begin/commit/rollback 순서를 비교하고 예외를 catch한 rollback-only 상태를 성공으로 보고하지 않는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "shop_order(member_id,idempotency_key)",
+                "reason": "회원별 같은 key 요청을 한 주문으로 식별하며 동일 body 재생과 다른 body 422의 기준이다."
+              },
+              {
+                "name": "shop_item.stock와 paid_amount",
+                "reason": "성공 주문의 재고 1 감소와 실제 지출 계산이 각각 한 번만 일어났는지 보인다."
+              },
+              {
+                "name": "member.point_balance와 ORDER ledger",
+                "reason": "주문 차감이 성공 시 한 번이고 rollback 때는 잔액/원장이 원상복구됐는지 확인한다."
+              },
+              {
+                "name": "Spring transaction log/rollback-only marker",
+                "reason": "self invocation·joined transaction exception과 실제 commit 결과의 차이를 관찰한다."
+              }
+            ],
+            "policies": [
+              "같은 회원·같은 키 동시 주문 두 요청은 모두 201을 받을 수 있지만 주문·재고·잔액 반영은 한 번만 이뤄져야 합니다.",
+              "같은 키의 동일 본문은 같은 저장 결과를 재사용하고 다른 본문이면 422입니다. 주문 입력 규격은 key 8~64자, 수량 1~10입니다.",
+              "변경들은 함께 확정/취소되어야 합니다. 잡은 예외나 rollback-only 표식이 최종 커밋에 미치는 영향을 로그로 확인합니다.",
+              "B03은 원문 D12-3 문제와 D13-1의 동시성 후속을 연속 유지합니다. B03은 D12·D13 연속 필수 티켓입니다.",
+              "원문 완료 기준: 트랜잭션 로그(`org.springframework.transaction` DEBUG)로 구매 한 번에서 트랜잭션이 열리고 끝나는 순서를 찾는다",
+              "원문 완료 기준: `OrderRollbackTest` 통과: 예외를 잡았는데 롤백되던 경우와 롤백돼야 하는데 안 되던 경우 둘 다",
+              "원문 완료 기준: `OrderRollbackTest` 통과: D12의 두 실패 증상과 같은 키 동시 주문을 함께 검증한다",
+              "원문 완료 기준: 같은 회원·같은 키로 동시에 주문해도 두 요청은 201이고 주문·재고·잔액은 한 번만 반영된다",
+              "원문 완료 기준: 원인 서술: 증상 ①과 ②가 각각 왜 생기는지, 하나를 고치면 다른 하나가 어떻게 바뀌는지",
+              "원문 완료 기준: 재현 테스트: 테스트 메서드에 `@Transactional`을 붙이지 않고, 응답 코드와 주문·재고·쿠폰·잔액의 최종 상태로 판정(결함 상태에서 실패 → 수정 후 통과). 예: `src/test/java/com/example/board/shop/OrderRollbackTest.java`",
+              "원문 완료 기준: 수정 diff"
+            ],
+            "inputs": [
+              "POST /api/shop/orders body `{\"itemId\":1,\"quantity\":1}` header `Idempotency-Key: order-0001`; 유효 USER token.",
+              "동일한 body/key 두 요청을 동시에 보내 양쪽 HTTP status를 기록한다. 기대 두 요청 201, DB 주문은 한 건만.",
+              "같은 key로 quantity=2 재요청 → 422. balance 부족/쿠폰 사용 실패 injected case → 409와 전체 원상 유지."
+            ],
+            "success": [
+              "D12 `OrderRollbackTest`에서 rollback되지 않던 결함과 rollback-only UnexpectedRollbackException 증상을 둘 다 고치고 테스트한다.",
+              "동일 회원·key·body 동시 주문 두 응답은 201; order row=1, stock 10→9, balance 2,000→1,500, ORDER ledger -500 1건.",
+              "같은 key+다른 quantity=2 body → 422; 원래 주문·수량·지출 결과는 한 번만 유지된다. 실패 구매는 409이며 재고·balance·coupon 상태가 모두 원복된다."
+            ],
+            "failures": [
+              {
+                "when": "재고 감소 뒤 포인트 부족으로 구매가 중단",
+                "result": "409 `/errors/insufficient-points`.",
+                "unchanged": "order row는 없고 stock 10, balance 400 fixture, coupon UNUSED, ledger가 그대로다."
+              },
+              {
+                "when": "같은 Idempotency-Key를 quantity=2의 다른 body로 재사용",
+                "result": "422.",
+                "unchanged": "기존 quantity=1 주문만 한 건 유지, stock/balance 차감은 추가되지 않는다."
+              },
+              {
+                "when": "트랜잭션 내부에서 예외를 catch했지만 joined transaction이 rollback-only 상태",
+                "result": "커밋 시 UnexpectedRollbackException으로 구매가 전체 rollback될 수 있다.",
+                "unchanged": "부분 주문/재고/쿠폰/포인트 변경을 성공으로 남기지 않고 TransactionTemplate 경계를 수정한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "같은 key 동시 주문",
+                "start": "balance 2,000, item1 500/stock10, `order-0001` 미사용.",
+                "action": "두 worker를 동시에 시작해 같은 body/key로 POST order를 보낸다.",
+                "result": "각 201; order row 1, stock 9, balance 1,500, ledger -500 한 건."
+              },
+              {
+                "title": "다른 body와 실패 rollback",
+                "start": "첫 주문 뒤 위 상태가 확정돼 있다.",
+                "action": "같은 key로 quantity 2를 보낸 뒤 별도 balance 400 회원이 item1을 구매하도록 한다.",
+                "result": "다른 body 422; 부족 주문 409; 첫 주문만 저장되고 실패 회원 stock/balance/order는 이전 값."
+              }
+            ],
+            "work": [
+              "주문 service transaction이 실제 Spring proxy/TransactionTemplate 경계를 거치는지 transaction log와 debugger로 확인한다.",
+              "재고·쿠폰 사용·주문·포인트 차감의 commit/rollback을 명확히 하고 deadlock retry가 rollback된 transaction 밖에 있는지 본다.",
+              "D12 재현과 D13 same-key 두 thread 경쟁 테스트를 실행해 HTTP 및 DB 변경 횟수를 함께 검증한다."
+            ],
+            "done": [
+              "D12 두 rollback 증상 재현 테스트가 수정 뒤 통과했다.",
+              "D13 동시 같은 key 요청 두 건은 201을 반환하고 order 1건/재고 1감소/잔액 1회 차감만 남겼다.",
+              "다른 body 422 및 실패 409 뒤 stock·balance·coupon·order 보존을 확인했다. B03 ticket은 두 날에 걸친 필수 흐름으로 남겼다."
+            ]
+          },
+          "hints": [
+            "같은 클래스 안의 this 호출로 @Transactional method를 부르면 proxy가 적용되지 않을 가능성을 어떤 log로 확인하나요?",
+            "안쪽 REQUIRED transaction의 예외를 catch해도 rollback-only가 남으면 최종 commit에서 어떤 일이 생기나요?",
+            "동일 key 두 요청이 모두 201일 때 주문 row 1개와 stock/balance 한 번 반영을 어떻게 대조하나요?",
+            "구매 실패 때 coupon/stock/balance 변경이 순서대로 일부 commit되지 않게 경계를 어디에 두나요?"
+          ],
+          "recipeIds": [
+            "board:shop-order:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D12-3 · B03 \"예외를 잡았는데도 구매가 롤백된다 / 안 된다\": 트랜잭션 로그와 디버거",
+              "href": "course/spring/D12.html#step-d12-3"
+            },
+            {
+              "label": "course:D13-1 · B03 \"예외를 잡았는데도 구매가 롤백된다 / 안 된다\": 같은 키 동시 주문까지 검증",
+              "href": "course/spring/D13.html#step-d13-1"
+            },
+            {
+              "label": "support:course/tickets/B03.md · B03. 예외를 잡았는데도 구매가 롤백된다 / 안 된다",
+              "href": "course/tickets/B03.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

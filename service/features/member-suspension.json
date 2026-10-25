@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "id": "member-suspension",
+  "title": "정지 기간 동안 글쓰기 제한하기",
+  "summary": "기간 정지 회원은 유효 구간 동안 쓰기 요청이 막히고 만료 뒤 다시 쓸 수 있다.",
+  "difficulty": "중급",
+  "group": "운영과 안전",
+  "prerequisites": [
+    "community-moderation"
+  ],
+  "stages": [
+    {
+      "id": "suspend",
+      "title": "운영자가 기간 정지하고 만료 후 허용하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "suspend",
+          "title": "운영자가 기간 정지하고 만료 후 허용하기",
+          "sourceUnits": [
+            "legacy:13-3"
+          ],
+          "brief": {
+            "purpose": "기간 정지 회원은 유효 구간 동안 쓰기 요청이 막히고 만료 뒤 다시 쓸 수 있다.",
+            "task": "운영자의 정지 등록과 글쓰기 시점의 정지 유효성 검사를 구현한다.",
+            "preconditions": [
+              "시나리오 DB(`community`) — 앱을 기본 프로파일로 띄운다.",
+              "practice 프로파일과 고정 시각 Clock을 사용하며 운영자·정지 회원을 준비한다."
+            ],
+            "scenario": [
+              {
+                "start": "운영자가 도배한 회원 9에게 3일 정지와 사유를 등록합니다.",
+                "action": "정지 중인 회원으로 글쓰기·읽기를 각각 시도하고 운영자가 정지를 해제합니다.",
+                "result": "정지 중 쓰기에는 403과 정지 시각/사유가 표시되고 읽기는 계속 가능합니다. 해제는 멱등 204입니다.",
+                "after": "days는 1~30, reason은 2~200자이며 잘못된 필드 오류를 모아 400으로 반환합니다. 운영진 정지는 409입니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "member suspension status/until",
+                "reason": "Clock 기준 정지 유효 구간과 만료 직후 복귀를 판정한다."
+              },
+              {
+                "name": "post create status",
+                "reason": "정지 기간 중 새 글이 저장되지 않았음을 확인한다."
+              }
+            ],
+            "policies": [
+              "기간 정지는 MODERATOR·ADMIN의 SUSPEND_MEMBER 권한으로 관리한다. member 9에 days=3, reason=[채점] 도배 경고를 넣으면 suspendedUntil=now+3일이다.",
+              "days 정수 1~30, reason 문자열 2~200자. 빈/null/공백·범위 밖·문자열 숫자·소수·비문자열은 400이며 필드 오류를 모두 돌려준다.",
+              "정지 중 POST/PUT/PATCH/DELETE는 403과 suspendedUntil/reason; 읽기 GET은 200. 운영진 정지는 409, 없는/탈퇴 회원 404, 일반 회원 403, 토큰 없음 401. DELETE 해제는 멱등 204."
+            ],
+            "inputs": [
+              "legacy:13-3:S: PUT /api/admin/members/9/suspension; body={\"days\":3,\"reason\":\"[채점] 도배 경고\"}; case=회원 9를 3일 정지; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"S\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.memberId\",\"equals\":9},{\"path\":\"$.suspendedUntil\",\"type\":\"string\"},{\"path\":\"$.reason\",\"equals\":\"[채점] 도배 경고\"}]}},{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"S\",\"expect\":{\"status\":200}}]",
+              "legacy:13-3:W1: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 정지 중 글\",\"content\":\"정지 중에는 저장되면 안 된다\"}; case=정지 중 글쓰기; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"W1\",\"expect\":{\"status\":403,\"json\":[{\"path\":\"$.suspendedUntil\",\"equals\":\"{{S.body.suspendedUntil}}\"},{\"path\":\"$.reason\",\"equals\":\"[채점] 도배 경고\"}]}}]",
+              "legacy:13-3:B30: PUT /api/admin/members/9/suspension; body={\"days\":30,\"reason\":\"가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가가\"}; case=days=30·reason 200자(경계 안); source expected/status checks=[{\"id\":\"C5\",\"pointer\":\"/checks/4\",\"request\":\"B30\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.reason\",\"matches\":\"^가{200}$\"}]}}]",
+              "legacy:13-3:L: DELETE /api/admin/members/9/suspension; case=정지 풀기; source expected/status checks=[{\"id\":\"C6\",\"pointer\":\"/checks/5\",\"request\":\"L\",\"expect\":{\"status\":204}}]",
+              "legacy:13-3:W4: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 정지 풀린 뒤 글\",\"content\":\"풀리면 다시 쓸 수 있다\"}; case=푼 뒤 글쓰기; source expected/status checks=[{\"id\":\"C6\",\"pointer\":\"/checks/5\",\"request\":\"W4\",\"expect\":{\"status\":201}}]",
+              "legacy:13-3:P2: PUT /api/admin/members/9/suspension; body={\"days\":3,\"reason\":\"[채점] 사유\"}; case=토큰 없이 정지; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"P2\",\"expect\":{\"status\":401}}]"
+            ],
+            "success": [
+              "만료 전 차단, 만료 이후 요청 처리; 기존 글/세션·계정 상태는 정지 요청만으로 삭제하지 않는다."
+            ],
+            "failures": [
+              {
+                "when": "PUT /api/admin/members/9/suspension 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "member suspension 상태/until 및 실패한 post 생성 수를 실패 전 그대로 보존한다."
+              },
+              {
+                "when": "POST /api/posts · [교육용 fixture · legacy:13-3:W1] 정지 중 글쓰기",
+                "result": "HTTP 403 (W1); $.suspendedUntil equals \"{{S.body.suspendedUntil}}\"; $.reason equals \"[채점] 도배 경고\"",
+                "unchanged": "member suspension 상태/until 및 실패한 post 생성 수는 실패 전 그대로다."
+              },
+              {
+                "when": "PUT /api/admin/members/9/suspension · [교육용 fixture · legacy:13-3:P2] 토큰 없이 정지",
+                "result": "HTTP 401 (P2)",
+                "unchanged": "member suspension 상태/until 및 실패한 post 생성 수는 실패 전 그대로다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "운영자가 도배한 회원 9에게 3일 정지와 사유를 등록합니다.",
+                "action": "정지 중인 회원으로 글쓰기·읽기를 각각 시도하고 운영자가 정지를 해제합니다.",
+                "result": "days는 1~30, reason은 2~200자이며 잘못된 필드 오류를 모아 400으로 반환합니다. 운영진 정지는 409입니다."
+              }
+            ],
+            "work": [
+              "기간 저장값과 쓰기 시점의 유효 판정을 같은 시간 기준으로 구현한다."
+            ],
+            "done": [
+              "정지 중 쓰기에는 403과 정지 시각/사유가 표시되고 읽기는 계속 가능합니다. 해제는 멱등 204입니다.",
+              "days는 1~30, reason은 2~200자이며 잘못된 필드 오류를 모아 400으로 반환합니다. 운영진 정지는 409입니다.",
+              "PUT /api/admin/members/9/suspension 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 member suspension 상태/until 및 실패한 post 생성 수를 실패 전 그대로 보존한다.",
+              "POST /api/posts · [교육용 fixture · legacy:13-3:W1] 정지 중 글쓰기 → HTTP 403 (W1); $.suspendedUntil equals \"{{S.body.suspendedUntil}}\"; $.reason equals \"[채점] 도배 경고\" member suspension 상태/until 및 실패한 post 생성 수는 실패 전 그대로다."
+            ]
+          },
+          "hints": [
+            "정지 만료를 시스템 시각과 고정 Clock으로 각각 계산하면 테스트가 어떤 불일치를 보일까요?",
+            "until 시각과 현재 시각이 정확히 같을 때 허용할지 여부는 어디에 적힌 정책으로 결정해야 할까요?",
+            "정지 실패 요청이 이미 저장된 suspension 기간을 덮어쓰지 않게 어떤 변경 순서를 둘까요?"
+          ],
+          "recipeIds": [
+            "legacy:13-3:S",
+            "legacy:13-3:W1",
+            "legacy:13-3:B30",
+            "legacy:13-3:L",
+            "legacy:13-3:W4",
+            "legacy:13-3:P2"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "13-3-member-suspension.html",
+              "href": "/scenario/ch13-operations/13-3-member-suspension.html"
+            },
+            {
+              "label": "W20-time-timezone.html",
+              "href": "/docs/knowledge/W20-time-timezone.html"
+            },
+            {
+              "label": "V05-testing-tricky-things.html",
+              "href": "/docs/knowledge/V05-testing-tricky-things.html"
+            },
+            {
+              "label": "I1-why-tests.html",
+              "href": "/lessons/I1-why-tests.html"
+            },
+            {
+              "label": "F2-auth-token.html",
+              "href": "/lessons/F2-auth-token.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

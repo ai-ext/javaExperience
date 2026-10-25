@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "id": "post-images",
+  "title": "글에 이미지를 첨부하기",
+  "summary": "파일은 저장소에 두고 DB에는 소유자·글 연결과 메타데이터를 둔다.",
+  "difficulty": "중급",
+  "group": "게시글과 소통",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "images",
+      "title": "이미지 업로드·대표 이미지·정렬 관리하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "images",
+          "title": "이미지 업로드·대표 이미지·정렬 관리하기",
+          "sourceUnits": [
+            "legacy:11-2"
+          ],
+          "brief": {
+            "purpose": "파일은 저장소에 두고 DB에는 소유자·글 연결과 메타데이터를 둔다.",
+            "task": "이미지 업로드와 글 등록의 imageIds 연결을 구현한다.",
+            "preconditions": [
+              "시나리오 DB(`community`). 이번 단계 마이그레이션은 `V20`이다.",
+              "community V20, uploads 설정 폴더, MultipartFile 요청을 사용하고 실제 1×1 GIF 파일을 준비한다."
+            ],
+            "scenario": [
+              {
+                "start": "김자바가 실제 GIF 이미지를 선택했습니다. 글에는 아직 연결하지 않았습니다.",
+                "action": "파일을 업로드하고 반환한 실제 이미지 id를 새 글의 imageIds에 넣습니다.",
+                "result": "정상 파일은 201로 저장되고 본인 소유의 미연결 이미지만 글에 연결됩니다.",
+                "after": "확장자만 png인 텍스트는 415로 거절합니다. 다른 회원 이미지나 이미 연결된 이미지는 새 글에 가져올 수 없습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post_image.uploader_id, post_id",
+                "reason": "업로더 소유와 업로드 후 글 연결 전후를 구분한다."
+              },
+              {
+                "name": "stored_name, original_name, content_type, size_bytes",
+                "reason": "서버 저장 식별자와 사용자 파일 메타데이터, 검사된 실제 형식을 비교한다."
+              }
+            ],
+            "policies": [
+              "1MB 초과 거절; 파일 앞 바이트 signature로 형식을 검증; 클라이언트 파일명·Content-Type을 신뢰하지 않는다. 이미지 7은 로그인 업로더 본인 소유이고 아직 미연결이어야 연결한다."
+            ],
+            "inputs": [
+              "legacy:11-2:I0: POST /api/images; body=\"--jx11\\r\\nContent-Disposition: form-data; name=\\\"file\\\"; filename=\\\"dot.gif\\\"\\r\\nContent-Type: image/gif\\r\\n\\r\\nGIF89a\\u0001\\u0000\\u0001\\u0000\\u0000\\u0000\\u0000;\\r\\n--jx11--\\r\\n\"; case=I0 GIF 올리기(김자바); source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"I0\",\"expect\":{\"status\":201,\"headers\":{\"location\":{\"endsWith\":\"/api/images/{{I0.body.fileName}}\"}},\"json\":[{\"path\":\"$.id\",\"type\":\"number\"},{\"path\":\"$.fileName\",\"matches\":\"^[0-9a-f]{32}\\\\.gif$\"},{\"path\":\"$.url\",\"equals\":\"/api/images/{{I0.body.fileName}}\"},{\"path\":\"$.contentType\",\"equals\":\"image/gif\"},{\"path\":\"$.size\",\"equals\":14}]}}]",
+              "legacy:11-2:I2: POST /api/images; body=\"--jx11\\r\\nContent-Disposition: form-data; name=\\\"file\\\"; filename=\\\"photo.png\\\"\\r\\nContent-Type: image/png\\r\\n\\r\\nhello\\r\\n--jx11--\\r\\n\"; case=I2 이름만 .png인 텍스트; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"I2\",\"expect\":{\"status\":415}}]",
+              "legacy:11-2:I3: POST /api/images; body=\"--jx11\\r\\nContent-Disposition: form-data; name=\\\"file\\\"; filename=\\\"dot.gif\\\"\\r\\nContent-Type: image/gif\\r\\n\\r\\nGIF89a\\u0001\\u0000\\u0001\\u0000\\u0000\\u0000\\u0000;\\r\\n--jx11--\\r\\n\"; case=I3 토큰 없이 올리기; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"I3\",\"expect\":{\"status\":401}}]",
+              "legacy:11-2:I5: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 사진 글\",\"content\":\"사진 첨부\",\"imageIds\":[\"{{I0.body.id}}\"]}; case=I5 이미지를 붙여 글쓰기; source expected/status checks=[{\"id\":\"C6\",\"pointer\":\"/checks/5\",\"request\":\"I5\",\"expect\":{\"status\":201}}]",
+              "legacy:11-2:I6: GET /api/posts/{{I5.body.id}}; case=I6 글 상세; source expected/status checks=[{\"id\":\"C6\",\"pointer\":\"/checks/5\",\"request\":\"I6\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.images\",\"length\":1},{\"path\":\"$.images[0].id\",\"equals\":\"{{I0.body.id}}\"},{\"path\":\"$.images[0].url\",\"equals\":\"{{I0.body.url}}\"}]}}]"
+            ],
+            "success": [
+              "업로드 id와 주소로 미리보기를 표시하고 글 저장 후 상세 이미지 순서를 확인."
+            ],
+            "failures": [
+              {
+                "when": "POST /api/images 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "기존 파일·post_image row·post 연결을 요청 직전 그대로 보존하고 거절 파일을 새 저장하지 않는다."
+              },
+              {
+                "when": "POST /api/images · [교육용 fixture · legacy:11-2:I2] I2 이름만 .png인 텍스트",
+                "result": "HTTP 415 (I2)",
+                "unchanged": "기존 파일·post_image row·post 연결은 그대로며 실패 파일은 새 저장하지 않는다."
+              },
+              {
+                "when": "POST /api/images · [교육용 fixture · legacy:11-2:I3] I3 토큰 없이 올리기",
+                "result": "HTTP 401 (I3)",
+                "unchanged": "기존 파일·post_image row·post 연결은 그대로며 실패 파일은 새 저장하지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "김자바가 실제 GIF 이미지를 선택했습니다. 글에는 아직 연결하지 않았습니다.",
+                "action": "파일을 업로드하고 반환한 실제 이미지 id를 새 글의 imageIds에 넣습니다.",
+                "result": "확장자만 png인 텍스트는 415로 거절합니다. 다른 회원 이미지나 이미 연결된 이미지는 새 글에 가져올 수 없습니다."
+              }
+            ],
+            "work": [
+              "서버 측 형식 판정, 안전한 저장 이름, 업로더 소유 검증, 글과 연결 트랜잭션을 구성한다."
+            ],
+            "done": [
+              "정상 파일은 201로 저장되고 본인 소유의 미연결 이미지만 글에 연결됩니다.",
+              "확장자만 png인 텍스트는 415로 거절합니다. 다른 회원 이미지나 이미 연결된 이미지는 새 글에 가져올 수 없습니다.",
+              "POST /api/images 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 기존 파일·post_image row·post 연결을 요청 직전 그대로 보존하고 거절 파일을 새 저장하지 않는다.",
+              "POST /api/images · [교육용 fixture · legacy:11-2:I2] I2 이름만 .png인 텍스트 → HTTP 415 (I2) 기존 파일·post_image row·post 연결은 그대로며 실패 파일은 새 저장하지 않는다."
+            ]
+          },
+          "hints": [
+            "파일 확장자와 Content-Type이 GIF라고 주장할 때 서버가 실제 형식을 확인할 근거는 무엇일까요?",
+            "업로드 직후 post_id가 NULL인 이미지가 다른 회원의 글에 연결되지 않게 어떤 소유 조건을 확인해야 할까요?",
+            "파일 저장은 성공했지만 DB 연결이 실패하면 어떤 정리 범위가 현재 과제에 포함되고 어떤 것은 명시적으로 제외되어 있나요?"
+          ],
+          "recipeIds": [
+            "legacy:11-2:I0",
+            "legacy:11-2:I2",
+            "legacy:11-2:I3",
+            "legacy:11-2:I5",
+            "legacy:11-2:I6"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "11-2-image-upload.html",
+              "href": "/scenario/ch11-post-advanced/11-2-image-upload.html"
+            },
+            {
+              "label": "007-post-thumbnail.html",
+              "href": "/tickets/007-post-thumbnail.html"
+            },
+            {
+              "label": "P17-file-upload-storage.html",
+              "href": "/docs/knowledge/P17-file-upload-storage.html"
+            },
+            {
+              "label": "A2-http-anatomy.html",
+              "href": "/lessons/A2-http-anatomy.html"
+            },
+            {
+              "label": "D11-web-security-basics.html",
+              "href": "/docs/knowledge/D11-web-security-basics.html"
+            },
+            {
+              "label": "C3-application-yml-profiles.html",
+              "href": "/lessons/C3-application-yml-profiles.html"
+            },
+            {
+              "label": "R03-schema-types-constraints.html",
+              "href": "/docs/knowledge/R03-schema-types-constraints.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

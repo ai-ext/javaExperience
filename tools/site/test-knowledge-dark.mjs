@@ -50,7 +50,8 @@ for (const page of baseline.pages) {
 
 for (const file of ['scenario/README.html', 'practice/MISSIONS.html']) {
   const document = new JSDOM(fs.readFileSync(path.join(ROOT, file), 'utf8')).window.document;
-  assert.notEqual(document.documentElement.dataset.theme, 'dark', `${file} 다크 테마 미적용`);
+  // 통합 화면은 다크 단일 테마다. 개념 전용 표식과 stylesheet의 적용 범위만 분리한다.
+  assert.equal(document.documentElement.dataset.theme, 'dark', `${file} 공통 다크 테마 적용`);
   assert.notEqual(document.body.dataset.conceptSurface, 'dark', `${file} 개념 표식 미적용`);
   assert.ok(![...document.querySelectorAll('link[rel="stylesheet"]')].some((link) => darkHref(link.getAttribute('href'))), `${file} 다크 stylesheet 미적용`);
 }

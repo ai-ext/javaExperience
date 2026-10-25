@@ -1,0 +1,328 @@
+{
+  "version": 1,
+  "id": "members-auth",
+  "title": "회원 가입과 로그인 만들기",
+  "summary": "회원 입력을 검증하고 정규화한 뒤 인증에 사용할 수 있는 계정으로 안전하게 저장합니다.",
+  "difficulty": "기초",
+  "group": "회원과 접근",
+  "prerequisites": [
+    "runtime-ready"
+  ],
+  "stages": [
+    {
+      "id": "register",
+      "title": "회원 정보를 안전하게 등록하기"
+    },
+    {
+      "id": "login",
+      "title": "토큰으로 로그인하고 내 정보 확인하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "register",
+          "title": "회원 정보를 안전하게 등록하기",
+          "sourceUnits": [
+            "course:D02-1",
+            "course:D02-2",
+            "course:D02-4",
+            "course:D02-5",
+            "course:D03-1",
+            "course:D03-2",
+            "course:D03-3",
+            "support:course/java/J02.md",
+            "support:course/java/J03.md"
+          ],
+          "brief": {
+            "purpose": "회원 입력을 검증하고 정규화한 뒤 인증에 사용할 수 있는 계정으로 안전하게 저장합니다.",
+            "task": "회원·공통 에러 저장 기반을 정하고 닉네임 정규화와 비밀번호 해시를 적용해 가입 흐름을 연결하세요. 중복과 유효성 실패가 계정 일부를 남기지 않는지 확인합니다.",
+            "preconditions": [
+              "D02의 ErrorCode/ProblemDetail 기반, 회원 테이블과 닉네임 정규화 규칙을 준비한다.",
+              "가입 요청은 새 email/nickname으로 시작하고, 동일 email 재시도는 첫 성공 뒤 수행한다."
+            ],
+            "scenario": [
+              {
+                "start": "회원 테이블에 `learner@example.test` 계정이 없다. 요청 nickname에는 앞뒤 공백과 대문자를 넣고 password는 8자 이상으로 준비한다.",
+                "action": "`POST /api/auth/signup` 정상 요청을 보내고 같은 email로 한 번 더 요청한다. 별도 요청에서 password를 7자로 줄인다.",
+                "result": "첫 요청은 HTTP 201이며 정규화된 nickname과 BCrypt password hash가 저장된다. 같은 email 재요청은 409 `/errors/duplicate`; 7자 password는 400 `/errors/validation`, `errors[0].field=password`다.",
+                "after": "DB에서 해당 email row가 한 건이고 password_hash가 입력 원문이 아닌 BCrypt 형식인지 확인한다. 중복·검증 실패 뒤 row 수는 계속 한 건이다."
+              }
+            ],
+            "data": [
+              {
+                "name": "email과 nickname",
+                "reason": "email과 정규화된 nickname 각각의 UNIQUE 조건을 가입 중복 검증과 연결한다."
+              },
+              {
+                "name": "password 원문과 password_hash",
+                "reason": "BCrypt 저장 여부를 확인하며 원문은 DB·응답·로그에 남기지 않는다."
+              },
+              {
+                "name": "nickname 정규화 결과",
+                "reason": "앞뒤 공백 제거·소문자화가 저장 전에 적용되는지 비교한다."
+              },
+              {
+                "name": "ErrorCode 및 ProblemDetail",
+                "reason": "중복·필드 검증 실패를 안정적인 409/400 계약으로 표현한다."
+              }
+            ],
+            "policies": [
+              "비밀번호 원문 대신 BCrypt hash를 저장하고 응답에서 반환하지 않습니다.",
+              "같은 email 재가입은 409 /errors/duplicate, password 7자 입력은 400 /errors/validation이며 errors[0].field는 password입니다.",
+              "D02-5는 금칙어·공통 코드를 기동 준비 뒤 JdbcClient로 적재합니다. DB 스키마는 데이터 요구사항에 맞게 직접 설계합니다.",
+              "인증 경로 정책의 401과 권한 부족 403을 구분합니다.",
+              "원문 완료 기준: `GET /api/unknown` → 404 `application/problem+json`, `instance` = `/api/unknown`",
+              "원문 완료 기준: `GlobalExceptionHandlerTest` 통과: `BusinessException(ErrorCode.NOT_FOUND)` → 404 `type` `/errors/not-found`",
+              "원문 완료 기준: `GET /actuator/health` → 200",
+              "원문 완료 기준: `JpaAuditingTest` 통과: `@EnableJpaAuditing`이 켜져 있고 `BaseEntity`에 감사 리스너가 달려 있다",
+              "원문 완료 기준: `GET /actuator/health` → 200 (`@EnableJpaAuditing` 포함)",
+              "원문 완료 기준: `ForbiddenWordCheckerTest` 통과",
+              "원문 완료 기준: `NicknameNormalizerTest` 통과: 앞뒤 공백 제거·소문자화",
+              "원문 완료 기준: `ForbiddenWordChecker`에 요청마다 바뀌는 필드가 없다(리뷰 체크)",
+              "원문 완료 기준: 기동 로그에서 `Started BoardApplication` 다음에 `금칙어 N건, 공통코드 M건 적재`",
+              "원문 완료 기준: 금칙어 데이터를 추가하고 재기동하면 적재 건수가 늘어난다",
+              "원문 완료 기준: 설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+              "원문 완료 기준: DB 불변식 확인: 같은 금칙어와 같은 그룹·코드의 중복 INSERT가 거부된다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다.",
+              "원문 완료 기준: 토큰 없이 `GET /actuator/health` → 200",
+              "원문 완료 기준: 토큰 없이 `GET /api/members/me` → 401 `application/problem+json`, `type` `/errors/unauthorized`",
+              "원문 완료 기준: `GET /actuator/env` → 401 (health 외 actuator 비공개)",
+              "원문 완료 기준: `MemberRepositoryTest` 통과: 같은 `email`로 두 번 저장하면 `DataIntegrityViolationException`",
+              "원문 완료 기준: DB 불변식 확인: 이메일 중복과 정규화한 닉네임 중복을 각각 직접 INSERT해 거부됨을 확인한다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다.",
+              "원문 완료 기준: `POST /api/auth/signup` → 201",
+              "원문 완료 기준: 같은 `email`로 다시 → 409 `/errors/duplicate`",
+              "원문 완료 기준: `password` 7자 → 400 `/errors/validation`, `errors[0].field` = `password`"
+            ],
+            "inputs": [
+              "POST /api/auth/signup JSON: email=`learner@example.test`, nickname=`  Learner `, password는 8자 이상 문자열.",
+              "동일 email 재요청은 409 `/errors/duplicate`; password를 7자로 보낸 별도 요청은 400 `/errors/validation`이며 errors[0].field는 password다.",
+              "회원 엔티티는 USER 역할과 생성·수정 시각을 보관한다. 요청 DTO와 저장 Entity를 구분한다."
+            ],
+            "success": [
+              "첫 `POST /api/auth/signup` → 201. nickname은 앞뒤 공백 제거 및 소문자화 후 저장된다.",
+              "email 중복 요청 → 409 `/errors/duplicate`; password 7자 요청 → 400 `/errors/validation`, `errors[0].field=password`.",
+              "회원 row는 성공 1건만 남고 password_hash는 BCrypt hash이며 평문 password와 passwordHash 응답 노출은 없다."
+            ],
+            "failures": [
+              {
+                "when": "동일 email 또는 정규화한 nickname이 이미 존재함",
+                "result": "409 `/errors/duplicate`.",
+                "unchanged": "첫 가입 row가 한 건 유지되고 두 번째 회원 row가 생기지 않는다."
+              },
+              {
+                "when": "password가 7자임",
+                "result": "400 `/errors/validation`, errors[0].field=password.",
+                "unchanged": "새 회원 row/hash가 추가되지 않는다."
+              },
+              {
+                "when": "요청 필수값 누락 또는 email 형식 위반",
+                "result": "400 validation 응답으로 거부한다.",
+                "unchanged": "회원 row와 닉네임 데이터가 바뀌지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "가입 후 정규화 확인",
+                "start": "email learner@example.test가 없고 nickname 입력은 `  Learner `다.",
+                "action": "유효 password로 signup을 한 번 보낸다.",
+                "result": "201; DB nickname은 normalizer 결과이며 password_hash만 저장된다."
+              },
+              {
+                "title": "중복 및 짧은 비밀번호",
+                "start": "첫 가입이 끝나 회원 row가 1건 있다.",
+                "action": "같은 email로 재요청한 뒤, 별도 신규 email에는 7자 password를 보낸다.",
+                "result": "첫 실패는 409 duplicate, 둘째는 400 validation/password; 두 실패 후 신규 row는 늘지 않는다."
+              }
+            ],
+            "work": [
+              "회원 email·정규화 nickname UNIQUE와 역할·시각 필드를 설계하고 DB 직접 INSERT 중복도 거부되는지 확인한다.",
+              "닉네임 정규화, BCrypt encode, DTO 검증, ProblemDetail 매핑을 연결한다.",
+              "성공·중복·검증 실패 요청 전후 회원 row와 hash를 비교한다."
+            ],
+            "done": [
+              "신규 가입 201과 정규화 nickname, USER 역할을 확인했다.",
+              "같은 email 409 및 password 7자 400/password 필드를 재현했다.",
+              "DB에서 중복이 거부되고 비밀번호 hash만 보관되며 실패 요청으로 row가 늘지 않는 근거를 남겼다."
+            ]
+          },
+          "hints": [
+            "정규화된 nickname UNIQUE와 원문 nickname UNIQUE 중 어느 값에 제약을 걸어야 공백·대소문자 변형을 막을 수 있나요?",
+            "`PasswordEncoder`가 반환한 값과 요청 password를 각각 어느 경계에서 확인하면 원문 저장을 막을 수 있나요?",
+            "중복 email 두 요청이 동시에 들어오면 애플리케이션의 사전 조회 다음에 DB가 어떤 불변식을 지켜야 하나요?",
+            "400 응답에서 사용자가 잘못 보낸 필드를 어떻게 식별할 수 있나요?"
+          ],
+          "recipeIds": [
+            "board:signup:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D02-1 · 공통 에러 체계: `ErrorCode`, `BusinessException`, ProblemDetail을 만드는 전역 예외 처리기",
+              "href": "course/spring/D02.html#step-d02-1"
+            },
+            {
+              "label": "course:D02-2 · `BaseEntity`(생성·수정 시각 Auditing)와 Testcontainers MySQL 문자셋 고정(utf8mb4)",
+              "href": "course/spring/D02.html#step-d02-2"
+            },
+            {
+              "label": "course:D02-4 · 금칙어 검사기는 빈으로, 닉네임 정규화는 static 유틸로 나누기",
+              "href": "course/spring/D02.html#step-d02-4"
+            },
+            {
+              "label": "course:D02-5 · 기동 준비 뒤 금칙어·공통코드를 JdbcClient로 메모리에 적재하기 — 데이터 요구사항 §6-1을 만족하도록 테이블을 직접 설계·생성",
+              "href": "course/spring/D02.html#step-d02-5"
+            },
+            {
+              "label": "course:D03-1 · Spring Security를 켜고 경로별 공개 범위 표를 규칙으로 옮기기 (BCrypt `PasswordEncoder` 빈, 401·403 ProblemDetail 핸들러)",
+              "href": "course/spring/D03.html#step-d03-1"
+            },
+            {
+              "label": "course:D03-2 · 회원 엔티티와 역할 매핑, BaseEntity 연결 — 데이터 요구사항 §6-2을 만족하도록 테이블을 직접 설계·생성",
+              "href": "course/spring/D03.html#step-d03-2"
+            },
+            {
+              "label": "course:D03-3 · 회원 가입 API (닉네임은 `NicknameNormalizer`로 정규화, 비밀번호는 BCrypt 해시로 저장)",
+              "href": "course/spring/D03.html#step-d03-3"
+            },
+            {
+              "label": "J02. 예외 계층과 제네릭 Result, Lombok이 만드는 코드",
+              "href": "course/java/J02.html"
+            },
+            {
+              "label": "J03. enum과 불변 객체, equals/hashCode",
+              "href": "course/java/J03.html"
+            }
+          ]
+        },
+        {
+          "id": "login",
+          "title": "토큰으로 로그인하고 내 정보 확인하기",
+          "sourceUnits": [
+            "course:D03-4",
+            "course:D03-5"
+          ],
+          "brief": {
+            "purpose": "저장된 회원 자격을 확인해 Bearer JWT를 발급하고, 발급된 주체로 내 정보를 조회합니다.",
+            "task": "로그인 실패 사유가 계정 존재 여부를 노출하지 않게 하고, 토큰으로 인증된 회원 정보만 돌려주는 요청 흐름을 만드세요.",
+            "preconditions": [
+              "앞 단계에서 가입한 `learner@example.test`와 저장된 BCrypt hash를 사용한다.",
+              "BOARD_JWT_SECRET은 환경 변수에서 공급하며 token을 로그·학습 기록에 복사하지 않는다."
+            ],
+            "scenario": [
+              {
+                "start": "가입 회원 learner@example.test가 있고 password hash가 저장돼 있다.",
+                "action": "올바른 password로 POST /api/auth/login 후 반환된 Bearer token으로 GET /api/members/me를 호출한다. 이어서 틀린 password와 없는 email을 각각 로그인시킨다.",
+                "result": "정상 로그인은 200 `{accessToken, tokenType:\"Bearer\", expiresIn}`이고 tokenType은 Bearer다. 내 정보는 200 `{id,email,nickname,role,createdAt}`이며 passwordHash가 없다. 두 종류의 잘못된 자격은 같은 401 `/errors/unauthorized`다.",
+                "after": "정상 응답 token을 보안 입력란에만 사용한다. GET /api/members/me에 token을 빼거나 만료 token을 넣으면 401이며 비밀값이 body·로그에 저장되지 않는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "email lookup key",
+                "reason": "요청 email이 어떤 회원 row와 비교되는지 확인하고 등록되지 않은 계정의 실패 응답도 동일하게 만든다."
+              },
+              {
+                "name": "BCrypt password hash",
+                "reason": "평문 비교 대신 저장 hash에 대한 password 검증이 성공/실패를 결정한다."
+              },
+              {
+                "name": "accessToken·tokenType·expiresIn",
+                "reason": "클라이언트가 인증 헤더를 만들기 위해 필요한 필드와 만료 정보를 검증한다."
+              },
+              {
+                "name": "인증 회원의 MemberResponse",
+                "reason": "JWT 주체에서 회원을 찾고 passwordHash를 응답 DTO에서 제외한다."
+              }
+            ],
+            "policies": [
+              "없는 email과 틀린 password는 모두 401 /errors/unauthorized로 같은 응답 계약을 사용합니다.",
+              "JWT 서명 키는 BOARD_JWT_SECRET 환경 변수에서 읽습니다. 토큰·비밀번호를 기록 파일에 저장하지 않습니다.",
+              "내 정보에는 passwordHash를 노출하지 않습니다.",
+              "원문 완료 기준: `POST /api/auth/login` → 200 `{accessToken, tokenType: \"Bearer\", expiresIn}`",
+              "원문 완료 기준: 틀린 비밀번호와 없는 이메일 → 둘 다 같은 401 `/errors/unauthorized`",
+              "원문 완료 기준: USER 토큰으로 `GET /api/members/me` → 200 `{id, email, nickname, role, createdAt}`, `passwordHash` 없음",
+              "원문 완료 기준: 토큰 없음·만료 토큰 → 401",
+              "원문 완료 기준: USER 토큰으로 `GET /api/admin/reports` → 403 `/errors/forbidden` (컨트롤러는 D10에 만들지만 규칙은 지금 막는다)"
+            ],
+            "inputs": [
+              "POST /api/auth/login JSON의 email/password; 성공 시 응답의 accessToken을 Bearer token으로 사용한다.",
+              "GET /api/members/me는 Authorization: Bearer <실제 accessToken>이며 token은 예시 파일에 붙여 넣지 않는다.",
+              "잘못된 password와 존재하지 않는 email은 같은 401 `/errors/unauthorized` 응답이어야 한다."
+            ],
+            "success": [
+              "`POST /api/auth/login` → 200 `{accessToken, tokenType:\"Bearer\", expiresIn}`.",
+              "Bearer token의 `GET /api/members/me` → 200 `{id,email,nickname,role,createdAt}`; passwordHash 필드는 없다.",
+              "token 미포함·만료 token은 401; 틀린 password와 없는 email은 둘 다 401 `/errors/unauthorized`로 동일하다."
+            ],
+            "failures": [
+              {
+                "when": "password가 맞지 않거나 email에 해당하는 회원이 없음",
+                "result": "양쪽 모두 401 `/errors/unauthorized`의 같은 공개 오류 형식을 반환한다.",
+                "unchanged": "accessToken이 발급되지 않고 회원 데이터·password hash도 변경되지 않는다."
+              },
+              {
+                "when": "token 없이 또는 만료된 token으로 GET /api/members/me",
+                "result": "401 `/errors/unauthorized`.",
+                "unchanged": "요청자 임의 ID의 회원 정보나 passwordHash를 반환하지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "로그인해 내 정보 확인",
+                "start": "가입된 회원 learner@example.test의 password를 알고 있다.",
+                "action": "login 200의 accessToken을 Bearer로 GET /api/members/me에 보낸다.",
+                "result": "같은 회원의 id/email/nickname/role/createdAt만 받고 passwordHash는 받지 않는다."
+              },
+              {
+                "title": "실패 사유 감추기",
+                "start": "한 요청은 등록 회원의 틀린 password, 다른 요청은 미등록 email이다.",
+                "action": "두 POST /api/auth/login 응답의 status와 ProblemDetail 공개 필드를 비교한다.",
+                "result": "둘 다 동일한 401 unauthorized 형식이며 token이 발급되지 않는다."
+              }
+            ],
+            "work": [
+              "password hash 검증과 JWT 생성·검증을 환경 변수 서명 키에 연결한다.",
+              "인증 subject에서 내 회원 ID를 얻어 응답 DTO에 필요한 다섯 필드만 매핑한다.",
+              "정상/틀린 password/없는 email/누락·만료 token의 상태와 응답 필드를 비교한다."
+            ],
+            "done": [
+              "정상 login 200 필드와 만료 초, Bearer token의 내 정보 200 필드 및 passwordHash 부재를 확인했다.",
+              "틀린 password와 없는 email의 공개 401 형식이 같고 token이 발급되지 않는 것을 확인했다.",
+              "token을 저장하지 않고 BOARD_JWT_SECRET이 환경 변수에서 읽힌다는 설정 근거를 남겼다."
+            ]
+          },
+          "hints": [
+            "없는 email과 틀린 password가 같은 오류 형식을 사용하면 어떤 계정 정보를 숨길 수 있나요?",
+            "Bearer token의 주체와 요청 본문의 memberId 중 어떤 값을 내 정보의 기준으로 삼아야 하나요?",
+            "응답 DTO에서 passwordHash가 빠졌는지 테스트는 어떤 필드 집합을 고정해야 하나요?",
+            "expiresIn 값은 클라이언트가 token 만료를 판단할 때 어떤 의미인가요?"
+          ],
+          "recipeIds": [
+            "board:login:normal",
+            "board:member-me:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D03-4 · 로그인과 JWT 발급·검증 필터 (서명 키는 `BOARD_JWT_SECRET` 환경 변수)",
+              "href": "course/spring/D03.html#step-d03-4"
+            },
+            {
+              "label": "course:D03-5 · 내 정보 조회 API와 응답 DTO",
+              "href": "course/spring/D03.html#step-d03-5"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

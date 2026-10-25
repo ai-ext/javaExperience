@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "id": "post-copy",
+  "title": "기존 글을 복사해 새 글 만들기",
+  "summary": "1-8 원본 공개 글을 새 게시글로 복사하면서 새 id/작성자를 쓰고 선택한 경우에만 tag 연결을 복사한다.",
+  "difficulty": "기초",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "copy",
+      "title": "원본을 보존하고 새 id로 글 복사하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "copy",
+          "title": "원본을 보존하고 새 id로 글 복사하기",
+          "sourceUnits": [
+            "legacy:1-8"
+          ],
+          "brief": {
+            "purpose": "1-8 원본 공개 글을 새 게시글로 복사하면서 새 id/작성자를 쓰고 선택한 경우에만 tag 연결을 복사한다.",
+            "task": "post2를 title [복사실습] JPA 복습으로 복사해 copyTags true/false 결과를 비교하고 원본의 소유자·내용·태그가 그대로인지 확인한다.",
+            "preconditions": [
+              "post2는 public/published/undeleted이고 tags=[spring,jpa]다.",
+              "tok-kimjava로 일반 dev board에 작성 가능함을 확인하고 생성 전 post count와 source fields를 기록한다."
+            ],
+            "scenario": [
+              {
+                "start": "post2 original owner/content/tags and post/tag relation counts를 기록한다.",
+                "action": "POST /api/posts/2/copies?copyTags=true with title [복사실습] JPA 복습, 이어 copyTags=false로 두 번째 복사한다.",
+                "result": "각 성공 201+Location 새 id; true copy는 tags [spring,jpa], false copy는 tags []; 새 글 author는 Kim, original fields unchanged.",
+                "after": "source missing/hidden/deleted/private, invalid copyTags, blank title, unauthorized board permission을 error contract와 no-insert로 확인."
+              }
+            ],
+            "data": [
+              {
+                "name": "source post2 fields/status/visibility/author/tags",
+                "reason": "복사 허용 조건과 원본 불변 비교."
+              },
+              {
+                "name": "new post id and Kim author_id",
+                "reason": "새 리소스가 원본 id/author를 재사용하지 않는지 확인."
+              },
+              {
+                "name": "copyTags true/false and post_tag associations",
+                "reason": "요청 옵션에 따른 연결만 새 글에 포함."
+              },
+              {
+                "name": "board write permission and response Location",
+                "reason": "source access와 새 생성 응답 검증."
+              }
+            ],
+            "policies": [
+              "POST /api/posts/{sourceId}/copies?copyTags=true|false; omitted copyTags defaults false. Body contains title only, 1..200 nonblank after trim.",
+              "source must be PUBLISHED+PUBLIC and not deleted; unreadable/missing source 404. Apply target board write permission again; unauthorized 403.",
+              "author comes from token. New entity/new id; do not reuse source id or author id. copyTags true shares tag associations; false creates no associations.",
+              "Post and post_tag writes are one transaction. Any failure leaves source and new rows unchanged."
+            ],
+            "inputs": [
+              "POST /api/posts/2/copies?copyTags=true body {title:\"[복사실습] JPA 복습\"}.",
+              "POST /api/posts/2/copies?copyTags=false body {title:\"[복사실습] 태그 없이\"}.",
+              "Failure copyTags=maybe, blank/missing title, no token, source ids 6/hidden or 999999; unauthorized board source."
+            ],
+            "success": [
+              "201 with Location /api/posts/{newId}; response title and new id.",
+              "true returns spring/jpa tags; false returns empty tags; author is token member2.",
+              "Original post2 content, status, owner, id, tags unchanged."
+            ],
+            "failures": [
+              {
+                "when": "copyTags=maybe or title missing/blank",
+                "result": "400.",
+                "unchanged": "post count and post_tag counts unchanged."
+              },
+              {
+                "when": "no token",
+                "result": "401.",
+                "unchanged": "no copied post/tag rows."
+              },
+              {
+                "when": "source missing/hidden/unpublished/deleted/private",
+                "result": "404.",
+                "unchanged": "source and new rows unchanged."
+              },
+              {
+                "when": "new author cannot write to source board",
+                "result": "403.",
+                "unchanged": "source unchanged and no target row."
+              }
+            ],
+            "examples": [
+              {
+                "title": "Copy tags",
+                "start": "post2 public, original tags spring/jpa; Kim token",
+                "action": "POST /api/posts/2/copies?copyTags=true title=[복사실습] JPA 복습",
+                "result": "201; distinct new id; author Kim; tags spring/jpa; Location points new id"
+              },
+              {
+                "title": "Copy without tags",
+                "start": "same source post2",
+                "action": "POST /api/posts/2/copies?copyTags=false title=[복사실습] 태그 없이",
+                "result": "201; different new id, tags=[]; source still spring/jpa"
+              },
+              {
+                "title": "Bad option",
+                "start": "post2 unchanged; count n",
+                "action": "POST copyTags=maybe",
+                "result": "400; post count n and source fields unchanged"
+              }
+            ],
+            "work": [
+              "Capture actual created ids from response Location.",
+              "Compare source and each copy fields and post_tag joins.",
+              "Run failure cases one at a time and check no partial insert."
+            ],
+            "done": [
+              "source/new id and author separation confirmed.",
+              "true/false tag outcomes match query.",
+              "400/401/403/404 failures leave source and new-row counts unchanged."
+            ],
+            "hints": [
+              "Which values come from sourceId, query parameter, title body, and authenticated member respectively?",
+              "When copyTags=false, should the shared tag rows be deleted or only no new post_tag links be made?",
+              "What source state makes an existing id return 404 instead of creating a copy?"
+            ]
+          },
+          "hints": [
+            "Which values come from sourceId, query parameter, title body, and authenticated member respectively?",
+            "When copyTags=false, should the shared tag rows be deleted or only no new post_tag links be made?",
+            "What source state makes an existing id return 404 instead of creating a copy?"
+          ],
+          "recipeIds": [
+            "legacy:1-8:A",
+            "legacy:1-8:B",
+            "legacy:1-8:C",
+            "legacy:1-8:D",
+            "legacy:1-8:E",
+            "legacy:1-8:F",
+            "legacy:1-8:G"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:1-8 · 기존 글 복사 생성 — 경로·쿼리·본문을 함께",
+              "href": "/scenario/ch1-create-post/1-8-copy-post.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:1-8 · 기존 글 복사 생성 — 경로·쿼리·본문을 함께",
+              "href": "/scenario/ch1-create-post/1-8-copy-post.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "게시글과 소통",
+  "status": "authored"
+}

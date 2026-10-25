@@ -1,0 +1,574 @@
+{
+  "version": 1,
+  "id": "likes",
+  "title": "좋아요를 누르고 취소하기",
+  "summary": "과정 D05 likes 관계의 PUT/DELETE 멱등 동작을 spec-board의 204 빈 body 계약으로 확인한다.",
+  "difficulty": "기초",
+  "prerequisites": [
+    "posts-create-read"
+  ],
+  "stages": [
+    {
+      "id": "likes",
+      "title": "반복·동시 요청에서도 좋아요 수 일치시키기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "likes",
+          "title": "반복·동시 요청에서도 좋아요 수 일치시키기",
+          "sourceUnits": [
+            "course:D05-5",
+            "course:D05-6"
+          ],
+          "brief": {
+            "purpose": "과정 D05 likes 관계의 PUT/DELETE 멱등 동작을 spec-board의 204 빈 body 계약으로 확인한다.",
+            "task": "같은 member/post를 PUT 두 번, DELETE 두 번 보내고 post_like 행 수와 like_count 변화가 한번만 생기는지 확인한다.",
+            "preconditions": [
+              "spec-board board:like-put/like-delete recipe가 사용하는 PUT/DELETE route를 선택한다.",
+              "테스트 post와 Kim member id를 준비하고 좋아요 전 post_like row 수·like_count를 읽는다."
+            ],
+            "scenario": [
+              {
+                "start": "post 3, Kim→post 3 관계 없음; 기존 like_count L.",
+                "action": "PUT /api/posts/3/like 두 번, DELETE 두 번을 순서대로 호출한다.",
+                "result": "각 board API contract는 204 empty body; 첫 PUT만 관계 생성/카운트 +1, 두 번째는 동일; 첫 DELETE만 제거/카운트 -1, 두 번째 동일.",
+                "after": "응답 body가 비어 있다는 점과 DB row/count를 구별해 측정한다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post_like(post_id=3,member_id=Kim)",
+                "reason": "멱등 요청에서 relation row가 최대 1개인지 확인."
+              },
+              {
+                "name": "post.like_count의 시작값 L",
+                "reason": "처음 PUT/DELETE의 변화만 계산하고 고정 절대값을 가정하지 않음."
+              },
+              {
+                "name": "204 empty response",
+                "reason": "본문 JSON이 없는 성공을 community/project 응답으로 착각하지 않음."
+              }
+            ],
+            "policies": [
+              "board D05 likes API recipe의 URI와 성공 status 204/empty body를 그대로 쓴다. 200 JSON 응답이 아니다.",
+              "PUT은 liked=true 상태를 만든다. DELETE는 liked=false 상태를 만든다. 같은 verb 반복은 상태를 다시 toggle하지 않는다.",
+              "본문에서 member id나 likeCount를 받지 않고 token member를 쓴다. 자기 글 좋아요 및 visibility/접근 조건은 source rule에 따른다."
+            ],
+            "inputs": [
+              "PUT /api/posts/3/like, 동일 PUT 재요청.",
+              "DELETE /api/posts/3/like, 동일 DELETE 재요청.",
+              "멤버별 토큰 누락 및 없는 post id."
+            ],
+            "success": [
+              "각 정상 PUT/DELETE → 204 No Content.",
+              "첫 PUT 뒤 relation 1개와 like_count L+1; 두 번째 뒤 그대로.",
+              "첫 DELETE 뒤 row 0개와 L; 두 번째 뒤 그대로."
+            ],
+            "failures": [
+              {
+                "when": "token 없음",
+                "result": "401.",
+                "unchanged": "relation row·like_count 그대로."
+              },
+              {
+                "when": "post 없음/삭제/비공개 접근 불가",
+                "result": "recipe contract에 명시된 404.",
+                "unchanged": "관계와 count unchanged."
+              },
+              {
+                "when": "내 글을 좋아요",
+                "result": "해당 course 원문/API validation status를 확인한다.",
+                "unchanged": "row나 count가 생성되지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "중복 PUT",
+                "start": "Kim-post3 relation 없음, like_count=L",
+                "action": "PUT /api/posts/3/like 두 번",
+                "result": "각 204 빈 body; row는 1개, count=L+1"
+              },
+              {
+                "title": "중복 DELETE",
+                "start": "관계 1개, count=L+1",
+                "action": "DELETE 같은 경로 두 번",
+                "result": "각 204 빈 body; row=0, count=L"
+              }
+            ],
+            "work": [
+              "board recipes의 exact project/status/bodyMode를 확인한다.",
+              "요청마다 relation count와 count column을 다시 읽는다.",
+              "status 204에 JSON body를 기대하지 않고 측정한다."
+            ],
+            "done": [
+              "PUT/DELETE 재전송 후 관계와 집계가 멱등이다.",
+              "204 no-content 계약을 별도 기록했다.",
+              "401/404 실패 후 DB가 보존됐다."
+            ],
+            "hints": [
+              "204 response가 빈 본문이어도 좋아요가 생성됐음을 어떤 DB 두 값으로 증명할 수 있나요?",
+              "같은 PUT을 두 번 보낸 뒤 count가 L+2가 되지 않게 하려면 어떤 relation 제약이 필요한가요?",
+              "좋아요 취소 DELETE를 반복할 때 두 번째 요청은 상태를 toggle해야 할까요, 유지해야 할까요?"
+            ]
+          },
+          "hints": [
+            "204 response가 빈 본문이어도 좋아요가 생성됐음을 어떤 DB 두 값으로 증명할 수 있나요?",
+            "같은 PUT을 두 번 보낸 뒤 count가 L+2가 되지 않게 하려면 어떤 relation 제약이 필요한가요?",
+            "좋아요 취소 DELETE를 반복할 때 두 번째 요청은 상태를 toggle해야 할까요, 유지해야 할까요?"
+          ],
+          "recipeIds": [
+            "board:like-put:normal",
+            "board:like-delete:normal"
+          ],
+          "executionChecks": [
+            {
+              "title": "원문 실행 절차 확인",
+              "command": "./gradlew test",
+              "expected": "LikeConcurrencyTest 및 project별 like/unlike recipe를 실행한다.",
+              "record": "각 시나리오의 응답 상태·post_like 행 수·like_count를 기록한다."
+            }
+          ],
+          "concepts": [],
+          "references": []
+        }
+      ]
+    },
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 커뮤니티 프로젝트",
+      "stages": [
+        {
+          "id": "likes",
+          "title": "반복·동시 요청에서도 좋아요 수 일치시키기",
+          "sourceUnits": [
+            "legacy:4-0",
+            "legacy:4-1",
+            "legacy:4-2",
+            "functional:like",
+            "functional:unlike"
+          ],
+          "brief": {
+            "purpose": "community 4-0~4-2의 좋아요 생성·취소·동시성 경합을 실제 relation 수와 like_count로 검증한다.",
+            "task": "김자바가 박디비 글 3을 먼저 취소하고 PUT/DELETE idempotency를 반복한다. 동시성 fixture에서는 20명·동일 회원 경합도 테스트한다.",
+            "preconditions": [
+              "tok-kimjava와 public post 3 또는 자신의 테스트 글, post_like 및 like_count 시작값을 기록한다.",
+              "4-2 동시성 테스트는 글16 실제 seed 초기값 0, 회원 7~26 및 tok-c01~tok-c20을 쓴다. 설명 timeline의 5는 별도 예시값이다."
+            ],
+            "scenario": [
+              {
+                "start": "post 3에서 Kim relation을 DELETE로 제거해 baseline을 기록한다.",
+                "action": "PUT /api/posts/3/like 두 번 후 DELETE 두 번; 별도 LikeConcurrencyTest에서 20명 동시 PUT 및 같은 회원 5회 PUT.",
+                "result": "일반 4-1은 각 PUT/DELETE 200 JSON {postId,liked,likeCount}; 반복 요청은 상태/count 유지. 4-2 20명 요청 모두 200이며 row=20,count=20; 같은 회원 동시 5회 row=1.",
+                "after": "DB count와 select count(*) from post_like를 일치 확인하고 같은 글 request에서 500/중복 key가 없는지 log 확인."
+              }
+            ],
+            "data": [
+              {
+                "name": "post 3 Kim relation 및 like_count baseline L",
+                "reason": "첫/반복 PUT/DELETE의 변화량 분리."
+              },
+              {
+                "name": "post 16 동시성 fixture와 회원7~26",
+                "reason": "서로 다른 20명의 정합성 기준."
+              },
+              {
+                "name": "post_like rows 및 UNIQUE(post_id,member_id)",
+                "reason": "중복과 갱신손실 예방을 확인."
+              },
+              {
+                "name": "4-2 설명값 5→6→7",
+                "reason": "lost-update 원리 그림 예시이며 seed 실제 count=0과 구별."
+              }
+            ],
+            "policies": [
+              "community 4-1 PUT은 like 상태, DELETE는 unlike 상태를 멱등하게 만든다. 각 응답은 200 JSON {postId,liked,likeCount}. toggle로 구현하지 않는다.",
+              "post_like row 수와 post.like_count는 항상 같아야 한다. 원자 DB update는 INSERT/DELETE 실제 영향 행이 1일 때만 count를 바꾼다.",
+              "자기 글·없는 글·권한/인증 실패 status는 source recipe를 사용한다. 경합의 unique violation을 transaction에서 삼켜 500으로 끝내지 않는다.",
+              "20명 동시 요청과 같은 회원 5회 요청은 서로 다른 동시성 케이스로 실행한다."
+            ],
+            "inputs": [
+              "일반: Kim token, post 3; 먼저 DELETE baseline reset, then PUT×2, DELETE×2.",
+              "경합: post16, 회원 7..26/tok-c01..tok-c20 동시 PUT 20개.",
+              "같은 member: 동일 post에 concurrent PUT 5개."
+            ],
+            "success": [
+              "community PUT/DELETE 200 response의 liked=true/false와 likeCount가 변경 뒤 수치다.",
+              "서로 다른 20명 concurrent PUT 모두 200; post_like 20행, like_count 20 증가(시작 0).",
+              "같은 회원 5 simultaneous PUT 모두 정상 처리, 관계 row 1개."
+            ],
+            "failures": [
+              {
+                "when": "회원 없이 PUT/DELETE",
+                "result": "401.",
+                "unchanged": "relation/count unchanged."
+              },
+              {
+                "when": "없는 id/자기 글/비공개 글 등 원문 실패 사례",
+                "result": "각 source recipe 상태(400/401/403/404)를 확인한다.",
+                "unchanged": "row 수와 like_count 관계가 요청 전 상태."
+              },
+              {
+                "when": "동일 회원 동시 INSERT가 중복키로 충돌",
+                "result": "원문 기준 이미 좋아요 상태로 정상 응답해야 하며 500이 아니다.",
+                "unchanged": "중복행 없이 count가 실제 row 수와 일치."
+              }
+            ],
+            "examples": [
+              {
+                "title": "멱등 PUT/DELETE",
+                "start": "post 3 Kim unlike, count=L",
+                "action": "PUT×2 → DELETE×2",
+                "result": "200 liked true,count L+1 이후 반복 유지; DELETE 첫 성공 count L, 반복도 L"
+              },
+              {
+                "title": "서로 다른 20명 동시",
+                "start": "post 16 count=0, likes=0; 20 member tokens",
+                "action": "동시 PUT 20개",
+                "result": "모두 200; like rows=20, like_count=20"
+              },
+              {
+                "title": "같은 회원 5회 경합",
+                "start": "같은 post/member pair 없음",
+                "action": "동시 PUT 5개",
+                "result": "모두 200; row 1개, count 1 증가"
+              }
+            ],
+            "work": [
+              "4-1 state-reset부터 실행하고 일반 요청과 동시성 테스트를 구분한다.",
+              "thread barrier 결과, 각 HTTP status, final SQL count를 기록한다.",
+              "race 설명의 시작 5와 post16 실습 초기 0을 별개라고 표시한다."
+            ],
+            "done": [
+              "PUT/DELETE 반복이 toggle이 아니라 멱등 상태 설정임을 확인했다.",
+              "두 동시성 케이스의 HTTP status/관계행수/count가 일치한다.",
+              "500이나 lost update 재현/수정 여부를 테스트 결과로 남겼다."
+            ],
+            "hints": [
+              "동일 회원 5개의 PUT에서 relation insertion 결과가 1인 뒤에만 counter를 올리려면 어떤 값을 살펴야 할까요?",
+              "서로 다른 20명이 동시에 좋아요를 누를 때 증가분은 relation row와 어떤 산술로 비교하나요?",
+              "화면 타임라인의 count 5와 fixture post16의 초기 count 0을 혼동하지 않으려면 어떤 기준으로 기록해야 할까요?"
+            ]
+          },
+          "hints": [
+            "동일 회원 5개의 PUT에서 relation insertion 결과가 1인 뒤에만 counter를 올리려면 어떤 값을 살펴야 할까요?",
+            "서로 다른 20명이 동시에 좋아요를 누를 때 증가분은 relation row와 어떤 산술로 비교하나요?",
+            "화면 타임라인의 count 5와 fixture post16의 초기 count 0을 혼동하지 않으려면 어떤 기준으로 기록해야 할까요?"
+          ],
+          "recipeIds": [
+            "community:like:normal",
+            "community:unlike:normal",
+            "legacy:4-0:A",
+            "legacy:4-0:B",
+            "legacy:4-0:P",
+            "legacy:4-0:C",
+            "legacy:4-0:D",
+            "legacy:4-0:E",
+            "legacy:4-1:K0",
+            "legacy:4-1:K1",
+            "legacy:4-1:K2",
+            "legacy:4-1:K3",
+            "legacy:4-1:K4",
+            "legacy:4-1:K5",
+            "legacy:4-1:K6",
+            "legacy:4-1:K8",
+            "legacy:4-1:K9",
+            "legacy:4-1:V1",
+            "legacy:4-1:V2",
+            "legacy:4-1:V3",
+            "legacy:4-2:P1",
+            "legacy:4-2:P2",
+            "legacy:4-2:P3"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:4-0 · 좋아요 설정 — 관계 행 하나와 숫자 하나",
+              "href": "/scenario/ch4-like/4-0-set-like.html"
+            },
+            {
+              "label": "legacy:4-1 · 좋아요·취소(멱등)",
+              "href": "/scenario/ch4-like/4-1-like-toggle.html"
+            },
+            {
+              "label": "../../docs/knowledge/P18-concurrency-inventory.md",
+              "href": "/docs/knowledge/P18-concurrency-inventory.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:4-0 · 좋아요 설정 — 관계 행 하나와 숫자 하나",
+              "href": "/scenario/ch4-like/4-0-set-like.html"
+            },
+            {
+              "label": "legacy:4-1 · 좋아요·취소(멱등)",
+              "href": "/scenario/ch4-like/4-1-like-toggle.html"
+            },
+            {
+              "label": "../../docs/knowledge/P18-concurrency-inventory.md",
+              "href": "/docs/knowledge/P18-concurrency-inventory.html"
+            },
+            {
+              "label": "../../docs/knowledge/S06-rest-api-clients.md",
+              "href": "/docs/knowledge/S06-rest-api-clients.html"
+            },
+            {
+              "label": "../../docs/knowledge/W11-why-tx-in-service.md",
+              "href": "/docs/knowledge/W11-why-tx-in-service.html"
+            },
+            {
+              "label": "legacy:4-2 · 동시에 눌러도 맞는 like_count",
+              "href": "/scenario/ch4-like/4-2-like-concurrency.html"
+            },
+            {
+              "label": "../../docs/knowledge/W25-spring-multithreading.md",
+              "href": "/docs/knowledge/W25-spring-multithreading.html"
+            },
+            {
+              "label": "../../docs/knowledge/V05-testing-tricky-things.md",
+              "href": "/docs/knowledge/V05-testing-tricky-things.html"
+            },
+            {
+              "label": "../../docs/knowledge/V04-test-db-strategy.md",
+              "href": "/docs/knowledge/V04-test-db-strategy.html"
+            },
+            {
+              "label": "functional:like · 좋아요 설정",
+              "href": "/scenario/flow/like-post.html"
+            },
+            {
+              "label": "functional:unlike · 좋아요 취소",
+              "href": "/scenario/flow/unlike-post.html"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "project-v1",
+      "project": "project-v1",
+      "label": "project-v1 · 명세 프로젝트",
+      "stages": [
+        {
+          "id": "likes",
+          "title": "반복·동시 요청에서도 좋아요 수 일치시키기",
+          "sourceUnits": [
+            "legacy:10-10",
+            "legacy:10-11"
+          ],
+          "brief": {
+            "purpose": "spec-board 10-10 토글 v1과 10-11 멱등 v2를 분리해 상태 변화·버전 호환을 검증한다.",
+            "task": "post 29 v1 POST를 두 번 보내 toggle 변화와 10-11 v2 PUT/DELETE 재요청의 멱등 차이를 비교한다.",
+            "preconditions": [
+              "project-v1 posts schema post_likes와 count를 확인하고 본인 소유가 아닌 visible post 29/40을 사용한다.",
+              "10-10 v1 POST /api/v1/posts/{postId}/like, 10-11 v2 PUT/DELETE /api/v2/posts/{postId}/like는 별개 contract다."
+            ],
+            "scenario": [
+              {
+                "start": "post29 count=0, Kim relation 없음.",
+                "action": "v1 POST 두 번, 별도 post40에서 v2 PUT 두 번 후 DELETE 두 번.",
+                "result": "v1 POST 200 wrapper에서 첫 liked=true,count1, 둘째 false,count0; v2 PUT 반복 모두 200 liked=true,count1, DELETE 반복 모두 200 liked=false,count0.",
+                "after": "동시 v2 PUT 10개도 모두 200이고 final count=1, old v1 route 의미는 계속 toggle로 둔다."
+              }
+            ],
+            "data": [
+              {
+                "name": "post_likes(post_id,user_id) pair",
+                "reason": "복합 기본키로 한 회원·글 관계를 중복 방지."
+              },
+              {
+                "name": "posts.like_count",
+                "reason": "DB atomic delta 후 응답 count를 재조회."
+              },
+              {
+                "name": "v1/v2 endpoint version",
+                "reason": "기존 앱 토글 계약을 보존하면서 새 API 의미 차이를 확인."
+              }
+            ],
+            "policies": [
+              "10-10 v1은 POST /api/v1/posts/{id}/like toggle 그대로 둔다. 두 번 호출하면 liked true→false로 전환된다.",
+              "10-11 v2는 PUT으로 liked=true, DELETE로 false를 idempotently 설정한다. 같은 회원 동시 PUT 10회 모두 200, count 한 번 증가.",
+              "count delta는 DB에서 원자 update, 관계 변경과 같은 transaction에서 처리한다. 해당 viewer가 글을 볼 수 없으면 404, token 없음 401."
+            ],
+            "inputs": [
+              "v1 post29: POST twice, token Kim; inspect data.liked/likeCount.",
+              "v2 post40: PUT twice, DELETE twice.",
+              "Concurrent v2: 같은 회원·post에 PUT 10회."
+            ],
+            "success": [
+              "v1 첫 POST {liked:true,likeCount:1}; 두 번째 {liked:false,likeCount:0}, both 200.",
+              "v2 PUT repeated → both 200, liked=true,count=1. DELETE repeated → both 200, liked=false,count=0.",
+              "동시 v2 PUT 10회 모두 200, 한 row와 count1."
+            ],
+            "failures": [
+              {
+                "when": "token 없음",
+                "result": "401 ApiResponse error.",
+                "unchanged": "post_likes/count 유지."
+              },
+              {
+                "when": "post 없음·삭제·남의 private",
+                "result": "404.",
+                "unchanged": "like relation/count unchanged."
+              },
+              {
+                "when": "동시 요청이 unique conflict/deadlock으로 종결",
+                "result": "재시도 정책 뒤 API success 200을 확인; 처리 안 된 500은 실패.",
+                "unchanged": "final count가 relation row와 같아야 한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "v1 toggle 유지",
+                "start": "post29 count=0, relation 없음",
+                "action": "POST /api/v1/posts/29/like twice",
+                "result": "200 liked=true/count1, then 200 liked=false/count0"
+              },
+              {
+                "title": "v2 idempotent PUT",
+                "start": "post40 count=0, pair 없음",
+                "action": "PUT /api/v2/posts/40/like twice",
+                "result": "둘 다 200 liked=true/count1, row 1"
+              },
+              {
+                "title": "v2 concurrent PUT",
+                "start": "같은 회원/post40 관계 없음",
+                "action": "PUT 10개 동시 전송",
+                "result": "10개 모두 200; 최종 row1/count1"
+              }
+            ],
+            "work": [
+              "같은 초기 상태를 만들기 위해 먼저 v1/v2 각각의 reset contract를 실행한다.",
+              "응답 body wrapper의 data 값을 확인하고 DB like_count를 새로 읽는다.",
+              "동시 요청에서는 server log의 deadlock retry와 최종 row/count를 함께 기록한다."
+            ],
+            "done": [
+              "v1 toggle와 v2 PUT/DELETE의 의미 차이를 확인했다.",
+              "같은 요청 재전송 및 10회 동시 요청의 idempotency를 확인했다.",
+              "세션/route version을 바꾸지 않고 기존 v1 호환을 보존했다."
+            ],
+            "hints": [
+              "POST 토글을 두 번 호출했을 때 처음 상태로 돌아오는 것이 왜 재전송에 안전하지 않은가요?",
+              "v2 PUT 요청이 10번 들어올 때 관계 insert 영향 행 수와 count update를 어떤 순서로 연결할까요?",
+              "벌크 UPDATE 뒤 이미 읽은 JPA entity의 likeCount를 응답에 써도 최신 값일까요?"
+            ]
+          },
+          "hints": [
+            "POST 토글을 두 번 호출했을 때 처음 상태로 돌아오는 것이 왜 재전송에 안전하지 않은가요?",
+            "v2 PUT 요청이 10번 들어올 때 관계 insert 영향 행 수와 count update를 어떤 순서로 연결할까요?",
+            "벌크 UPDATE 뒤 이미 읽은 JPA entity의 likeCount를 응답에 써도 최신 값일까요?"
+          ],
+          "recipeIds": [
+            "legacy:10-10:L",
+            "legacy:10-10:M",
+            "legacy:10-10:P",
+            "legacy:10-10:T1",
+            "legacy:10-10:G1",
+            "legacy:10-10:T2",
+            "legacy:10-10:G2",
+            "legacy:10-10:N",
+            "legacy:10-10:X",
+            "legacy:10-10:PV",
+            "legacy:10-10:V1",
+            "legacy:10-10:V2",
+            "legacy:10-10:RACE",
+            "legacy:10-11:L",
+            "legacy:10-11:M",
+            "legacy:10-11:P",
+            "legacy:10-11:T",
+            "legacy:10-11:S",
+            "legacy:10-11:R",
+            "legacy:10-11:Q",
+            "legacy:10-11:U",
+            "legacy:10-11:G",
+            "legacy:10-11:U2",
+            "legacy:10-11:D",
+            "legacy:10-11:D2",
+            "legacy:10-11:G2",
+            "legacy:10-11:N",
+            "legacy:10-11:X",
+            "legacy:10-11:PV",
+            "legacy:10-11:V2",
+            "legacy:10-11:V3",
+            "legacy:10-11:V1"
+          ],
+          "executionChecks": [
+            {
+              "title": "선택한 원문 recipe 실행",
+              "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
+              "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
+              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+            }
+          ],
+          "concepts": [
+            {
+              "label": "legacy:10-10 · 좋아요 토글",
+              "href": "/scenario/ch10-project/10-10-like-toggle.html"
+            },
+            {
+              "label": "../../lessons/G3-first-transaction.md",
+              "href": "/lessons/G3-first-transaction.html"
+            },
+            {
+              "label": "../../lessons/H1-concurrency-taste.md",
+              "href": "/lessons/H1-concurrency-taste.html"
+            }
+          ],
+          "references": [
+            {
+              "label": "legacy:10-10 · 좋아요 토글",
+              "href": "/scenario/ch10-project/10-10-like-toggle.html"
+            },
+            {
+              "label": "../../lessons/G3-first-transaction.md",
+              "href": "/lessons/G3-first-transaction.html"
+            },
+            {
+              "label": "../../lessons/H1-concurrency-taste.md",
+              "href": "/lessons/H1-concurrency-taste.html"
+            },
+            {
+              "label": "../../lessons/B4-record-getter-immutable.md",
+              "href": "/lessons/B4-record-getter-immutable.html"
+            },
+            {
+              "label": "../../docs/knowledge/P20-jpa-entity-mapping.md",
+              "href": "/docs/knowledge/P20-jpa-entity-mapping.html"
+            },
+            {
+              "label": "legacy:10-11 · 토글의 문제 — 멱등 PUT/DELETE를 v2로 나란히",
+              "href": "/scenario/ch10-project/10-11-idempotent-like.html"
+            },
+            {
+              "label": "../../lessons/A2-http-anatomy.md",
+              "href": "/lessons/A2-http-anatomy.html"
+            },
+            {
+              "label": "../../docs/knowledge/S08-transactions.md",
+              "href": "/docs/knowledge/S08-transactions.html"
+            },
+            {
+              "label": "../../docs/knowledge/P18-concurrency-inventory.md",
+              "href": "/docs/knowledge/P18-concurrency-inventory.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "group": "게시글과 소통",
+  "status": "authored"
+}

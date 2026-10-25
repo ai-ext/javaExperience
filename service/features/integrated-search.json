@@ -1,0 +1,147 @@
+{
+  "version": 1,
+  "id": "integrated-search",
+  "title": "제목·본문·작성자로 글 검색하기",
+  "summary": "검색어 단어 모두를 제목·본문·닉네임 범위에서 찾되 공개 권한을 유지한다.",
+  "difficulty": "중급",
+  "group": "조회와 성능",
+  "prerequisites": [
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "search",
+      "title": "검색 범위와 결과 정렬 지키기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "search",
+          "title": "검색 범위와 결과 정렬 지키기",
+          "sourceUnits": [
+            "legacy:11-4"
+          ],
+          "brief": {
+            "purpose": "검색어 단어 모두를 제목·본문·닉네임 범위에서 찾되 공개 권한을 유지한다.",
+            "task": "기존 필터 검색을 바꾸지 않고 GET /api/search/posts 통합 검색을 추가한다.",
+            "preconditions": [
+              "시나리오 DB(`community`). 스키마 변경 없음.",
+              "community DB와 기존 8-4 동적 쿼리 조립기를 확인한다. 2-3 접근 규칙을 재사용한다."
+            ],
+            "scenario": [
+              {
+                "start": "검색어에 두 글자 이상의 단어를 입력하고 제목·본문·작성자 중 일치하는 글을 찾으려 합니다.",
+                "action": "GET /api/search/posts에 검색어와 페이지 조건을 보내고 공백·특수문자·권한별 요청을 비교합니다.",
+                "result": "앞뒤/중복 공백이 정리되고 %, _, 역슬래시는 리터럴로 검색합니다. 볼 수 없는 글은 검색에 포함되지 않습니다.",
+                "after": "검색어 없음·너무 짧음은 400이며 글·태그는 변하지 않습니다. 기존 목록 검색 API도 유지됩니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "q, in, page, size",
+                "reason": "단어별 AND와 검색 칸별 OR, 범위·페이지 입력을 재현한다."
+              },
+              {
+                "name": "post title/content와 member nickname",
+                "reason": "같은 단어가 세 검색 칸 중 어디에 매치되는지 구분한다."
+              }
+            ],
+            "policies": [
+              "앞뒤/중복 공백 정리, 최소 길이 2, `%`, `_`, `\\`는 리터럴 검색. 접근 불가 DRAFT·숨김·삭제·타인 FOLLOWERS·차단 글 제외."
+            ],
+            "inputs": [
+              "legacy:11-4:S0: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 검색 기준점\",\"content\":\"x\"}; case=S0 기준 글(이 id로 검색 단어를 만든다); source expected/status checks=[]",
+              "legacy:11-4:SA: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] zq{{S0.body.id}}x 트랜잭션 정리\",\"content\":\"제목에만 있다\"}; case=SA 제목에 단어; source expected/status checks=[]",
+              "legacy:11-4:SB: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 본문 검색\",\"content\":\"본문에 zq{{S0.body.id}}x 트랜잭션 이야기\"}; case=SB 본문에 단어; source expected/status checks=[]",
+              "legacy:11-4:Q1: GET /api/search/posts?q=zq{{S0.body.id}}x; case=Q1 비로그인 검색; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"Q1\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.totalElements\",\"equals\":2},{\"path\":\"$.items[0].id\",\"equals\":\"{{SB.body.id}}\"},{\"path\":\"$.items[1].id\",\"equals\":\"{{SA.body.id}}\"}]}}]",
+              "legacy:11-4:Q2: GET /api/search/posts?q=zq{{S0.body.id}}x&in=title; case=Q2 제목에서만; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"Q2\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.totalElements\",\"equals\":1},{\"path\":\"$.items[0].id\",\"equals\":\"{{SA.body.id}}\"}]}}]",
+              "legacy:11-4:Q3: GET /api/search/posts?q=zq{{S0.body.id}}x&in=content; case=Q3 본문에서만; source expected/status checks=[{\"id\":\"C2\",\"pointer\":\"/checks/1\",\"request\":\"Q3\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$.totalElements\",\"equals\":1},{\"path\":\"$.items[0].id\",\"equals\":\"{{SB.body.id}}\"}]}}]",
+              "legacy:11-4:X1: GET /api/search/posts; case=X1 q 없음; source expected/status checks=[{\"id\":\"C7\",\"pointer\":\"/checks/6\",\"request\":\"X1\",\"expect\":{\"status\":400,\"json\":[{\"path\":\"$.errors[*].field\",\"contains\":\"q\"}]}}]"
+            ],
+            "success": [
+              "items/totalElements/hasNext 등 게시판 목록 응답 규약을 유지한다."
+            ],
+            "failures": [
+              {
+                "when": "GET /api/search/posts 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "조회 요청이므로 post/tag 원본을 변경하지 않는다."
+              },
+              {
+                "when": "GET /api/search/posts · [교육용 fixture · legacy:11-4:X1] X1 q 없음",
+                "result": "HTTP 400 (X1); $.errors[*].field contains \"q\"",
+                "unchanged": "조회이므로 post/tag 원본을 바꾸지 않는다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "검색어에 두 글자 이상의 단어를 입력하고 제목·본문·작성자 중 일치하는 글을 찾으려 합니다.",
+                "action": "GET /api/search/posts에 검색어와 페이지 조건을 보내고 공백·특수문자·권한별 요청을 비교합니다.",
+                "result": "검색어 없음·너무 짧음은 400이며 글·태그는 변하지 않습니다. 기존 목록 검색 API도 유지됩니다."
+              }
+            ],
+            "work": [
+              "입력 정규화·LIKE 리터럴 escaping·범위별 OR/단어별 AND·공개 정책을 한 쿼리 흐름으로 구현한다."
+            ],
+            "done": [
+              "앞뒤/중복 공백이 정리되고 %, _, 역슬래시는 리터럴로 검색합니다. 볼 수 없는 글은 검색에 포함되지 않습니다.",
+              "검색어 없음·너무 짧음은 400이며 글·태그는 변하지 않습니다. 기존 목록 검색 API도 유지됩니다.",
+              "GET /api/search/posts 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 조회 요청이므로 post/tag 원본을 변경하지 않는다.",
+              "GET /api/search/posts · [교육용 fixture · legacy:11-4:X1] X1 q 없음 → HTTP 400 (X1); $.errors[*].field contains \"q\" 조회이므로 post/tag 원본을 바꾸지 않는다."
+            ]
+          },
+          "hints": [
+            "단어 두 개가 각각 제목과 본문에 나뉘어 있어도 결과에 포함되어야 하는 이유를 AND/OR로 어떻게 표현할까요?",
+            "사용자가 입력한 `%`를 와일드카드가 아니라 글자로 찾으려면 LIKE 패턴 전에 무엇을 처리해야 할까요?",
+            "검색 쿼리에 결과를 붙이기 전에 2-3의 “볼 수 있는 글” 규칙은 어디서 재사용해야 할까요?"
+          ],
+          "recipeIds": [
+            "legacy:11-4:S0",
+            "legacy:11-4:SA",
+            "legacy:11-4:SB",
+            "legacy:11-4:Q1",
+            "legacy:11-4:Q2",
+            "legacy:11-4:Q3",
+            "legacy:11-4:X1"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "11-4-search.html",
+              "href": "/scenario/ch11-post-advanced/11-4-search.html"
+            },
+            {
+              "label": "G2-access-rules-in-one-place.html",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "J1-reading-explain.html",
+              "href": "/lessons/J1-reading-explain.html"
+            },
+            {
+              "label": "R05-index-btree.html",
+              "href": "/docs/knowledge/R05-index-btree.html"
+            },
+            {
+              "label": "D11-web-security-basics.html",
+              "href": "/docs/knowledge/D11-web-security-basics.html"
+            },
+            {
+              "label": "F1-validation-errors.html",
+              "href": "/lessons/F1-validation-errors.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

@@ -8,6 +8,9 @@ import { siteDestinations, courseDestinations } from './site-navigation.mjs';
 import { JSDOM } from 'jsdom';
 import { loadFlows, renderDayFlow, renderDayTicketLinks } from './course-flow.mjs';
 import { loadCourseSources } from '../course/sources.mjs';
+import { renderCourseApiWorkspace } from './course-api-workspace.mjs';
+import { renderCoursePostVisual } from './course-post-visual.mjs';
+import { renderLearningContent } from './course-criteria.mjs';
 
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const PHASE = { warmup: '선택 · Java 워밍업', build: '1단계 · 빈 프로젝트로 서버 만들기', maintain: '2단계 · 어수선한 서버 넘겨받기', wrap: '중간 점검 · 설명 세션', extend: '3단계 · 설계·운영·업무 적용' };
@@ -45,7 +48,7 @@ export function loadCourse(root) {
   const days = [
     { id: 'D00', phase: 'warmup', title: d00 ? d00.replace(/^D00\.\s*/, '') : 'Java 워밍업 (선택)', java: 'J00', steps: [], optional: true },
     ...roadmap.days.map((d) => ({ id: d.id, phase: d.phase, title: d.title, java: d.java, tomorrow: d.tomorrow, transition: d.transition, workTarget: d.workTarget, entryNotice: d.entryNotice,
-      steps: d.steps.map((s) => ({ id: `${d.id}-${s.no}`, no: s.no, title: s.title, short: s.navTitle || shortTitle(s.title), files: s.files || [], visualGuide: s.visualGuide, requirement: s.requirement, tickets: s.tickets || [], guides: s.guides || [] })) })),
+      steps: d.steps.map((s) => ({ id: `${d.id}-${s.no}`, no: s.no, title: s.title, short: s.navTitle || shortTitle(s.title), files: s.files || [], visualGuide: s.visualGuide, presentation: s.presentation, requirement: s.requirement, tickets: s.tickets || [], guides: s.guides || [] })) })),
   ].map((d) => ({ ...d, page: `course/spring/${d.id}.html`, source: `course/spring/${d.id}.md` }));
   for (const d of days) if (!exists(d.source)) throw new Error(`과정 데이터: ${d.source}가 없다`);
   // 티켓 페이지는 원문(md)이 git에 커밋돼 있을 때만 "준비됨"으로 잇는다. 작업 중인 원문(미추적)을 링크하면
@@ -339,7 +342,7 @@ function renderStepSection(section, fromRel, course, step) {
   const next = day.steps[day.steps.indexOf(step) + 1];
   const nextLink = `<a class="step-next" href="${next ? `#step-${next.id.toLowerCase()}` : '#오늘-순서'}">${next ? `다음 순서 ${NUMS[next.no - 1]} →` : '오늘 순서로 돌아가기 ↑'}</a>`;
   const done = `<p class="step-done"><label><input type="checkbox" class="step-check" data-step="${esc(step.id)}"> 이 순서를 끝냈다</label></p>`;
-  return `${head}${facts}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${done}${nextLink}</div></section>`;
+  return `${head}${facts}${renderCoursePostVisual({ stepId: step.id })}${renderCourseApiWorkspace({ stepId: step.id })}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${done}${nextLink}</div></section>`;
 }
 
 function dayPager(day, fromRel, course) {
@@ -498,7 +501,8 @@ export function renderDayPage(sourceRel, body, course) {
   const context = notice ? `${notice.href && !notice.linkLabel ? '' : `<strong>${esc(notice.label)}</strong>`}${notice.selection ? ' <span data-selected-ticket-compact>선택 기록 없음 · D11에서 한 건을 고르세요.</span>' : ''}${notice.description && !notice.selection ? `<p>${esc(notice.description)}</p>` : ''}${notice.href ? ` <a href="${esc(notice.href)}">${esc(notice.linkLabel || notice.label)} →</a>` : ''}`
     : day.phase === 'extend' ? `<strong>작업 대상</strong> ${esc(day.workTarget)}` : '';
   if (context) html = html.replace('</header>', `</header><aside class="day-context">${context}</aside>`);
-  return `<article class="course-day" data-day-page="${day.id}" data-phase="${day.phase}">${renderDayStepper(html, day)}</article>`;
+  const rendered = `<article class="course-day" data-day-page="${day.id}" data-phase="${day.phase}">${renderDayStepper(html, day)}</article>`;
+  return renderLearningContent(rendered, day.steps);
 }
 
 
@@ -810,13 +814,13 @@ export function renderCourseHome(course) {
       <p class="ch-daily-method">매일 Java → Spring 구현 → SQL·말하기·채점으로 확인합니다.</p><a href="course/README.html">과정 안내 자세히 →</a>
     </aside>
   </div>
-  <section class="ch-menu-guide" id="home-menus" aria-labelledby="home-menu-title"><h2 id="home-menu-title">대주제 안내</h2><p>공부하다 필요한 곳으로 바로 이동하세요.</p><ul>${siteDestinations.filter(e=>e.label!=='홈').map(({label,target,description})=>`<li><a href="${esc(href(target))}"><strong>${label}</strong><span>${description}</span></a></li>`).join('')}</ul><p class="ch-course-links">45일 과정 안에서 · ${courseDestinations.filter(e=>['Java','티켓','출발 자료','과정 지도'].includes(e.label)).map(e=>`<a href="${esc(href(e.target))}">${e.label}</a> — ${{Java:'오늘 사용할 문법 연습',티켓:'원인 분석·수정 과제','출발 자료':'환경·데이터·운영 준비','과정 지도':'일자와 자료의 연결'}[e.label]}`).join(' · ')}</p></section>
+  <section class="ch-menu-guide" id="home-menus" aria-labelledby="home-menu-title"><h2 id="home-menu-title">대주제 안내</h2><p>공부하다 필요한 곳으로 바로 이동하세요.</p><ul>${siteDestinations.filter(e=>e.label!=='홈').map(({label,target,description})=>`<li><a href="${esc(href(target))}"><strong>${label}</strong><span>${description}</span></a></li>`).join('')}</ul><p class="ch-course-links">서비스 만들기 참고 자료 · ${courseDestinations.filter(e=>['Java','티켓','출발 자료','과정 지도'].includes(e.label)).map(e=>`<a href="${esc(href(e.target))}">${e.label}</a> — ${{Java:'오늘 사용할 문법 연습',티켓:'원인 분석·수정 과제','출발 자료':'환경·데이터·운영 준비','과정 지도':'일자와 자료의 연결'}[e.label]}`).join(' · ')}</p></section>
   <script type="application/json" id="course-choice-data">${JSON.stringify(ticketChoices(course,from)).replace(/</g, '\\u003c')}</script>
   <script type="application/json" id="course-days-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script>
 </section>`;
 }
 
-// 기존 홈(시나리오 첫 과제·미리보기·FAQ·설치 안내)은 링크와 이어하기를 그대로 두고 "참고 도감"으로 내린다.
+// 기존 홈(시나리오 첫 과제·미리보기·FAQ·설치 안내)은 링크와 이어하기를 그대로 둔다.
 export function renderHomeReference(homeVisualHtml) {
   const demoted = homeVisualHtml.replace(/<h1 id="home-title"([^>]*)>([\s\S]*?)<\/h1>/, '<h2 id="home-title"$1>$2</h2>');
   if (demoted === homeVisualHtml) throw new Error('홈: 기존 제목(#home-title)을 찾지 못했다');

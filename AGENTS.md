@@ -43,3 +43,10 @@ Spring Boot 백엔드를 직접 구현하며 배우는 실습 레포다. 요구�
 - 프론트 화면을 다듬을 때는 설치된 `taste-skill`에서 이 정적 문서 사이트에 맞는 타이포·재질·상태·모바일 점검을 적용한다. `shadcn` 스킬은 `components.json`과 React/Tailwind 구성이 있는 프로젝트의 실제 컴포넌트 작업에 적용한다. 현재 문서 사이트에 해당 구성을 임의로 추가하거나 React로 옮기지 않는다.
 - UI 구현은 작은 범위로 나눠 서브에이전트에 맡길 수 있다. 메인 담당자는 시안과 실제 화면을 비교하고 원문 보존, 모바일 배치, 링크·코드·브라우저 동작을 검증한 뒤 상태를 갱신한다.
 - 생성 HTML까지 바뀌는 변경은 `cd tools/site && npm run build && npm run audit:visual && npm run audit:version-cards && npm run audit:parity`로 검증한다. 새 체크가 생기면 해당 화면의 사실 관계와 조작 흐름을 확인하는 검사도 추가한다. PR 업데이트는 검증된 변경을 묶어 올려 불필요한 CI 실행을 줄인다.
+
+## 과정 통합 작업 기준 (2026-10-25)
+
+- 이 worktree는 feat/course-learning-integration이다. main과 feat/course-stepper-design의 과정·요구사항을 먼저 보존하고 이전 자료의 학습 도구만 현재 계약에 맞춰 이식한다.
+- 화면의 새 구현·검증 기준은 PC 다크 1366×768, 1440×900, 1920×1080이다. 신규 모바일·light 작업은 하지 않는다.
+- API 요청 도구의 성공 표시를 과정 체크나 자동 채점으로 연결하지 않는다. 토큰·요청·응답은 영구 저장하지 않는다. 설명 시각화는 실측 API/DB 결과와 명확히 구별한다.
+- 진행과 증거는 docs/design/course-integration-2026-10-24/REPORT.md에서 확인한다. 기존 제외 캡처가 있는 과거 feature 이력을 직접 merge하지 않는다.

@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "id": "pinned-posts",
+  "title": "게시판 위에 공지 글 고정하기",
+  "summary": "게시판 상단 고정은 게시판별 최대 세 글과 고정 순서를 지킨다.",
+  "difficulty": "중급",
+  "group": "게시글과 소통",
+  "prerequisites": [
+    "posts-find"
+  ],
+  "stages": [
+    {
+      "id": "pin",
+      "title": "게시판별 세 개 제한과 순서 지키기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "community",
+      "project": "community",
+      "label": "community · 시나리오 DB",
+      "stages": [
+        {
+          "id": "pin",
+          "title": "게시판별 세 개 제한과 순서 지키기",
+          "sourceUnits": [
+            "legacy:14-3"
+          ],
+          "brief": {
+            "purpose": "게시판 상단 고정은 게시판별 최대 세 글과 고정 순서를 지킨다.",
+            "task": "운영자가 글을 고정·해제·순서 조정하고 목록에서 일반 글과 구별해 보여 준다.",
+            "preconditions": [
+              "시나리오 DB(`community`) — 앱을 기본 프로파일로 띄운다.",
+              "community 게시판 및 게시글을 준비하고 원문 운영 권한을 확인한다."
+            ],
+            "scenario": [
+              {
+                "start": "같은 게시판에 고정 글 3개가 있고 운영자가 네 번째 글을 고정하려 합니다.",
+                "action": "현재 고정 목록을 확인하고 고정 추가·해제·정렬 요청을 보냅니다.",
+                "result": "게시판별 최대 3개와 정한 순서를 지키고 다른 게시판의 고정 글은 영향을 받지 않습니다.",
+                "after": "권한·대상·한도 실패에서는 기존 고정 목록과 글 상태가 변하지 않습니다."
+              }
+            ],
+            "data": [
+              {
+                "name": "board_pin(board_id, post_id, position)",
+                "reason": "게시판별 상한 3과 고정 순서 상태를 비교한다."
+              },
+              {
+                "name": "post status/board",
+                "reason": "고정 대상이 같은 게시판의 유효한 공개 글인지 확인한다."
+              }
+            ],
+            "policies": [
+              "같은 게시판의 PUBLISHED·PUBLIC·미삭제 글만 운영자가 고정할 수 있고 게시판별 3개까지입니다. 다른 게시판 글·상태·한도 오류는 400입니다.",
+              "이미 고정한 글의 PUT은 한도와 무관하게 멱등 200, 미고정 글의 DELETE도 204입니다. 토큰 없음 401·운영 권한 없음 403·대상 없음 404입니다.",
+              "목록은 먼저 고정한 시각과 id 순서이며 비로그인 조회도 가능합니다. 나중에 숨김·삭제되거나 조회자에게 접근 불가한 글은 응답에서 빼되 고정 행은 해제 전까지 남깁니다."
+            ],
+            "inputs": [
+              "legacy:14-3:N4: PUT /api/boards/free/pinned-posts/14; case=14번 고정; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"N4\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$[*].id\",\"equals\":[14]}]},\"note\":\"먼저 고정한 글이 위 — 셋째(한도 안쪽)까지는 성공\"}]",
+              "legacy:14-3:N5: PUT /api/boards/free/pinned-posts/12; case=12번 고정; source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"N5\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$[*].id\",\"equals\":[14,12]}]},\"note\":\"먼저 고정한 글이 위 — 셋째(한도 안쪽)까지는 성공\"}]",
+              "legacy:14-3:N6: PUT /api/boards/free/pinned-posts/9; case=9번 고정(셋째 — 한도 안쪽); source expected/status checks=[{\"id\":\"C4\",\"pointer\":\"/checks/3\",\"request\":\"N6\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$[*].id\",\"equals\":[14,12,9]}]},\"note\":\"먼저 고정한 글이 위 — 셋째(한도 안쪽)까지는 성공\"}]",
+              "legacy:14-3:N7: PUT /api/boards/free/pinned-posts/15; case=15번 고정(넷째 — 한도 밖); source expected/status checks=[{\"id\":\"C5\",\"pointer\":\"/checks/4\",\"request\":\"N7\",\"expect\":{\"status\":400}}]",
+              "legacy:14-3:N9: GET /api/boards/free/pinned-posts; case=고정 글 목록(비로그인); source expected/status checks=[{\"id\":\"C7\",\"pointer\":\"/checks/6\",\"request\":\"N9\",\"expect\":{\"status\":200,\"json\":[{\"path\":\"$[*].id\",\"equals\":[14,12,9]},{\"path\":\"$[0].title\",\"equals\":\"자유글 03\"},{\"path\":\"$[0].author.nickname\",\"equals\":\"이스프링\"}]}}]"
+            ],
+            "success": [
+              "상단 고정 항목이 최대 3개이며 게시판 안의 순서대로 반환."
+            ],
+            "failures": [
+              {
+                "when": "PUT /api/boards/free/pinned-posts/2 입력이 원문 실패 check 조건에 해당",
+                "result": "HTTP 400 — 원문 check의 실패 응답",
+                "unchanged": "board_pin 행과 게시판 내 현재 위치를 실패 전 그대로 보존한다."
+              },
+              {
+                "when": "PUT /api/boards/free/pinned-posts/15 · [교육용 fixture · legacy:14-3:N7] 15번 고정(넷째 — 한도 밖)",
+                "result": "HTTP 400 (N7)",
+                "unchanged": "board_pin 행과 기존 고정 순서를 보존한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "교육용 데이터로 전후 확인",
+                "start": "같은 게시판에 고정 글 3개가 있고 운영자가 네 번째 글을 고정하려 합니다.",
+                "action": "현재 고정 목록을 확인하고 고정 추가·해제·정렬 요청을 보냅니다.",
+                "result": "권한·대상·한도 실패에서는 기존 고정 목록과 글 상태가 변하지 않습니다."
+              }
+            ],
+            "work": [
+              "동시성 상황에서도 게시판별 상한과 순서가 깨지지 않는 저장 흐름을 만든다."
+            ],
+            "done": [
+              "게시판별 최대 3개와 정한 순서를 지키고 다른 게시판의 고정 글은 영향을 받지 않습니다.",
+              "권한·대상·한도 실패에서는 기존 고정 목록과 글 상태가 변하지 않습니다.",
+              "PUT /api/boards/free/pinned-posts/2 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 board_pin 행과 게시판 내 현재 위치를 실패 전 그대로 보존한다.",
+              "PUT /api/boards/free/pinned-posts/15 · [교육용 fixture · legacy:14-3:N7] 15번 고정(넷째 — 한도 밖) → HTTP 400 (N7) board_pin 행과 기존 고정 순서를 보존한다."
+            ]
+          },
+          "hints": [
+            "세 개 상한을 요청 직전 COUNT로만 검사하면 동시에 요청이 들어왔을 때 어떤 결과가 날까요?",
+            "고정 순서를 바꾸는 입력의 기준이 0부터인지 1부터인지 원문 계약 어디서 확인할 수 있을까요?",
+            "삭제되거나 다른 게시판으로 옮긴 글이 고정 목록에 남지 않는지 어떤 후속 조회로 검증할까요?"
+          ],
+          "recipeIds": [
+            "legacy:14-3:N4",
+            "legacy:14-3:N5",
+            "legacy:14-3:N6",
+            "legacy:14-3:N7",
+            "legacy:14-3:N9"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "14-3-pinned-posts.html",
+              "href": "/scenario/ch14-more-with-posts/14-3-pinned-posts.html"
+            },
+            {
+              "label": "G2-access-rules-in-one-place.html",
+              "href": "/lessons/G2-access-rules-in-one-place.html"
+            },
+            {
+              "label": "W10-where-to-validate.html",
+              "href": "/docs/knowledge/W10-where-to-validate.html"
+            },
+            {
+              "label": "W15-paging-offset-vs-cursor.html",
+              "href": "/docs/knowledge/W15-paging-offset-vs-cursor.html"
+            },
+            {
+              "label": "S09-jpa-hibernate.html",
+              "href": "/docs/knowledge/S09-jpa-hibernate.html"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

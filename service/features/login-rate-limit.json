@@ -1,0 +1,139 @@
+{
+  "version": 1,
+  "id": "login-rate-limit",
+  "title": "반복 로그인 시도 제한하기",
+  "summary": "계정 단위로 로그인 실패 횟수를 제한하고 10분이 지난 뒤 다시 시도할 수 있게 합니다.",
+  "difficulty": "중급",
+  "group": "회원과 접근",
+  "prerequisites": [
+    "members-auth"
+  ],
+  "stages": [
+    {
+      "id": "limit",
+      "title": "정해진 시간 안의 로그인 시도 제한하기"
+    }
+  ],
+  "variants": [
+    {
+      "id": "board",
+      "project": "board",
+      "label": "board · 과정 프로젝트",
+      "stages": [
+        {
+          "id": "limit",
+          "title": "정해진 시간 안의 로그인 시도 제한하기",
+          "sourceUnits": [
+            "course:D09-6"
+          ],
+          "brief": {
+            "purpose": "계정 단위로 로그인 실패 횟수를 제한하고 10분이 지난 뒤 다시 시도할 수 있게 합니다.",
+            "task": "틀린 비밀번호로 연속 요청을 보내 제한 임계 횟수와 만료 TTL을 확인하세요. 제한에 걸린 요청과 정상 인증 오류를 구분합니다.",
+            "preconditions": [
+              "Redis가 실행 중이며 계정 email을 기준으로 만든 10분 rate-limit key를 초기화한다.",
+              "기존 로그인 정상 recipe는 비밀번호 오류 여부를 확인하고 5회 임계치·6번째 요청 응답을 직접 검증한다."
+            ],
+            "scenario": [
+              {
+                "start": "가입 회원 `learner@example.test`와 Redis key 부재, 올바른 비밀번호는 별도로 보관한다. 제한 기간은 첫 실패부터 600초다.",
+                "action": "틀린 password로 POST /api/auth/login을 다섯 번 연속 보낸 뒤 여섯 번째를 보낸다. Redis key TTL을 기록하고 600초 경과 후 다시 틀린 password 요청을 보낸다.",
+                "result": "첫 5회는 정상 인증 실패 401, 6번째는 429 `/errors/too-many-attempts`다. TTL 만료 뒤 새 실패 요청은 다시 인증 실패 흐름(401)을 실행하고 제한 상태를 재시작한다.",
+                "after": "계정 email 기준 key와 남은 TTL을 확인한다. 인스턴스를 바꿔도 같은 Redis key가 공유되고 성공 로그인 token을 초과 거절 응답에서 발급하지 않는다."
+              }
+            ],
+            "data": [
+              {
+                "name": "email 기준 Redis counter",
+                "reason": "IP가 아니라 계정별로 실패 시도를 합산해 여러 인스턴스에서도 동일 계정을 제한한다."
+              },
+              {
+                "name": "첫 실패 시각과 600초 TTL",
+                "reason": "10분 윈도우가 언제 시작되고 언제 만료되는지 제한 해제 시점을 계산한다."
+              },
+              {
+                "name": "401 인증 실패와 429 rate limit 응답",
+                "reason": "비밀번호 오류와 시도 횟수 초과를 클라이언트가 상태코드로 구별한다."
+              },
+              {
+                "name": "accessToken 미발급 상태",
+                "reason": "제한된 요청에서 인증 성공 결과가 생기지 않았음을 확인한다."
+              }
+            ],
+            "policies": [
+              "틀린 비밀번호 로그인 5회 이후 6번째 요청은 429 /errors/too-many-attempts입니다. Redis 제한 키 TTL은 10분이며 만료 뒤 재시도할 수 있습니다.",
+              "사용자 존재 여부를 노출하지 않는 로그인 오류 응답과 rate limit 응답을 구별합니다.",
+              "요청 한도 초과 응답도 로그인 성공이나 토큰 발급으로 취급하지 않습니다.",
+              "원문 완료 기준: 틀린 비밀번호로 `POST /api/auth/login` 5회 뒤 6번째 → 429 `/errors/too-many-attempts`",
+              "원문 완료 기준: 키 TTL(10분)이 지나면 다시 시도할 수 있다"
+            ],
+            "inputs": [
+              "POST /api/auth/login에 등록 email과 틀린 password를 보낸다. 5회 실패 뒤 6번째 같은 계정 요청을 보낸다.",
+              "제한 key는 계정 기준, TTL은 600초(10분); 기대 6번째 HTTP 429 `/errors/too-many-attempts`.",
+              "600초 만료 뒤 요청은 다시 password 검증으로 이동한다."
+            ],
+            "success": [
+              "POST login 틀린 password 1~5회 → 각각 401 unauthorized; 여섯 번째 시도 → 429 `/errors/too-many-attempts`.",
+              "Redis 계정 key TTL은 600초이고 만료 뒤 같은 계정은 제한 횟수를 새로 센다.",
+              "실패/제한 요청은 accessToken을 발급하지 않는다. 계정 기준 counter는 다른 앱 instance에서도 공유된다."
+            ],
+            "failures": [
+              {
+                "when": "잘못된 password 요청을 6회 이상 보냄",
+                "result": "6번째와 제한 윈도우 내 후속 요청은 429 `/errors/too-many-attempts`.",
+                "unchanged": "로그인 token/last-login 성공 상태가 생기지 않는다."
+              },
+              {
+                "when": "account counter INCR와 expire가 분리되어 expire 전에 오류가 남",
+                "result": "만료 없는 key가 계정을 무기한 잠글 위험을 테스트에서 드러낸다.",
+                "unchanged": "한 번의 제한 기간이 600초를 넘어 지속되지 않도록 원자적인 증가/만료 적용 후 재검증한다."
+              }
+            ],
+            "examples": [
+              {
+                "title": "5회 이후 차단",
+                "start": "Redis key 없는 learner@example.test 계정이다.",
+                "action": "오류 password 요청을 다섯 번 보낸 뒤 6번째 요청을 즉시 보낸다.",
+                "result": "앞의 다섯 건 401, 여섯 번째 429, key TTL 600초 이하, token 없음."
+              },
+              {
+                "title": "10분 뒤 재시도",
+                "start": "6번째 429 뒤 동일 Redis counter가 남아 있다.",
+                "action": "TTL 만료를 기다리거나 격리 테스트 clock/Redis expiration으로 만료시키고 다시 요청한다.",
+                "result": "요청은 rate-limit 429에 막히지 않고 password 검증에서 401로 끝난다."
+              }
+            ],
+            "work": [
+              "Redis key를 account email 기준으로 만들고 실패 증가와 최초 expire 설정이 경쟁에 안전한지 정한다.",
+              "5번째와 6번째 실패, TTL 만료 뒤 상태를 HTTP와 Redis에서 동시에 관찰한다.",
+              "서버 인스턴스 두 곳이 같은 Redis counter를 쓰는 구성을 확인한다."
+            ],
+            "done": [
+              "틀린 password 5회 뒤 6번째 429를 확인했다.",
+              "key의 600초(10분) TTL과 만료 후 재시도 흐름을 확인했다.",
+              "401/429를 구분하고 제한 요청에서 token이 발급되지 않음을 검증했다."
+            ]
+          },
+          "hints": [
+            "계정별 카운터 대신 instance 메모리에 실패 횟수를 두면 두 서버를 번갈아 호출할 때 제한이 어떻게 달라지나요?",
+            "INCR 후 EXPIRE 전에 서버가 멈추면 어떤 Redis 상태가 남을 수 있나요?",
+            "5번째의 401과 6번째의 429를 어떤 순서로 발생시켜 경계값을 확인하나요?",
+            "600초 TTL이 만료된 뒤에는 어떤 오류 단계로 돌아가야 하나요?"
+          ],
+          "recipeIds": [
+            "board:login:normal"
+          ],
+          "executionChecks": [],
+          "choices": [],
+          "concepts": [],
+          "references": [
+            {
+              "label": "course:D09-6 · 로그인 시도 횟수 제한 (Redis, 10분 5회)",
+              "href": "course/spring/D09.html#step-d09-6"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "authored"
+}

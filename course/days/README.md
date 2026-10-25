@@ -10,6 +10,8 @@
 
 `roadmap`에는 날의 메타·목적·순서·만들 파일·파일별 동작·완료 조건·명세 참조·티켓·카드 연결이 들어 있다. `java`는 같은 날 Jnn의 주제·기초 연습·타입 한 컷·습관 메타다. `hints`에는 순서별 힌트·리뷰 초점·참고 자료·오늘의 SQL·관찰·채점 관련 날별 값이 들어 있다. `cards`는 `## Dnn 제목`부터 그날 마지막 카드까지의 Markdown 원문을 JSON 문자열로 보관한다. 카드 ID·나열 순서는 `roadmap.talkCards`와 같아야 한다. 빈 줄과 마지막 개행도 합본에 그대로 이어 붙인다.
 
+`roadmap.steps[].presentation`은 완료 조건의 표시 유형이며 기술 내용이나 채점 기준은 변경하지 않는다. `contract`, `sequence`, `comparison`, `evidence`는 각각 요청·기대 결과, 실행 순서, 조건별 대조, 증거·판단 문서를 표시하고, 화살표 구분은 `contract`·`comparison`에서 코드와 링크 밖 첫 `→`에만 적용한다.
+
 D00은 선택 Java 워밍업이다. 기존 출력에 별도 roadmap·hints·카드가 없으므로 `roadmap: null`, `hints: null`, `cards: ""`이고 `java.day`도 `null`이다. 다른 날에서 `hints: null`은 기존 생성기의 준비 중 페이지 의미를 유지한다.
 
 ## 새 날짜 추가
