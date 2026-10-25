@@ -6,7 +6,7 @@ const { chromium } = loadPlaywright();
 const out = await checkOutput('frame');
 const stage=arg('stage')||'after';
 const routes={홈:'index.html','일자 목록':'course/spring/README.html','과정 지도':'course/map.html','기능 상세':'scenario/features/posts-create-read.html','출발 자료':'course/start/README.html','개념 학습':'docs/knowledge/README.html',Java:'course/java/README.html',티켓:'course/tickets/README.html','서비스 만들기':'scenario/README.html','실전 미션':'practice/MISSIONS.html','일자 상세':'course/spring/D05.html','Java 상세':'course/java/J05.html','티켓 상세':'course/tickets/B01.html','더미 데이터':'course/start/dummy/README.html','운영 실습':'course/start/ops/README.html','서비스 상세':'scenario/ch0-first-steps/0-1-ts-to-java.html','개념 상세':'docs/knowledge/P16-json-jackson-practical.html','레슨':'lessons/README.html','구현 티켓':'tickets/README.html'};
-Object.assign(routes, {'Spring 분야':'docs/knowledge/README.html#kc-category-spring', ...Object.fromEntries(CORE_UNITS.map(unit=>[unit.id, `lessons/concept-core.html?unit=${unit.id}`]))});
+Object.assign(routes, {'일반 개념 리더':'docs/knowledge/J01-types-string.html','장면 개념 리더':'docs/knowledge/P09-java-syntax-basics.html','레슨 상세':'lessons/A1-client-server-http.html','학습 순서':'docs/knowledge/README.html#kc-sequence','Spring 분야':'docs/knowledge/README.html#kc-category-spring', ...Object.fromEntries(CORE_UNITS.map(unit=>[unit.id, `lessons/concept-core.html?unit=${unit.id}`]))});
 const pairs=[['출발 자료','개념 학습'],['일자 목록','Java'],['티켓','서비스 만들기'],['홈','과정 지도'],['서비스 만들기','일자 목록'],['서비스 만들기','기능 상세'],['실전 미션','개념 학습']];
 const server = await startCheckServer();
 const base = server.base;

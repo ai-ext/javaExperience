@@ -11,6 +11,14 @@ export function renderKnowledgeReaderPage({ title, navigation = '', visual = '',
     .map((m) => ({ id: m[1], label: text(m[2]) }));
   const fallback = headings.length ? headings : [...source.matchAll(/<h2\b[^>]*id="([^"]+)"[^>]*>([\s\S]*?)<\/h2>/g)].map((m) => ({ id: m[1], label: text(m[2]) }));
   const toc = fallback.map((h) => `<a href="#${esc(h.id)}" data-kr-toc-link>${esc(h.label)}</a>`).join('');
+  const overview = fallback.slice(0, 6).map((heading, index) => {
+    const start = source.indexOf(`id="${heading.id}"`);
+    const end = fallback[index + 1] ? source.indexOf(`id="${fallback[index + 1].id}"`) : source.length;
+    const fullExcerpt = text(source.slice(start, end).match(/<p\b[^>]*>([\s\S]*?)<\/p>/i)?.[1] || heading.label);
+    const excerpt = fullExcerpt.length > 110 ? fullExcerpt.slice(0, 110).replace(/\s+\S*$/, '') + '…' : fullExcerpt;
+    return `<a class="visual-file" data-kr-chapter="${esc(heading.id)}" href="#${esc(heading.id)}"><span class="file-index">${String(index + 1).padStart(2, '0')}</span><strong>${esc(heading.label)}</strong><small>${esc(excerpt)}</small></a>`;
+  }).join('');
+  const chapterControls = fallback.length ? `<div class="kr-chapter-controls"><button type="button" data-kr-previous>이전 절</button><label>읽을 절<select data-kr-chapter-select aria-label="읽을 절"><option value="all">전체 원문</option>${fallback.map(h => `<option value="${esc(h.id)}">${esc(h.label)}</option>`).join('')}</select></label><button type="button" data-kr-next>다음 절</button></div>` : '';
   const hasScene = /<(?:button|input|select|textarea)\b|data-(?:step|stage|scene|p09|jpa|concept-scene)\b/.test(visual);
   const metadata = JSON.stringify({ title: fullTitle, hasScene, headings: fallback }).replace(/</g, '\\u003c');
   const titleId = titleTag.match(/\bid="([^"]+)"/)?.[1];
@@ -23,5 +31,5 @@ export function renderKnowledgeReaderPage({ title, navigation = '', visual = '',
   const toolbarTitle = sceneHasH1 ? `<h2>${esc(shortTitle)}</h2>` : `<h1>${esc(shortTitle)}</h1>`;
   return `<div class="kr-reader" data-knowledge-reader data-kr-metadata="${esc(metadata)}">
   <header class="kr-toolbar"><div class="kr-toolbar-title"><p>개념 학습</p>${toolbarTitle}</div><div class="kr-controls" role="group" aria-label="개념 읽는 방식"${hasScene ? '' : ' hidden'}><button type="button" data-kr-mode="scene" aria-pressed="false" aria-controls="kr-scene">장면으로 보기</button><button type="button" data-kr-mode="read" aria-pressed="true" aria-controls="kr-reading">설명 차근차근 읽기</button></div>${navigation}</header>
-  <div class="kr-layout">${toc ? `<aside class="kr-toc" aria-label="이 문서의 목차"><strong>이 문서에서 볼 내용</strong><nav>${toc}</nav></aside>` : ''}<div class="kr-content"><section id="kr-scene" data-kr-scene${visual ? '' : ' hidden'}>${visual}</section><section id="kr-reading" data-kr-reading aria-label="${esc(shortTitle)} 설명"><h1 class="kr-reading-title" tabindex="-1">${esc(shortTitle)}</h1>${retainedTitle}<div class="knowledge-reader-original">${source}</div></section></div></div></div>`;
+  <div class="kr-layout">${toc ? `<aside class="kr-toc" aria-label="이 문서의 목차"><strong>이 문서에서 볼 내용</strong><nav>${toc}</nav></aside>` : ''}<div class="kr-content"><section id="kr-scene" data-kr-scene${visual ? '' : ' hidden'}>${visual}</section><section id="kr-reading" data-kr-reading aria-label="${esc(shortTitle)} 설명"><h1 class="kr-reading-title" tabindex="-1">${esc(shortTitle)}</h1>${retainedTitle}<nav class="kr-overview visual-file-grid" aria-label="핵심 내용 요약">${overview}</nav>${chapterControls}<div class="knowledge-reader-original">${source}</div></section></div></div></div>`;
 }

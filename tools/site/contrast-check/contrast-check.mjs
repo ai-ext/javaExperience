@@ -13,7 +13,7 @@ const root = path.resolve(opt('--root', fileURLToPath(new URL('../../../', impor
 const out = path.resolve(opt('--out', path.join(os.tmpdir(), 'javaexperience-contrast')));
 const quick = args.includes('--quick');
 // 새 서비스 대표 화면과 독립 지도도 같은 PC 다크 대비 기준으로 검사한다.
-const representatives = ['index.html','scenario/README.html','scenario/features/posts-create-read.html','course/map.html','course/README.html','course/spring/D01.html','course/spring/D05.html','course/spring/D11.html','course/java/J01.html','course/tickets/B01.html','scenario/ch0-first-steps/0-1-ts-to-java.html','scenario/ch1-create-post/1-1-receive-request.html','scenario/ch1-create-post/1-5-validation.html','scenario/ch10-project/10-4-login-jwt.html','scenario/labs/l12-query-methods/README.html','docs/knowledge/P02-mvc-layered-architecture.html','docs/knowledge/README.html','lessons/concept-core.html'];
+const representatives = ['index.html','scenario/README.html','scenario/features/posts-create-read.html','course/map.html','course/README.html','course/spring/D01.html','course/spring/D05.html','course/spring/D11.html','course/java/J01.html','course/tickets/B01.html','scenario/ch0-first-steps/0-1-ts-to-java.html','scenario/ch1-create-post/1-1-receive-request.html','scenario/ch1-create-post/1-5-validation.html','scenario/ch10-project/10-4-login-jwt.html','scenario/labs/l12-query-methods/README.html','docs/knowledge/P02-mvc-layered-architecture.html','docs/knowledge/README.html','lessons/concept-core.html','docs/knowledge/J01-types-string.html','docs/knowledge/P09-java-syntax-basics.html','lessons/A1-client-server-http.html','docs/knowledge/D12-linux-terminal-basics.html'];
 const walk = dir => fs.readdirSync(dir, {withFileTypes:true}).flatMap(e => e.name.startsWith('.') || e.name === 'node_modules' ? [] : e.isDirectory() ? walk(path.join(dir,e.name)) : e.name.endsWith('.html') ? [path.relative(root,path.join(dir,e.name))] : []);
 const discover = () => (quick ? representatives : walk(root).sort()).filter(file => !opt('--match','') || new RegExp(opt('--match','')).test(file)).slice(0, Number(opt('--limit', '0')) || undefined);
 const result = { viewport:{width:1440,height:900}, startedAt:new Date().toISOString(), pages:0, states:0, textNodes:0, controlEdges:0, findings:[], errors:[], coverage:{html:[],stateTypes:{}} };
@@ -46,7 +46,8 @@ async function main() {
       const rel = files[cursor++];
       try {
         await page.goto(base + rel.split(path.sep).map(encodeURIComponent).join('/'), {waitUntil:'load',timeout:30000});
-        if (await page.locator('pre.mermaid').count()) await page.waitForFunction(() => [...document.querySelectorAll('pre.mermaid')].every(e=>e.querySelector('svg')), null, {timeout:15000});
+        // 절 전환 리더는 보인 도식만 렌더하므로 접힌 원문까지 강제 대기하지 않는다.
+        if (await page.locator('pre.mermaid').count()) await page.waitForFunction(() => [...document.querySelectorAll('pre.mermaid')].filter(e=>!e.closest('[hidden]')&&e.getClientRects().length&&e.getBoundingClientRect().width>0).every(e=>e.querySelector('svg')), null, {timeout:15000});
         const scan = async state => {
           const r = await page.evaluate(inspectDom,args.includes('--icons-only')?{state,iconsOnly:true}:state);
           result.states++; result.textNodes += r.nodes; result.controlEdges += r.edges;

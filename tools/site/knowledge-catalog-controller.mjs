@@ -332,6 +332,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   for (const button of root.querySelectorAll('[data-kc-query]')) button.addEventListener('click', () => search(button.dataset.kcQuery));
   const filter = (category) => { if (!categories.includes(category)) return; commit({ categoryId: category, explicitFilters: { ...entry.explicitFilters, category: true }, expanded: false }); };
   for (const button of doc.querySelectorAll('button[data-kc-category]')) button.addEventListener('click', () => filter(button.dataset.kcCategory));
+  for (const tile of root.querySelectorAll('[data-kc-domain-open]')) tile.addEventListener('click', event => { event.preventDefault(); doc.querySelector(`button[data-kc-category="${tile.dataset.kcDomainOpen}"]`)?.click(); });
   const fieldButtons = [...doc.querySelectorAll('button[data-kc-category]')];
   for (const button of fieldButtons) button.addEventListener('keydown', (event) => {
     const index = fieldButtons.indexOf(button);

@@ -17,9 +17,32 @@ function initKnowledgeReader(doc = document, win = window) {
     if (!win.location.hash || win.location.hash.length < 2) return '';
     try { return decodeURIComponent(win.location.hash.slice(1)); } catch { return ''; }
   };
+  const chapters = [...root.querySelectorAll('.knowledge-reader-original details.knowledge-chapter')];
+  const chapterSelect = root.querySelector('[data-kr-chapter-select]');
+  let activeChapter = 0;
+  const selectChapter = (value) => {
+    activeChapter = value === 'all' ? -1 : Math.max(0, chapters.findIndex(chapter => chapter.querySelector(':scope > summary')?.id === value));
+    chapters.forEach((chapter, index) => { chapter.hidden = activeChapter !== -1 && index !== activeChapter; });
+    doc.querySelectorAll('[data-kr-toc-link],[data-kr-chapter]').forEach(link => {
+      const selected = activeChapter >= 0 && decodeURIComponentSafe(link.hash) === chapters[activeChapter]?.querySelector(':scope > summary')?.id;
+      if (selected) link.setAttribute('aria-current', 'location'); else link.removeAttribute('aria-current');
+    });
+    if (chapterSelect) chapterSelect.value = activeChapter < 0 ? 'all' : chapters[activeChapter]?.querySelector(':scope > summary')?.id || 'all';
+    const previous = root.querySelector('[data-kr-previous]'), next = root.querySelector('[data-kr-next]');
+    if (previous) previous.disabled = activeChapter <= 0;
+    if (next) next.disabled = activeChapter < 0 || activeChapter >= chapters.length - 1;
+  };
+  chapterSelect?.addEventListener('change', () => selectChapter(chapterSelect.value));
+  for (const [attribute, delta] of [['previous', -1], ['next', 1]]) root.querySelector(`[data-kr-${attribute}]`)?.addEventListener('click', () => {
+    const next = chapters[activeChapter + delta];
+    if (next) selectChapter(next.querySelector(':scope > summary').id);
+  });
+  selectChapter(chapters[0]?.querySelector(':scope > summary')?.id);
   const reveal = (id, moveFocus = false) => {
     const target = id && doc.getElementById(id);
     if (!target || !reading.contains(target)) return false;
+    const chapter = target.closest('details.knowledge-chapter');
+    if (chapter) selectChapter(chapter.querySelector(':scope > summary').id);
     let parent = target.closest('details.knowledge-topic, details.knowledge-chapter');
     while (parent) { parent.open = true; parent = parent.parentElement?.closest('details.knowledge-topic, details.knowledge-chapter'); }
     for (let parentNode = target.parentElement; parentNode && parentNode !== reading; parentNode = parentNode.parentElement) {
@@ -70,16 +93,19 @@ function initKnowledgeReader(doc = document, win = window) {
       const target = targetId && doc.getElementById(targetId);
       (readMode ? (target && reading.contains(target) ? target : root.querySelector('.kr-reading-title')) : buttons.find((item) => item.dataset.krMode === 'scene'))?.focus?.({ preventScroll: true });
       if (readMode && target && reading.contains(target)) reveal(targetId, true);
-      else if (readMode) root.querySelector('.kr-reading-title')?.scrollIntoView?.({ block: 'start' });
+
     }
   };
   buttons.forEach((button) => button.addEventListener('click', () => setMode(button.dataset.krMode)));
   doc.addEventListener('click', (event) => {
-    const link = event.target.closest('a[data-kr-toc-link]');
+    const link = event.target.closest('a[data-kr-toc-link],a[data-kr-chapter]');
     if (!link) return;
+    event.preventDefault();
     const id = decodeURIComponentSafe(link.hash);
+    const url = new URL(win.location.href); url.hash = link.hash; url.searchParams.set('read', '1');
+    win.history.pushState(win.history.state, '', url);
     setMode('read', { updateUrl: false, focus: false });
-    reveal(id, true);
+    reveal(id, false);
   });
   const sync = () => {
     const stateMode = win.history.state?.[READER_KEY];

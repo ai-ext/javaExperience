@@ -30,18 +30,18 @@ export function renderCoreLearning(root) {
       <section class="core-stage" aria-labelledby="core-stage-title">
         <nav class="core-stage-nav" data-core-stage-nav aria-label="단계"></nav>
         <div class="core-stage-heading"><div class="core-stage-kicker"><p class="core-learning-kicker">단계별 설명</p><span class="core-stage-mode">설명 재생</span></div><h3 id="core-stage-title" data-core-stage-title>${esc(stage.title)}</h3><p data-core-stage-description>${esc(stage.explanation)}</p></div>
-        <div class="core-stage-columns">
-          <section class="core-code-section" aria-label="핵심 코드 요약"><div class="core-section-heading"><h4>핵심 코드 요약</h4><button type="button" class="core-button core-copy-button" data-core-copy>코드 복사</button></div><pre><code data-core-code>${esc(stage.code)}</code></pre><p class="core-copy-status" data-core-copy-status role="status" aria-live="polite"></p></section>
-          <section class="core-comparison" aria-labelledby="core-comparison-title"><div class="core-section-heading"><h4 id="core-comparison-title">상태 비교</h4><span>설명용 비교</span></div><div class="core-table-wrap"><table><thead><tr><th scope="col">대상</th><th scope="col">비교 A</th><th scope="col">비교 B</th></tr></thead><tbody data-core-rows>${rows}</tbody></table></div></section>
+        <div class="core-stage-columns visual-file-grid">
+          <section class="core-code-section visual-file" aria-label="핵심 코드 요약"><div class="core-section-heading"><h4>핵심 코드 요약</h4><button type="button" class="core-button core-copy-button" data-core-copy>코드 복사</button></div><pre><code data-core-code>${esc(stage.code)}</code></pre><p class="core-copy-status" data-core-copy-status role="status" aria-live="polite"></p></section>
+          <section class="core-comparison visual-file" aria-labelledby="core-comparison-title"><div class="core-section-heading"><h4 id="core-comparison-title">상태 비교</h4><span>설명용 비교</span></div><div class="core-table-wrap"><table><thead><tr><th scope="col">대상</th><th scope="col">비교 A</th><th scope="col">비교 B</th></tr></thead><tbody data-core-rows>${rows}</tbody></table></div></section>
         </div>
         <div class="core-stage-controls"><button type="button" class="core-button" data-core-previous disabled>이전 단계</button><span data-core-counter>${esc(`1 / ${first.stages.length}`)}</span><button type="button" class="core-button core-next-button" data-core-next>다음 단계</button></div>
       </section>
-      <section class="core-observation" aria-labelledby="core-observation-title"><h3 id="core-observation-title">실제 관찰</h3><ul data-core-observations>${observations}</ul><div class="core-observation-limit"><h4>관찰 범위와 한계</h4><p data-core-limit>${esc(first.limit)}</p></div><p class="core-evidence-scope">최소 예제의 확인 결과입니다. 프로젝트 전체나 원문 전체를 실행한 결과가 아닙니다.</p><div class="core-observation-environment"><h4>근거 환경과 조작 범위</h4><p class="core-learning-runtime" data-core-runtime>${esc(runtime)}</p><p class="core-learning-notice">단계 버튼은 설명을 재생합니다. 새 서버를 실행하거나 요청을 보내지 않습니다.</p></div></section>
-      <section class="core-reference" aria-label="출처와 원문">
+      <div class="core-evidence-grid visual-file-grid"><section class="core-observation visual-file" aria-labelledby="core-observation-title"><h3 id="core-observation-title">실제 관찰</h3><ul data-core-observations>${observations}</ul><div class="core-observation-limit"><h4>관찰 범위와 한계</h4><p data-core-limit>${esc(first.limit)}</p></div><p class="core-evidence-scope">최소 예제의 확인 결과입니다. 프로젝트 전체나 원문 전체를 실행한 결과가 아닙니다.</p><div class="core-observation-environment"><h4>근거 환경과 조작 범위</h4><p class="core-learning-runtime" data-core-runtime>${esc(runtime)}</p><p class="core-learning-notice">단계 버튼은 설명을 재생합니다. 새 서버를 실행하거나 요청을 보내지 않습니다.</p></div></section>
+      <section class="core-reference visual-file" aria-label="출처와 원문">
         <details><summary>공식 출처와 버전 범위</summary><ul data-core-sources></ul><p>조사 기록: <a data-core-research-link href="${esc(data.researchHref)}">조사 출처와 범위</a></p></details>
         <details><summary>실행 증거와 재현 방법</summary><p>실행 코드: <a data-core-code-link href="${esc(data.codeHref)}">최소 예제 전체 코드</a></p><p>기록: <a data-core-execution-link href="${esc(data.executionHref)}">실행 증거와 관찰값</a></p><p>재현 명령: <code>${esc(data.replay)}</code></p></details>
         <details><summary>기존 문서의 해당 원문 절</summary><div data-core-originals>${first.sourceLinks.map(source => `<a href="${esc(source.href)}">${esc(`${source.id} · ${source.heading}`)}</a>`).join('')}</div></details>
-      </section>
+      </section></div>
     </div>
   </div>
   <noscript><p class="core-learning-noscript">단계별 화면에는 JavaScript가 필요합니다. 원문 절 링크를 열어 기존 문서를 읽어 주세요.</p></noscript>

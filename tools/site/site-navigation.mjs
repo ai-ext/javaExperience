@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { CORE_UNITS, DOMAINS } from './concept-curriculum.mjs';
+import { renderConceptNavigation } from './concept-navigation.mjs';
 
 export const siteDestinations = [
   { label: '홈', target: 'index.html', description: '오늘 할 일과 과정의 전체 흐름을 확인합니다.' },
@@ -38,17 +38,13 @@ export function siteSection(sourcePath) {
 }
 export function renderSectionNavigation(sourcePath) {
   const current=siteSection(sourcePath);
+  if (current === '개념 학습') return renderConceptNavigation(sourcePath);
   const groups={
     '홈':[{label:'오늘 할 일',target:'index.html#course-home-title'},{label:'과정 전체 설명',target:'index.html#home-course-overview'},{label:'대주제 안내',target:'index.html#home-menus'}],
     '과정 지도':mapDestinations,
     '서비스 만들기':courseDestinations,
     '실전 미션':[{label:'미션 목록',target:'practice/MISSIONS.html'}],
-    '개념 학습':[
-      {label:'개념 목록',target:'docs/knowledge/README.html'},
-      ...DOMAINS.map(({id,label})=>({label,target:`docs/knowledge/README.html#kc-category-${id}`})),
-      ...CORE_UNITS.map(({id,title})=>({label:`${id} · ${title}`,target:`lessons/concept-core.html?unit=${id}`})),
-      {label:'레슨',target:'lessons/README.html'},
-    ],
+
   };
   const entries=groups[current]||siteDestinations;
   const target=sourcePath.replace(/\.md$/,'.html');

@@ -151,3 +151,67 @@ test('초기 분야 선택은 실제 분야 버튼과 개념 목록 패널이 �
   baked.window.close();win.close();
  }
 });
+
+// PC 다크 기준으로 분류·단원·리더 내용을 검증한다. 모바일 배치에 관한 새 단정은 추가하지 않는다.
+test('개념 흡수는 여섯 분류의 수·일자 근거와 공통 파일 부품을 유지한다',()=>{
+ const root=new URL('../../',import.meta.url);
+ const dom=new JSDOM(fs.readFileSync(new URL('docs/knowledge/README.html',root),'utf8'));
+ const doc=dom.window.document;
+ const tiles=[...doc.querySelectorAll('.kc-domain-tile')];assert.equal(tiles.length,6);
+ assert.deepEqual(tiles.map(tile=>tile.dataset.conceptDomain),['java','spring','request','data','testing','delivery']);
+ assert.equal(tiles.reduce((sum,tile)=>sum+Number(tile.querySelector('.file-layer').textContent.replace(/\D/g,'')),0),134);
+ assert.ok(tiles.every(tile=>tile.matches('.visual-file')));
+ assert.ok(doc.querySelector('.kc-results.visual-file-grid'));
+ assert.equal(doc.querySelectorAll('.kc-result.visual-file').length,134);
+ assert.equal(doc.querySelector('.concept-nav-group[data-concept-nav="domains"]').open,true);
+ assert.equal(doc.querySelector('.concept-nav-group[data-concept-nav="units"]').open,false);
+ dom.window.close();
+});
+
+test('개념 리더의 절 전환은 원문·코드·진도를 지우지 않고 선택한 절만 보여 준다',()=>{
+ const root=new URL('../../',import.meta.url);
+ const dom=new JSDOM(fs.readFileSync(new URL('docs/knowledge/J01-types-string.html',root),'utf8'),{url:'https://learn.example/docs/knowledge/J01-types-string.html',runScripts:'outside-only'});
+ const win=dom.window,doc=win.document;let scrolls=0;win.HTMLElement.prototype.scrollIntoView=()=>scrolls++;
+ win.eval(fs.readFileSync(new URL('knowledge-reader.js',import.meta.url),'utf8'));doc.dispatchEvent(new win.Event('DOMContentLoaded'));
+ const chapters=[...doc.querySelectorAll('.knowledge-chapter')];
+ const before=chapters.map(chapter=>chapter.textContent),keys=Object.keys(win.localStorage);
+ const visible=()=>chapters.filter(chapter=>!chapter.hidden);
+ assert.equal(visible().length,1);
+ const select=doc.querySelector('[data-kr-chapter-select]');select.value=chapters[1].querySelector('summary').id;select.dispatchEvent(new win.Event('change'));
+ assert.equal(visible()[0],chapters[1]);
+ doc.querySelector('[data-kr-next]').click();assert.equal(visible()[0],chapters[2]);
+ select.value='all';select.dispatchEvent(new win.Event('change'));assert.equal(visible().length,chapters.length);
+ assert.deepEqual(chapters.map(chapter=>chapter.textContent),before);assert.deepEqual(Object.keys(win.localStorage),keys);
+ assert.equal(scrolls,0,'내용 전환은 scrollIntoView를 호출하지 않는다');
+ assert.equal(doc.querySelectorAll('.kr-overview .visual-file').length,6);
+ win.close();
+});
+
+// 직접 패널 주소는 문서 스크롤 앵커가 아니다. 해시를 load까지 보류하고 같은 선택으로 인계한다.
+test('개념 목록의 직접 패널 주소는 첫 페인트 전에 기본 해시 스크롤을 보류한다',()=>{
+ const html=fs.readFileSync(new URL('../../docs/knowledge/README.html',import.meta.url),'utf8');
+ for(const id of ['kc-browse-view','kc-sequence','kc-original']) {
+  const dom=new JSDOM(html,{url:`https://learn.example/docs/knowledge/README.html#${id}`,runScripts:'outside-only'});
+  const win=dom.window,doc=win.document;win.CSS={escape:value=>value};
+  const prepare=[...doc.head.querySelectorAll('script')].find(script=>script.textContent.includes('function prepareFirstPaint'));
+  win.eval(prepare.textContent);
+  assert.equal(win.location.hash,'',`${id}: native fragment 스크롤 이전에 보류`);
+  assert.equal(win.__javaExperienceConceptHash,`#${id}`);
+  assert.ok(doc.getElementById('first-paint-state').textContent.includes(`#${id}{display:block`));
+  win.dispatchEvent(new win.Event('load'));
+  assert.equal(win.location.hash,`#${id}`,'URL 복원은 hashchange 없는 replaceState');
+  win.close();
+ }
+});
+
+// P09도 빈 슬롯을 뒤늦게 채우지 않고 실제 controller의 PC 기본 장면을 먼저 그린다.
+test('P09 첫 HTML은 단계 선택·관찰값·현재 코드가 이미 채워져 있다',()=>{
+ const dom=new JSDOM(fs.readFileSync(new URL('../../docs/knowledge/P09-java-syntax-basics.html',import.meta.url),'utf8'));
+ const doc=dom.window.document;
+ assert.equal(doc.querySelectorAll('[data-p09-stage]').length,7);
+ assert.equal(doc.querySelectorAll('[data-p09-stage][aria-current="step"]').length,1);
+ assert.equal(doc.querySelectorAll('[data-p09-state] dd').length,3);
+ assert.ok(doc.querySelector('[data-p09-code]').textContent.includes('Profile'));
+ assert.equal(doc.querySelector('[data-p09-learning]').dataset.ready,undefined,'브라우저에서도 기존 이벤트를 연결할 수 있어야 한다');
+ dom.window.close();
+});
