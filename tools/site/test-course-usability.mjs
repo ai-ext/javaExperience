@@ -48,3 +48,33 @@ test('데이터 공통 안내는 요청한 일자의 데이터 작업으로 복�
   dom.window.close();
  }
 });
+
+test('학습 관찰 틀은 열을 검증하고 코드와 사용자 입력을 안전하게 표시한다', async () => {
+ const {renderVisualGuide} = await import('./course-pages.mjs');
+ const {loadCourseSources} = await import('../course/sources.mjs');
+ const {roadmap} = loadCourseSources();
+ const guides = [...roadmap.days.flatMap(day => day.steps.map(step => step.visualGuide)), ...roadmap.java.map(day => day.visualGuide)].filter(Boolean);
+ assert.ok(guides.length >= 15);
+ for (const guide of guides) {
+  const dom = new JSDOM(renderVisualGuide(guide));
+  assert.equal(dom.window.document.querySelectorAll('tbody > tr, .task-visual > ol > li').length, guide.rows.length);
+  for (const row of guide.rows) for (const value of row) assert.ok(dom.window.document.body.textContent.includes(value.replace(/`/g,'')));
+  assert.equal(dom.window.document.querySelector('details'), null, '현재 관찰할 틀은 기본 노출');
+  dom.window.close();
+ }
+ const malicious = {kind:'evidence',title:'관찰',headers:['입력'],rows:[['<script>alert(1)</script>']]};
+ const doc = new JSDOM(renderVisualGuide(malicious)).window.document;
+ assert.equal(doc.querySelector('script'),null);
+ assert.throws(() => renderVisualGuide({...malicious,rows:[['하나','둘']]}),/열과 행/);
+ doc.defaultView.close();
+});
+
+test('직접 만든 흐름의 번호는 일반 절차 목록 스타일과 겹치지 않는다', async () => {
+ const {renderVisualGuide} = await import('./course-pages.mjs');
+ const {renderContentKinds} = await import('./course-content.mjs');
+ const guide={kind:'sequence',title:'입력과 출력',headers:['입력','관찰'],rows:[['List<Post>','직접 확인']]};
+ const dom=new JSDOM(renderContentKinds('course/java/J05.md',`<h1>연습</h1><section class="exercise-section">${renderVisualGuide(guide)}</section>`));
+ assert.equal(dom.window.document.querySelector('.task-visual > ol').classList.contains('visual-procedure'),false);
+ assert.match(dom.window.document.querySelector('.task-visual').textContent,/List<Post>/);
+ dom.window.close();
+});

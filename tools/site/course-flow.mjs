@@ -1,7 +1,7 @@
 // 흐름 재생 렌더러 — 일자 페이지의 [오늘 흐름](course/flows/days.json)과 티켓 페이지의 [장애 흐름](course/flows/tickets.json).
 // 정지 상태에서도 모든 단계와 값이 읽히도록 단계 목록을 HTML로 다 그리고, 재생 조작(course-flow.js)은 그 위에 얹기만 한다.
 // 티켓의 원인 쪽 단계(side=cause)는 "원인과 정답"과 같은 수준으로 접기 안에만 그린다. 지도·제목·aria 어디에도 원인 문장을 두지 않는다.
-// 노드 아이콘은 디자인 참고 자료 템플릿(정보 시스템 개발 제안서)의 선 아이콘·타일 톤을 참고해 직접 그린 인라인 SVG다(docs/design/COURSE-V2-DESIGN-REFERENCE-2026-10-23.md).
+// 노드 아이콘은 각 서버 구성요소를 구분하는 인라인 SVG다.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -173,10 +173,13 @@ export function renderTicketFlow(flow) {
   });
   return `<section class="ticket-flow flow" data-flow="${esc(flow.id)}" data-flow-kind="ticket" id="${idBase}" aria-labelledby="${idBase}-title">
   <div class="flow-head"><p class="flow-eyebrow">장애 흐름 · 증상에서 관찰 지점까지</p><h2 id="${idBase}-title">${esc(flow.id)} 장애가 번지는 흐름</h2><p class="flow-summary">밖에서 보이는 증상과 관찰 지점만 먼저 보여 줍니다. 원인 쪽 단계는 직접 진단한 뒤 아래 접기에서 펼쳐 맞춰 보세요. 펼치면 재생에도 원인 단계가 끼어듭니다.</p></div>
+  <div class="flow-mode-controls" data-flow-mode-controls role="group" aria-label="장애 흐름 보기 방식" hidden><button type="button" class="flow-btn" data-flow-mode="step" aria-pressed="true">한 단계씩</button><button type="button" class="flow-btn" data-flow-mode="all" aria-pressed="false">전체 흐름</button></div>
   ${nodeMap(flow, '장애 흐름')}
   ${player(idBase)}
-  <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>${open.length}단계</small></h3>
+  <div data-flow-overview>
+  <h3 class="flow-list-title">보이는 증상과 관찰 지점 <small>${open.length}단계 · 관측값은 직접 기록</small></h3>
   <ol class="flow-steps">${open.join('')}</ol>
+  </div>
   <details class="flow-cause"><summary>원인 쪽 단계 ${cause.length}개 펼치기 — "원인과 정답"과 같은 수준</summary>
   <p class="flow-cause-note">원인 서술을 먼저 써 본 뒤 펼치세요. 단계 번호는 위 증상 단계와 섞인 실제 순서로 재생됩니다.</p>
   <ol class="flow-steps is-cause">${cause.join('')}</ol></details>

@@ -122,10 +122,29 @@ export function renderCourseOutline(source, html) {
     list.append(item);
   }
   if (type.kind === 'days') {
-    for (const link of article.querySelectorAll('.course-outline h3 a[href]')) {
-      const item = doc.createElement('li');
-      item.append(link.cloneNode(true));
-      list.append(item);
+    const groups = new Map();
+    for (const item of article.querySelectorAll('.outline-schedule > li')) {
+      if (!groups.has(item.dataset.phase)) groups.set(item.dataset.phase, []);
+      groups.get(item.dataset.phase).push(item);
+    }
+    const names = {warmup:'선택 · 워밍업', build:'1단계 · 서버 만들기', maintain:'2단계 · 티켓 처리', wrap:'중간 점검', extend:'3단계 · 설계·운영'};
+    for (const [phase, items] of groups) {
+      const group = doc.createElement('li');
+      const link = doc.createElement('a');
+      const first = items[0];
+      first.id ||= `schedule-${phase}`;
+      link.href = `#${first.id}`;
+      link.textContent = names[phase];
+      group.append(link);
+      const details = doc.createElement('details');
+      details.innerHTML = `<summary>${items.length}개 일자 바로가기</summary><ul></ul>`;
+      for (const item of items) {
+        const row = doc.createElement('li');
+        row.append(item.querySelector('h3 a').cloneNode(true));
+        details.querySelector('ul').append(row);
+      }
+      group.append(details);
+      list.append(group);
     }
   }
   nav.append(list);
@@ -145,6 +164,15 @@ export function renderCourseOutline(source, html) {
     }
   }
   if (type.kind === 'overview') {
+    const promise = content.querySelector('.guide-section');
+    if (promise) {
+      const original = [...promise.children].slice(1);
+      const detail = doc.createElement('details');
+      detail.innerHTML = '<summary>과정의 범위·데이터 설계·연습 기준</summary>';
+      original.forEach(node => detail.append(node));
+      promise.insertAdjacentHTML('beforeend', '<ul class="overview-promises"><li><strong>만들기</strong> · 인증·조회·동시성·외부 연동 서버 구현</li><li><strong>말하기</strong> · 문제 → 원인 → 선택 → 결과를 내 경험으로 설명</li><li><strong>운영·협의</strong> · 배포·복원·두 앱 부하 검증, 반론에 따라 결정 수정</li></ul><p>데이터는 직접 설계하고 API 계약·DB 불변식·실행 증거로 확인합니다.</p>');
+      promise.append(detail);
+    }
     const schedule = content.querySelector('.outline-schedule');
     if (schedule && schedule.children.length > 20) {
       const overview = doc.createElement('div');

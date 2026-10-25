@@ -2,13 +2,6 @@
 
 1단계(D01~D10)는 빈 프로젝트에서 [명세서 v2](../spec-v2.md)의 서버를 직접 만든다. 이 폴더에는 출발에 필요한 것만 있다. 구현 예시 코드는 각 일자 페이지의 순서 칸 안에 있다.
 
-| 파일 | 쓰는 곳 | 내 프로젝트에 둘 위치 |
-|---|---|---|
-| [compose.yaml](compose.yaml) | MySQL 8.4·Redis 7.4·WireMock·Toxiproxy | 프로젝트 루트 `compose.yaml` |
-| [toxiproxy.json](toxiproxy.json) | Toxiproxy 프록시 정의(`pg` → WireMock) | 프로젝트 루트 `toxiproxy.json` |
-| [wiremock/mappings/pg-approve.json](wiremock/mappings/pg-approve.json) | PG 승인 모의 응답 | `src/test/resources/wiremock/mappings/` |
-| [wiremock/mappings/pg-approve-declined.json](wiremock/mappings/pg-approve-declined.json) | 금액 999000은 항상 거절 | `src/test/resources/wiremock/mappings/` |
-
 ## 1. 준비물
 
 - JDK 21
@@ -56,6 +49,15 @@ Windows에서는 WSL2의 Linux 작업 경로에서 `./gradlew`, Docker CLI, Pyth
 | D10 ⑤ | `poi-ooxml` 5.5.1 |
 
 ## 3. compose 실행
+
+먼저 파일을 복사하고, 그다음 의존 서비스를 기동한다.
+
+| 파일 | 쓰는 곳 | 내 프로젝트에 둘 위치 |
+|---|---|---|
+| [compose.yaml](compose.yaml) | MySQL 8.4·Redis 7.4·WireMock·Toxiproxy | 프로젝트 루트 `compose.yaml` |
+| [toxiproxy.json](toxiproxy.json) | Toxiproxy 프록시 정의(`pg` → WireMock) | 프로젝트 루트 `toxiproxy.json` |
+| [wiremock/mappings/pg-approve.json](wiremock/mappings/pg-approve.json) | PG 승인 모의 응답 | `src/test/resources/wiremock/mappings/` |
+| [wiremock/mappings/pg-approve-declined.json](wiremock/mappings/pg-approve-declined.json) | 금액 999000은 항상 거절 | `src/test/resources/wiremock/mappings/` |
 
 D01 ①에서 프로젝트를 만든 뒤, **파일 4개를 먼저 복사하고** 프로젝트 루트에서 실행한다. `compose.yaml`, `toxiproxy.json`은 프로젝트 루트에, 스텁 두 개는 `src/test/resources/wiremock/mappings/`에 둔다.
 

@@ -172,6 +172,47 @@ function frameContentBlocks(doc, root, source) {
     const labels = [...table.querySelectorAll('thead th')].map(node => node.textContent.trim());
     if (source.startsWith('course/java/') && labels.join('|') === '파일|채울 것|칸') table.classList.add('java-task-table');
   }
+  if (source.startsWith('course/tickets/')) {
+    const ticketId = source.split('/').at(-1).replace(/\.md$/, '').toLowerCase();
+    for (const [index, item] of [...root.querySelectorAll('.exercise-repro > ol > li')].entries()) {
+      const command = [...item.querySelectorAll(':scope > code, :scope > p > code')].find(code => /^(docker compose|\.\/gradlew|bash tickets\/)/.test(code.textContent));
+      if (!command) continue;
+      const main = doc.createElement('div'); main.className = 'repro-command';
+      const observed = item.querySelector(':scope > ul');
+      if (observed) observed.classList.add('repro-observation');
+      const figure = doc.createElement('figure'); figure.className = 'code-block';
+      const caption = doc.createElement('figcaption'); caption.className = 'code-toolbar';
+      const target = `repro-${ticketId}-${index + 1}`;
+      caption.innerHTML = `<span>${['의존 서비스','서버 기동','증상 재현'][index] || '실행'}</span><button type="button" data-copy-target="${target}">명령 복사</button><span class="copy-status" role="status" aria-live="polite"></span>`;
+      const pre = doc.createElement('pre'); pre.id = target;
+      pre.append(command); figure.append(caption, pre);
+      for (const child of [...item.childNodes]) if (child !== observed) main.append(child);
+      main.append(figure); item.prepend(main);
+      item.classList.add('repro-row');
+    }
+    if (source === 'course/tickets/E01.md') {
+      const received = [...root.querySelectorAll('.exercise-section')].find(section => /진행 순서와 선행 자료/.test(section.querySelector(':scope > h2')?.textContent || ''));
+      const prerequisites = [...(received?.querySelectorAll(':scope > p') || [])].find(p => p.querySelector('a[href*="J07"]'));
+      if (prerequisites) {
+        const details = doc.createElement('details'); details.className = 'ticket-prerequisites';
+        details.innerHTML = '<summary>연결 개념과 선택 티켓 확인</summary>';
+        prerequisites.before(details); details.append(prerequisites);
+      }
+      const list = received?.querySelector(':scope > ol');
+      if (list && list.children.length === 3) {
+        const validation = doc.createElement('section'); validation.className = 'ticket-validation'; validation.dataset.ticketValidation = '';
+        const tabs = doc.createElement('div'); tabs.className = 'ticket-validation-tabs'; tabs.setAttribute('role','tablist'); tabs.setAttribute('aria-label','인기글 검증 조건');
+        [...list.children].forEach((item,index) => {
+          const name = item.querySelector('strong')?.textContent.replace(/:$/, '') || `검증 ${index+1}`;
+          const tab = doc.createElement('button'); tab.type = 'button'; tab.id = `validation-e01-tab-${index}`; tab.textContent = name;
+          tab.setAttribute('role','tab'); tab.setAttribute('aria-controls',`validation-e01-${index}`); tab.setAttribute('aria-selected',String(index === 0)); tab.tabIndex = index === 0 ? 0 : -1;
+          const panel = doc.createElement('div'); panel.id = `validation-e01-${index}`; panel.className = 'ticket-validation-panel'; panel.setAttribute('role','tabpanel'); panel.setAttribute('aria-labelledby',tab.id); panel.append(...item.childNodes);
+          validation.append(panel); tabs.append(tab);
+        });
+        validation.prepend(tabs); list.replaceWith(validation);
+      }
+    }
+  }
   let codeIndex = 0;
   for (const pre of root.querySelectorAll('pre')) {
     if (pre.closest('.code-block') || !pre.innerHTML.includes('course-preserved-code:')) continue;
@@ -252,6 +293,29 @@ function frameContentBlocks(doc, root, source) {
   }
   if (source.startsWith('course/java/')) {
     const sheet = root.querySelector('.exercise-java');
+    if (['course/java/J01.md','course/java/J05.md'].includes(source)) {
+      const table = sheet?.querySelector('.java-task-table');
+      const rows = [...(table?.tBodies[0]?.rows || [])];
+      const following = rows.filter(row => row.cells[2]?.textContent.trim() !== '주제 과제');
+      if (table && following.length && following.length < rows.length) {
+        const details = doc.createElement('details'); details.className = 'exercise-next-practice';
+        const summary = doc.createElement('summary'); summary.textContent = '다음 연습·수정 범위';
+        const next = table.cloneNode(false); next.removeAttribute('id'); next.classList.add('java-followup-table');
+        if (table.tHead) next.append(table.tHead.cloneNode(true));
+        const body = doc.createElement('tbody');
+        for (const row of following) body.append(row);
+        next.append(body);
+        const wrap = doc.createElement('div'); wrap.className = 'table-wrap'; wrap.append(next);
+        details.append(summary,wrap);
+        const current = table.closest('.table-wrap') || table;
+        current.after(details);
+        table.classList.add('java-current-task-table');
+      }
+    }
+    if (source === 'course/java/J16.md') {
+      sheet?.classList.add('exercise-compact-lab');
+      for (const section of sheet?.querySelectorAll(':scope > .exercise-primary') || []) section.classList.add('exercise-compact-section');
+    }
     for (const files of sheet?.querySelectorAll('.visual-files') || []) {
       const count = files.querySelectorAll('.visual-file').length;
       if (count < 3 || files.closest('details')) continue;
@@ -274,7 +338,24 @@ function frameContentBlocks(doc, root, source) {
     }
     const sections = [...(sheet?.querySelectorAll(':scope > .exercise-section') || [])];
     const supporting = sections.filter(section => /^(기본기 반복|타입 한 컷|실무 습관)$/.test(section.querySelector(':scope > h2')?.textContent.replace(/^#\s*/,'').trim() || ''));
-    if (supporting.length > 1) {
+    if (source === 'course/java/J05.md') {
+      for (const section of supporting) if (/타입 한 컷/.test(section.querySelector(':scope > h2')?.textContent || '')) section.classList.add('exercise-type-comparison');
+    }
+    if (source === 'course/java/J01.md') {
+      const habit = supporting.find(section => /실무 습관/.test(section.querySelector(':scope > h2')?.textContent || ''));
+      const cases = habit?.querySelector(':scope > ol');
+      if (cases && cases.children.length === 2) {
+        cases.className = 'independent-cases'; cases.dataset.visualPattern = 'comparison';
+        [...cases.children].forEach((item,index) => {
+          const label = doc.createElement('strong'); label.className = 'case-label'; label.textContent = `독립 사례 ${index === 0 ? 'A' : 'B'}`;
+          const relation = doc.createElement('p'); relation.className = 'reference-pair';
+          relation.innerHTML = `<code>${index === 0 ? '외부 변수' : 'List.of()'}</code><span aria-hidden="true">→</span><strong>${index === 0 ? '같은 리스트' : '같은 불변 리스트'}</strong><span aria-hidden="true">←</span><code>LeakyPost.tags</code>`;
+          relation.setAttribute('aria-label', index === 0 ? '외부 변수와 LeakyPost.tags가 같은 리스트를 참조한다' : 'List.of()가 만든 불변 리스트를 LeakyPost.tags도 참조한다');
+          item.prepend(label,relation);
+        });
+      }
+    }
+    if (supporting.length > 1 && source !== 'course/java/J05.md') {
       const grid = doc.createElement('div');
       grid.className = 'exercise-support-grid';
       supporting[0].before(grid);
@@ -320,6 +401,7 @@ export function renderContentKinds(source,html) {
     else if(!block.querySelector(':scope > .content-kind'))block.insertAdjacentHTML('afterbegin',badge(kind));
   }
   for(const list of root.querySelectorAll('.exercise-section ol,.guide-section ol,.step-observations ol')) {
+    if (list.closest('.task-visual')) continue;
     if(list.closest('details,.content-visual')||list.matches('.course-outline')||list.parentElement.closest('ol'))continue;
     list.classList.add('visual-procedure');list.dataset.visualPattern='procedure';
     if (list.hasAttribute('start')) list.style.counterReset = `procedure ${Number(list.getAttribute('start')) - 1}`;

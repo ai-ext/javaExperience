@@ -25,7 +25,7 @@ export function renderSiteNavigation(sourcePath) {
   const href = (target) => path.posix.relative(path.posix.dirname(sourcePath), target);
   const study = /^course\/(?:spring\/D\d{2}|java\/J\d{2}|tickets\/)/.test(sourcePath);
   const items = spaces.map(({ label, target }) => `<a href="${href(target)}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`);
-  const links = study ? items.slice(0, 2).join('') + `<details class="study-library"><summary>자료 찾아보기</summary><div class="study-library-links">${items.slice(2).join('')}</div></details>` : items.join('');
+  const links = items.join('');
   const setup = current === '홈' ? '<a class="home-header-setup" href="#home-environment">개발 환경 ↗</a>' : '';
   const courseItems = [
     ['가이드 · 과정 안내', 'course/README.html', sourcePath === 'course/README.md'],

@@ -180,8 +180,10 @@ function collectHtml(page, html) {
     'flow', 'flow-links',
     // 콘텐츠 종류·파일 카드·관계·비교·절차를 페이지마다 독립적으로 추적한다.
     'content-page-kind', 'visual-files', 'visual-file', 'visual-relations',
-    'visual-comparison', 'visual-procedure', 'visual-flow', 'visual-rules']);
-  for (const match of html.matchAll(/<(?:section|header|footer|div|nav|button|article|aside|dialog|figure|p|ol|ul)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
+    'visual-comparison', 'visual-procedure', 'visual-flow', 'visual-rules',
+    'task-visual', 'task-target-files', 'repro-command', 'ticket-validation',
+    'independent-cases', 'cm-relation-filters', 'flow-observation-table', 'day-required-route']);
+  for (const match of html.matchAll(/<(?:section|header|footer|div|nav|button|article|aside|dialog|figure|p|ol|ul|table)\b([^>]*\bclass="([^"]+)"[^>]*)>/g)) {
     const classes = match[2].split(/\s+/);
     for (const component of classes) {
       if (!visualClasses.has(component)) continue;

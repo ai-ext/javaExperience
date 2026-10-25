@@ -55,10 +55,35 @@
       tabs.appendChild(tab); panel.append(heading, list); fold.appendChild(panel); panels.push(panel); tabButtons.push(tab);
     });
     tables.appendChild(fold); if (panels.length) chooseTab(0, false);
+    var phaseFilter, dayFilter;
+    var relationRows = panels[0] ? Array.prototype.slice.call(panels[0].querySelectorAll(':scope > ol > li, :scope > ul > li')) : [];
+    function dayPhase(id) { var day = Number(id.slice(1)); return day <= 10 ? 'build' : day <= 15 ? 'maintain' : 'extend'; }
+    function filterRelations() {
+      relationRows.forEach(function (row) {
+        var id = row.querySelector('h4 b')?.textContent || '';
+        row.hidden = Boolean((phaseFilter.value && dayPhase(id) !== phaseFilter.value) || (dayFilter.value && id !== dayFilter.value));
+      });
+    }
+    if (relationRows.length) {
+      var filters = document.createElement('div'); filters.className = 'cm-relation-filters';
+      var phaseLabel = document.createElement('label'); phaseLabel.textContent = '단계 ';
+      phaseFilter = document.createElement('select'); phaseFilter.setAttribute('aria-label', '일자 연결 목록 단계');
+      [['', '모든 단계'], ['build', '1단계 · 만들기'], ['maintain', '2단계 · 유지보수'], ['extend', '3단계 · 확장']].forEach(function (entry) { var option = document.createElement('option'); option.value = entry[0]; option.textContent = entry[1]; phaseFilter.append(option); });
+      var dayLabel = document.createElement('label'); dayLabel.textContent = '일자 ';
+      dayFilter = document.createElement('select'); dayFilter.setAttribute('aria-label', '일자 연결 목록 일자');
+      var allDays = document.createElement('option'); allDays.value = ''; allDays.textContent = '모든 일자'; dayFilter.append(allDays);
+      graph.nodes.filter(function (node) { return node.kind === 'day'; }).forEach(function (node) { var option = document.createElement('option'); option.value = node.id; option.textContent = node.id + ' ' + node.title; dayFilter.append(option); });
+      dayFilter.value = root.dataset.currentDay || 'D01';
+      phaseLabel.append(phaseFilter); dayLabel.append(dayFilter); filters.append(phaseLabel, dayLabel);
+      panels[0].querySelector('h3').after(filters);
+      phaseFilter.addEventListener('change', function () { if (dayFilter.value && phaseFilter.value && dayPhase(dayFilter.value) !== phaseFilter.value) dayFilter.value = ''; filterRelations(); });
+      dayFilter.addEventListener('change', function () { if (dayFilter.value) phaseFilter.value = dayPhase(dayFilter.value); filterRelations(); });
+      filterRelations();
+    }
     function revealAnchor() {
       var id; try { id = decodeURIComponent(window.location.hash.slice(1)); } catch (e) { return; }
       var target = document.getElementById(id); var index = panels.findIndex(function (panel) { return target && panel.contains(target); });
-      if (index !== -1) { fold.open = true; chooseTab(index, false); requestAnimationFrame(function () { target.scrollIntoView(); }); }
+      if (index !== -1) { if (index === 0 && phaseFilter) { phaseFilter.value = ''; dayFilter.value = ''; filterRelations(); } fold.open = true; chooseTab(index, false); requestAnimationFrame(function () { target.scrollIntoView(); }); }
     }
     window.addEventListener('hashchange', revealAnchor); revealAnchor();
   }
@@ -167,6 +192,12 @@
     detail.hidden = false;
   }
 
+  function updateLanes() {
+    root.classList.toggle('is-exploring', exploring);
+    Array.prototype.forEach.call(board.querySelectorAll('.cm-lane'), function (lane) {
+      lane.hidden = !exploring && !Array.prototype.some.call(lane.querySelectorAll('.cm-node'), function (button) { return !button.hidden; });
+    });
+  }
   function apply() {
     var v = view();
     if (!selected) {
@@ -174,6 +205,7 @@
       buttons.forEach(function (b) { b.classList.remove('is-related', 'is-selected'); b.setAttribute('aria-pressed', 'false'); b.hidden = !exploring && b.dataset.node !== (root.dataset.currentDay || 'D01'); });
       status.textContent = '노드를 고르면 관계 보기에 맞는 노드만 밝힙니다. 아래 연결 흐름에 모든 연결이 글로 있습니다.';
       renderDetail(null);
+      updateLanes();
       draw(null);
       return;
     }
@@ -189,6 +221,7 @@
     var names = []; rel.nodes.forEach(function (id) { names.push(name(id)); });
     status.textContent = name(selected) + ' · ' + VIEW_LABEL[v] + ': ' + (names.length ? names.length + '개 (' + names.join(', ') + ')' : '연결 없음') + (exploring ? ' · 전체 노드 탐색 중' : ' · 현재 연결만 표시');
     renderDetail(selected);
+    updateLanes();
     draw(rel.edges);
   }
 
