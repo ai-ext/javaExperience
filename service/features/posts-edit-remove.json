@@ -31,7 +31,7 @@
           ],
           "brief": {
             "purpose": "board 과정의 PUT 전체 교체와 PATCH 일부 수정 계약을 적용해 작성자·태그·기본값을 확인한다.",
-            "task": "자기 글 title A→B 수정, PUT 전체 본문 교체, PATCH title만 변경을 비교한다. 과정 board D05-2에 포함된 DELETE까지 실행해 soft delete 204와 후속 상세 404를 확인한다.",
+            "task": "내 글을 전체 교체하거나 일부만 수정하세요. PUT 뒤 title=B/content=D/tags=[spring], PATCH title=E 뒤에는 E/D/[spring]이어야 합니다. 삭제는 다음 단계에서 확인합니다.",
             "preconditions": [
               "spec-board recipe board:post-replace:normal, board:post-patch:normal을 사용하고 실제 postId를 받는다.",
               "Kim 소유 글과 Park 소유 글을 분리한다."
@@ -59,7 +59,7 @@
               }
             ],
             "policies": [
-              "PUT /api/posts/{postId}는 title/content 필수, tags 생략은 빈 목록, visibility는 기본 PUBLIC이며 author/board 변경 필드는 받지 않는다.",
+              "PUT은 title/content 필수이고 tags 생략은 빈 목록으로 교체합니다. 이 board 계약에는 visibility·boardSlug·authorId 입력이 없습니다. PATCH는 보낸 non-null 필드만 변경하며 최소 한 필드가 필요합니다.",
               "PATCH는 전달한 non-null 필드만 수정하며 boardSlug·authorId를 임의로 받지 않는다.",
               "대상 존재 및 작성자 권한은 source 규칙으로 판정한다. DB 실패는 부분 필드 변경을 남기지 않는다.",
               "course D05-2 source unit에는 DELETE /api/posts/{postId}도 포함한다. 작성자는 204, 후속 GET은 404이며 soft delete다. title/body 수정 stage에 함께 매핑된 이 source endpoint도 이 board variant에서 확인한다."
@@ -197,7 +197,7 @@
             ],
             "policies": [
               "작성자는 본문이 아니라 인증 주체로 확인합니다.",
-              "board 과정은 status=DELETED와 deleted_at을 확인합니다.",
+              "board의 소프트 삭제는 같은 post 행을 남기고 status를 DELETED로 바꿉니다. deleted_at 열은 이 계약의 확인 대상이 아닙니다. 성공204 뒤 상세 404와 목록 제외를 확인합니다.",
               "성공204는 빈 본문이며, 실패한 권한·대상 요청은 저장 상태를 바꾸지 않습니다."
             ],
             "inputs": [
@@ -236,7 +236,9 @@
             "다른 사람이 쓰는 공유 태그까지 삭제하지 않았다는 것을 어떤 행과 연결로 증명할까요?"
           ],
           "recipeIds": [
-            "board:post-delete:normal"
+            "board:post-delete:normal",
+            "board:post-detail:normal",
+            "board:post-list:normal"
           ],
           "executionChecks": [],
           "choices": [],
@@ -299,7 +301,7 @@
               "후속 validation 오류 시 transaction rollback이 DB를 되돌려도 이미 변경된 Java 객체가 자동으로 원복된다는 뜻은 아니다."
             ],
             "inputs": [
-              "PUT body {title:\"새 제목 B\",content:\"새 본문 D\",tags:[\"spring\"],visibility:\"PUBLIC\"}.",
+              "PUT은 {title:\"새 제목 B\",content:\"새 본문 D\",tags:[\"spring\"],visibility:\"PUBLIC\"}입니다. post22를 고정 사용하지 말고 준비 요청이 생성한 실제 id를 모든 호출에 씁니다.",
               "PATCH body {title:\"부분 제목 E\"}; failure PATCH {title:\"바뀌면 안 됨\",tags:[\"valid\",\" \"]}.",
               "Park token+Kim 글, token 없음, 없는 999999 id."
             ],
@@ -483,7 +485,7 @@
               {
                 "start": "Kim post active, 글 상세 200; post_tag에 tag 연결.",
                 "action": "Kim token DELETE /api/posts/{id}; 뒤이어 상세, 목록, 반복 DELETE 조회.",
-                "result": "첫 삭제 204, 상세 GET 404, 정상 목록에서 제외. 두 번째 삭제는 source contract status를 확인한다.",
+                "result": "작성자 첫 DELETE는204, 같은 id 상세와 반복 DELETE는404입니다. 타인 삭제는403이며 title/status/deleted_at/post_tag와 공유 tag는 요청 전 값입니다.",
                 "after": "Park token으로 별도 글을 삭제해 403 확인하고 soft delete 및 공유 tag 상태를 비교."
               }
             ],
@@ -701,12 +703,7 @@
               }
             ],
             "examples": [
-              {
-                "title": "소유 글 전체 수정",
-                "start": "Kim post id=실제 캡처값, title=A/content=C",
-                "action": "PUT project-v1 글 수정 요청 title=B/content=D",
-                "result": "200; ApiResponse.data에 동일 id와 B/D"
-              },
+              "입력 전: 실제 id의 title=\"명세 원문 A\",content=\"기존 본문 C\". 행동: PUT {title:\"명세 수정 B\",content:\"전체 교체 D\"}. 결과:200, data.title=\"명세 수정 B\",data.content=\"전체 교체 D\". 같은 id를 타인으로 수정하면403이고 방금 확정한 B/D가 유지됩니다.",
               {
                 "title": "타인 소유 수정",
                 "start": "동일 id, Park token",
@@ -826,7 +823,7 @@
               {
                 "start": "김자바의 공개 글이 상세와 목록에 보입니다. 박디비는 이 글의 작성자가 아닙니다.",
                 "action": "작성자 인증으로 DELETE /api/v1/posts/{postId}를 보낸 뒤 같은 글 상세와 목록을 다시 읽습니다.",
-                "result": "성공 응답은204이며 본문이 없습니다. 일반 상세는404, 목록에서는 제외됩니다.",
+                "result": "작성자 삭제는 HTTP 200, JSON status=200, data=null이며 code 필드는 없습니다. 이어서 같은 글 상세와 반복 삭제는 404입니다. posts 행은 남고 deleted_at이 설정됩니다. board/community의 204 빈 본문 계약을 사용하지 않습니다.",
                 "after": "DB의 삭제 표시를 확인하고 글의 기존 내용과 공유 태그가 보존됐는지 확인합니다."
               }
             ],
@@ -843,13 +840,13 @@
             "policies": [
               "작성자는 본문이 아니라 인증 주체로 확인합니다.",
               "명세 프로젝트는 posts.deleted_at을 확인합니다. community의 단수 post 테이블과 혼동하지 않습니다.",
-              "성공204는 빈 본문이며, 실패한 권한·대상 요청은 저장 상태를 바꾸지 않습니다."
+              "작성자 삭제는 HTTP 200, JSON status=200, data=null이며 code 필드는 없습니다. 이어서 같은 글 상세와 반복 삭제는 404입니다. posts 행은 남고 deleted_at이 설정됩니다. board/community의 204 빈 본문 계약을 사용하지 않습니다."
             ],
             "inputs": [
               "DELETE /api/v1/posts/{postId}, 실제 postId, 작성자 또는 다른 회원의 인증. 삭제 요청 본문은 없습니다."
             ],
             "success": [
-              "204 빈 본문, 같은 글 일반 상세404, 목록에서 제외됨을 확인합니다."
+              "작성자 삭제는 HTTP 200, JSON status=200, data=null이며 code 필드는 없습니다. 이어서 같은 글 상세와 반복 삭제는 404입니다. posts 행은 남고 deleted_at이 설정됩니다. board/community의 204 빈 본문 계약을 사용하지 않습니다."
             ],
             "failures": [
               {
@@ -863,20 +860,20 @@
                 "title": "작성자와 다른 회원 비교",
                 "start": "내 글은 정상 상세200입니다.",
                 "action": "다른 회원 삭제 후 작성자 삭제를 각각 요청합니다.",
-                "result": "다른 회원403에서 글은 유지되고, 작성자204 뒤 일반 상세404가 됩니다."
+                "result": "작성자 삭제는 HTTP 200, JSON status=200, data=null이며 code 필드는 없습니다. 이어서 같은 글 상세와 반복 삭제는 404입니다. posts 행은 남고 deleted_at이 설정됩니다. board/community의 204 빈 본문 계약을 사용하지 않습니다."
               }
             ],
             "work": [
               "대상·작성자·삭제 표시·일반 조회 조건을 하나의 삭제 기능으로 연결합니다."
             ],
             "done": [
-              "작성자 삭제204와 빈 본문을 확인했습니다.",
+              "작성자 삭제는 HTTP 200, JSON status=200, data=null이며 code 필드는 없습니다. 이어서 같은 글 상세와 반복 삭제는 404입니다. posts 행은 남고 deleted_at이 설정됩니다. board/community의 204 빈 본문 계약을 사용하지 않습니다.",
               "동일 id의 상세404·목록 제외·DB 삭제 표시를 확인했습니다.",
               "다른 회원403과 없는 글404에서 기존 저장 결과가 보존됐습니다."
             ]
           },
           "hints": [
-            "HTTP204를 받았는데 DB 행이 남아 있다면 무엇이 삭제를 나타낼까요?",
+            "HTTP200과data=null을받았는데posts행이남아있다면,어떤열과후속 상세응답으로소프트 삭제를확인할까요?",
             "목록과 상세가 같은 삭제 정책을 적용한다는 것은 어떤 조회로 확인할까요?",
             "다른 사람이 쓰는 공유 태그까지 삭제하지 않았다는 것을 어떤 행과 연결로 증명할까요?"
           ],

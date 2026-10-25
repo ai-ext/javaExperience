@@ -62,7 +62,8 @@
               "legacy:13-6:ES: GET /api/admin/reports/export?status=PENDING; case=대기 중인 것만; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"ES\",\"expect\":{\"status\":200,\"bodyText\":{\"contains\":\"글,2,기타\",\"notContains\":\"글,3,기타\"}}}]",
               "legacy:13-6:EX: GET /api/admin/reports/export?status=DONE; case=status가 없는 값; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"EX\",\"expect\":{\"status\":400}}]",
               "legacy:13-6:P1: GET /api/admin/reports/export; case=일반 회원이 내려받기; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"P1\",\"expect\":{\"status\":403}}]",
-              "legacy:13-6:P2: GET /api/admin/reports/export; case=토큰 없이 내려받기; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"P2\",\"expect\":{\"status\":401}}]"
+              "legacy:13-6:P2: GET /api/admin/reports/export; case=토큰 없이 내려받기; source expected/status checks=[{\"id\":\"C3\",\"pointer\":\"/checks/2\",\"request\":\"P2\",\"expect\":{\"status\":401}}]",
+              "status는 생략하거나 PENDING/ACCEPTED/REJECTED를 보냅니다. CSV 다운로드는 완료된 신고를 읽기만 합니다."
             ],
             "success": [
               "응답은 CSV 바이트/Content-Disposition을 확인하고 데이터 수·열 순서를 신고 목록과 대조."
@@ -70,7 +71,7 @@
             "failures": [
               {
                 "when": "POST /api/admin/reports/resolve 입력이 원문 실패 check 조건에 해당",
-                "result": "HTTP 409 — 원문 check의 실패 응답",
+                "result": "CSV GET 실패는 status=DONE이면 400, 무인증은 401, 일반 회원은 403입니다. 신고 준비 단계의 resolve 200/409는 CSV 실패 기준이 아닙니다.",
                 "unchanged": "DB는 변경하지 않으며 실패 응답에 CSV 신고 데이터가 섞이지 않는다."
               },
               {
@@ -91,10 +92,10 @@
             ],
             "examples": [
               {
-                "title": "교육용 데이터로 전후 확인",
-                "start": "운영자가 특정 조건의 신고 내역을 외부 도구에서 검토하려 합니다.",
-                "action": "운영자 권한으로 CSV를 다운로드하고 일반 회원의 같은 요청을 비교합니다.",
-                "result": "권한 없는 요청에서 파일 내용이 노출되지 않고 다운로드 조회가 신고 상태를 바꾸지 않습니다."
+                "title": "CSV 수식 및 quoting 전후",
+                "start": "셀 원문이 광고, \"무료\" 쿠폰이며 다른 셀은 =1+1 계산해 보세요",
+                "action": "정상 CSV를 내려받아 CSV 원문을 확인합니다.",
+                "result": "광고, \"\"무료\"\" 쿠폰으로 quoting하고 수식 셀에는 작은따옴표 접두가 있습니다. Content-Type·BOM·CRLF·열 순서를 확인하고 신고 상태는 유지합니다."
               }
             ],
             "work": [
@@ -103,7 +104,7 @@
             "done": [
               "허용된 신고 열과 정렬·문자 코드·CSV 이스케이프가 원본 다운로드 계약과 맞습니다.",
               "권한 없는 요청에서 파일 내용이 노출되지 않고 다운로드 조회가 신고 상태를 바꾸지 않습니다.",
-              "POST /api/admin/reports/resolve 입력이 원문 실패 check 조건에 해당 → HTTP 409 — 원문 check의 실패 응답 DB는 변경하지 않으며 실패 응답에 CSV 신고 데이터가 섞이지 않는다.",
+              "다운로드 전후 신고 집계가 같고 정상 응답의 Content-Type·BOM·CRLF·열 순서를 확인했습니다. CSV 요청은 신고 상태를 바꾸지 않습니다.",
               "GET /api/admin/reports/export?status=DONE · [교육용 fixture · legacy:13-6:EX] status가 없는 값 → HTTP 400 (EX) 신고 데이터는 바뀌지 않고 권한 실패 본문에 CSV가 없다."
             ]
           },
@@ -119,7 +120,14 @@
             "legacy:13-6:P1",
             "legacy:13-6:P2"
           ],
-          "executionChecks": [],
+          "executionChecks": [
+            {
+              "title": "기획 조건 저장 결과 확인",
+              "command": "선택한 실행 환경에서 원문에 정한 확인 절차 실행",
+              "expected": "기획서의 전후 사례와 일치",
+              "record": "실제 id, HTTP 결과, 확인한 저장값을 기록"
+            }
+          ],
           "choices": [],
           "concepts": [],
           "references": [

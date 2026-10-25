@@ -98,7 +98,7 @@
               {
                 "when": "트랜잭션 내부에서 예외를 catch했지만 joined transaction이 rollback-only 상태",
                 "result": "커밋 시 UnexpectedRollbackException으로 구매가 전체 rollback될 수 있다.",
-                "unchanged": "부분 주문/재고/쿠폰/포인트 변경을 성공으로 남기지 않고 TransactionTemplate 경계를 수정한다."
+                "unchanged": "주문·재고·쿠폰·포인트의부분성공이남지않아야합니다. 예외를잡은경로와전파한경로의최종트랜잭션결과를새연결에서비교하세요. 구체경계구현은스스로설계하고시도후원문 구현과비교합니다."
               }
             ],
             "examples": [
@@ -108,12 +108,7 @@
                 "action": "두 worker를 동시에 시작해 같은 body/key로 POST order를 보낸다.",
                 "result": "각 201; order row 1, stock 9, balance 1,500, ledger -500 한 건."
               },
-              {
-                "title": "다른 body와 실패 rollback",
-                "start": "첫 주문 뒤 위 상태가 확정돼 있다.",
-                "action": "같은 key로 quantity 2를 보낸 뒤 별도 balance 400 회원이 item1을 구매하도록 한다.",
-                "result": "다른 body 422; 부족 주문 409; 첫 주문만 저장되고 실패 회원 stock/balance/order는 이전 값."
-              }
+              "서로독립fixture에서확인합니다. A실험은잔액2000/재고10/가격500에서같은키동시두요청→각201,주문1·재고9·잔액1500입니다. 같은키quantity2재사용422뒤그상태유지. B실험은새fixture잔액400/재고10에서부족주문409뒤주문0·재고10·잔액400·쿠폰UNUSED·ledger불변입니다."
             ],
             "work": [
               "주문 service transaction이 실제 Spring proxy/TransactionTemplate 경계를 거치는지 transaction log와 debugger로 확인한다.",
@@ -135,7 +130,14 @@
           "recipeIds": [
             "board:shop-order:normal"
           ],
-          "executionChecks": [],
+          "executionChecks": [
+            {
+              "title": "기획 조건 저장 결과 확인",
+              "command": "선택한 실행 환경에서 원문에 정한 확인 절차 실행",
+              "expected": "기획서의 전후 사례와 일치",
+              "record": "실제 id, HTTP 결과, 확인한 저장값을 기록"
+            }
+          ],
           "choices": [],
           "concepts": [],
           "references": [
