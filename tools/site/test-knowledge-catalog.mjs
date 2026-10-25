@@ -59,7 +59,7 @@ test('탐색 대표 세 문서와 검색 관련도는 별도의 실제 메타데
   p.$('button[data-kc-category="request"]').click();assert.deepEqual(p.visible().map((row)=>row.dataset.kcDocument),['P16','W09','P02']);
   submit(p,'DTO');assert.deepEqual(p.visible().map((row)=>row.dataset.kcDocument),['P16','W09','P06','P02','P03','P25','W10']);
   const count=p.win.history.length;const all=p.$('button[data-kc-category="all"]');all.focus();all.dispatchEvent(new p.win.KeyboardEvent('keydown',{key:'End',cancelable:true}));
-  assert.equal(p.doc.activeElement.dataset.kcCategory,'delivery');assert.equal(p.win.history.length,count,'화살표 탐색은 선택 확정 전까지 history를 추가하지 않음');
+  assert.equal(p.doc.activeElement.dataset.kcCategory,'delivery');assert.equal(p.win.history.length,count+1,'방향키 탐색은 해당 분야를 즉시 선택');assert.equal(p.$('[data-kc-category-select]').value,'delivery');assert.equal(p.win.location.hash,'#kc-category-delivery');
 });
 
 test('미확정 초안은 분야를 바꿔도 제출 전 검색 조건을 덮어쓰지 않는다',()=>{
@@ -167,3 +167,49 @@ test('학습 진도 불변·원문 앵커·모바일 select·저장 차단·텍�
 });
 
 test.after(()=>{for(const fixture of fixtures)fixture.win.close();});
+
+
+test('분야 해시는 직접 열기·검색 query 유지·선택 URL과 타 모듈 state를 보존한다',()=>{
+  const p=page('README.html?q=DTO&category=java&sort=title&source=course#kc-category-request',{history:{other:{keep:true}}});
+  assert.equal(p.$('[data-kc-category-select]').value,'request');assert.equal(p.$('#knowledge-search-input').value,'DTO');
+  assert.equal(p.$('[data-kc-sort]').value,'title');assert.ok(p.visible().length>0);
+  p.$('button[data-kc-category="data"]').click();
+  const url=new URL(p.win.location.href);
+  assert.equal(url.hash,'#kc-category-data');assert.equal(url.searchParams.get('q'),'DTO');assert.equal(url.searchParams.get('category'),'data');
+  assert.equal(url.searchParams.get('source'),'course');assert.equal(url.searchParams.get('sort'),'title');
+  assert.deepEqual(p.win.history.state.other,{keep:true});
+});
+
+test('방향키·Home·End는 스크롤 없이 내용·선택·탭 순서를 함께 전환한다',()=>{
+  const p=page();p.win.scrollTo(0,240);
+  const keys=[['ArrowRight','request'],['ArrowLeft','java'],['Home','all'],['End','delivery']];
+  let current=p.$('button[data-kc-category="java"]');current.focus();
+  for (const [key,expected] of keys) {
+    current.dispatchEvent(new p.win.KeyboardEvent('keydown',{key,cancelable:true}));
+    current=p.doc.activeElement;
+    assert.equal(current.dataset.kcCategory,expected);assert.equal(current.getAttribute('aria-pressed'),'true');assert.equal(current.tabIndex,0);
+    assert.equal(p.$('[data-kc-category-select]').value,expected);assert.equal(p.scroll(),240);
+    assert.equal([...p.doc.querySelectorAll('button[data-kc-category]')].filter(button=>button.tabIndex===0).length,1);
+  }
+});
+
+test('분야 클릭 뒤 native Back과 Forward는 분야·해시·초안·focus를 각 entry에서 복원한다',async()=>{
+  const p=page('README.html?q=DTO&category=request#kc-category-request',{history:{other:7}});
+  draft(p,'이전 초안');p.$('button[data-kc-category="request"]').focus();
+  p.$('button[data-kc-category="data"]').click();draft(p,'다음 초안');
+  const move=delta=>new Promise(resolve=>{p.win.addEventListener('popstate',resolve,{once:true});p.nativeGo(delta);});
+  await move(-1);
+  assert.equal(p.win.location.hash,'#kc-category-request');assert.equal(p.$('[data-kc-category-select]').value,'request');
+  assert.equal(p.$('#knowledge-search-input').value,'이전 초안');assert.equal(p.doc.activeElement.dataset.kcCategory,'request');assert.equal(p.win.history.state.other,7);
+  await move(1);
+  assert.equal(p.win.location.hash,'#kc-category-data');assert.equal(p.$('[data-kc-category-select]').value,'data');assert.equal(p.$('#knowledge-search-input').value,'다음 초안');
+  assert.equal(p.win.history.state.other,7);
+});
+
+test('외부 해시 변경은 분야 내용을 바꾸고 알 수 없는 해시는 기존 분야를 유지한다',()=>{
+  const p=page('README.html?q=DTO&category=request');
+  p.win.history.pushState({foreign:true},'','#kc-category-data');p.win.dispatchEvent(new p.win.HashChangeEvent('hashchange'));
+  assert.equal(p.$('[data-kc-category-select]').value,'data');assert.equal(p.$('#knowledge-search-input').value,'DTO');assert.equal(p.win.history.state.foreign,true);
+  p.win.history.pushState(null,'','#kc-category-unknown');p.win.dispatchEvent(new p.win.HashChangeEvent('hashchange'));
+  assert.equal(p.$('[data-kc-category-select]').value,'data');
+});

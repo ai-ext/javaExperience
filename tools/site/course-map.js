@@ -34,27 +34,42 @@
   // 긴 관계 목록은 분류별로 읽고, 스크립트가 없을 때는 원래 목록을 그대로 제공한다.
   var tables = document.querySelector('.cm-tables');
   if (tables) {
-    var fold = document.createElement('details'); fold.className = 'cm-relations-fold';
-    var foldTitle = document.createElement('summary'); foldTitle.textContent = '일자·티켓·결함 영역의 전체 연결 목록'; fold.appendChild(foldTitle);
-    var tabs = document.createElement('div'); tabs.className = 'cm-relation-tabs'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '연결 목록 분류'); fold.appendChild(tabs);
+    var fold = document.createElement('div'); fold.className = 'cm-relations-fold'; fold.id = 'cm-table-all';
+    var tabs = document.createElement('div'); tabs.className = 'cm-relation-tabs section-switcher'; tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', '연결 목록 분류');
     var headings = Array.prototype.slice.call(tables.querySelectorAll(':scope > h3'));
     var panels = [], tabButtons = [];
-    function chooseTab(index, focus) {
-      panels.forEach(function (panel, i) { panel.hidden = i !== index; tabButtons[i].setAttribute('aria-selected', String(i === index)); tabButtons[i].tabIndex = i === index ? 0 : -1; });
-      if (focus) tabButtons[index].focus();
+    function chooseTab(index, focus, save) {
+      panels.forEach(function (panel, i) { panel.hidden = index !== 0 && i + 1 !== index; });
+      tabButtons.forEach(function (tab, i) { tab.setAttribute('aria-selected', String(i === index)); tab.tabIndex = i === index ? 0 : -1; });
+      if (index === 0 && phaseFilter) { phaseFilter.value = ''; dayFilter.value = ''; filterRelations(); }
+      if (focus) tabButtons[index].focus({ preventScroll: true });
+      if (save) {
+        var hash = '#' + (index === 0 ? fold.id : headings[index - 1].id);
+        if (window.location.hash !== hash) {
+          var previous = window.location.href;
+          window.history.pushState(null, '', hash);
+          window.dispatchEvent(new HashChangeEvent('hashchange', { oldURL: previous, newURL: window.location.href }));
+        }
+      }
     }
+    function createTab(id, label, index, controls) {
+      var tab = document.createElement('button'); tab.type = 'button'; tab.id = id; tab.textContent = label; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', controls);
+      tab.addEventListener('click', function () { chooseTab(index, false, true); });
+      tab.addEventListener('keydown', function (event) {
+        var count = tabButtons.length;
+        var next = event.key === 'ArrowRight' ? (index + 1) % count : event.key === 'ArrowLeft' ? (index + count - 1) % count : event.key === 'Home' ? 0 : event.key === 'End' ? count - 1 : null;
+        if (next === null) return; event.preventDefault(); chooseTab(next, true, true);
+      });
+      tabs.appendChild(tab); tabButtons.push(tab);
+    }
+    createTab('cm-table-all-tab', '전체', 0, headings.map(function (heading) { return heading.id + '-panel'; }).join(' '));
     headings.forEach(function (heading, i) {
       var list = heading.nextElementSibling;
       var panel = document.createElement('section'); panel.className = 'cm-relation-panel'; panel.id = heading.id + '-panel'; panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-labelledby', heading.id + '-tab');
-      var tab = document.createElement('button'); tab.type = 'button'; tab.id = heading.id + '-tab'; tab.textContent = ['일자별', '티켓별', '결함 영역별'][i]; tab.setAttribute('role', 'tab'); tab.setAttribute('aria-controls', panel.id);
-      tab.addEventListener('click', function () { chooseTab(i, false); });
-      tab.addEventListener('keydown', function (event) {
-        var index = event.key === 'ArrowRight' ? (i + 1) % headings.length : event.key === 'ArrowLeft' ? (i + headings.length - 1) % headings.length : event.key === 'Home' ? 0 : event.key === 'End' ? headings.length - 1 : null;
-        if (index === null) return; event.preventDefault(); chooseTab(index, true);
-      });
-      tabs.appendChild(tab); panel.append(heading, list); fold.appendChild(panel); panels.push(panel); tabButtons.push(tab);
+      createTab(heading.id + '-tab', ['일자별', '티켓별', '결함 영역별'][i], i + 1, panel.id);
+      panel.append(heading, list); fold.appendChild(panel); panels.push(panel);
     });
-    tables.appendChild(fold); if (panels.length) chooseTab(0, false);
+    tables.append(tabs, fold); if (panels.length) chooseTab(1, false);
     var phaseFilter, dayFilter;
     var relationRows = panels[0] ? Array.prototype.slice.call(panels[0].querySelectorAll(':scope > ol > li, :scope > ul > li')) : [];
     function dayPhase(id) { var day = Number(id.slice(1)); return day <= 10 ? 'build' : day <= 15 ? 'maintain' : 'extend'; }
@@ -83,9 +98,13 @@
     function revealAnchor() {
       var id; try { id = decodeURIComponent(window.location.hash.slice(1)); } catch (e) { return; }
       var target = document.getElementById(id); var index = panels.findIndex(function (panel) { return target && panel.contains(target); });
-      if (index !== -1) { if (index === 0 && phaseFilter) { phaseFilter.value = ''; dayFilter.value = ''; filterRelations(); } fold.open = true; chooseTab(index, false); requestAnimationFrame(function () { target.scrollIntoView(); }); }
+      if ((!id || id === tables.id || id === 'cm-table-title') && panels.length) chooseTab(1, false);
+      else if (id === fold.id) chooseTab(0, false);
+      else if (index !== -1) { if (index === 0 && phaseFilter) { phaseFilter.value = ''; dayFilter.value = ''; filterRelations(); } chooseTab(index + 1, false); }
     }
-    window.addEventListener('hashchange', revealAnchor); revealAnchor();
+    window.addEventListener('hashchange', revealAnchor);
+    window.addEventListener('popstate', revealAnchor);
+    revealAnchor();
   }
 
   function name(id) { var n = nodeById[id]; return n.kind === 'area' ? n.title : n.id; }

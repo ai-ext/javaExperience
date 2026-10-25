@@ -5,6 +5,10 @@ export const CATALOG_RETURN_KEY = 'javaexperience.knowledge.return.v1';
 export const CATALOG_HISTORY_KEY = '__javaExperienceKnowledge';
 const ENTRY_PREFIX = 'javaexperience:knowledge:v8:entry:';
 const categories = ['all', 'java', 'request', 'data', 'delivery'];
+const hashCategory = (hash) => {
+  let id; try { id = decodeURIComponent(hash).match(/^#kc-category-(.+)$/)?.[1]; } catch { return null; }
+  return categories.includes(id) ? id : null;
+};
 const safeRead = (storage, key) => { try { return JSON.parse(storage.getItem(key)); } catch { return null; } };
 const safeWrite = (storage, key, value) => { try { storage.setItem(key, JSON.stringify(value)); return true; } catch { return false; } };
 const safeRemove = (storage, key) => { try { storage.removeItem(key); } catch {} };
@@ -37,7 +41,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     const token = url.searchParams.get('kcOrigin');
     const target = new URL(url); target.searchParams.delete('kcOrigin');
     let entry = foreignState()[CATALOG_HISTORY_KEY];
-    const sameReferrer = url.protocol === 'file:' || doc.referrer === pending?.origin?.listHref?.split('#')[0];
+    const sameReferrer = url.protocol === 'file:' || doc.referrer.split('#')[0] === pending?.origin?.listHref?.split('#')[0];
     const validList = (list, origin) => {
       if (list?.schema !== 1 || list.entryId !== origin?.listEntryId || list.href !== origin?.listHref || typeof list.queryRaw !== 'string') return false;
       try { const href = new URL(list.href);const expected = new URL('README.html', win.location.href);return href.origin === expected.origin && href.pathname === expected.pathname; } catch { return false; }
@@ -97,7 +101,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   }
   function fromUrl() {
     const url = new URL(win.location.href); const query = clip(url.searchParams.get('q'));
-    return { schema: 1, entryId: uid(), route: url.pathname, queryRaw: query, inputDraft: query, categoryId: categories.includes(url.searchParams.get('category')) ? url.searchParams.get('category') : query ? 'all' : 'java', sort: url.searchParams.get('sort') === 'title' ? 'title' : 'relevance', expanded: url.searchParams.get('all') === '1', view: query ? 'results' : 'browse', selectedDocId: null, focusKey: null, scroll: url.hash ? {} : { absoluteY: 0 } };
+    return { schema: 1, entryId: uid(), route: url.pathname, queryRaw: query, inputDraft: query, categoryId: hashCategory(url.hash) || (categories.includes(url.searchParams.get('category')) ? url.searchParams.get('category') : query ? 'all' : 'java'), sort: url.searchParams.get('sort') === 'title' ? 'title' : 'relevance', expanded: url.searchParams.get('all') === '1', view: query ? 'results' : 'browse', selectedDocId: null, focusKey: null, scroll: url.hash ? {} : { absoluteY: 0 } };
   }
   function validEntry(value) {
     return value?.schema === 1 && typeof value.entryId === 'string' && value.route === win.location.pathname && ['browse','results'].includes(value.view) && typeof value.queryRaw === 'string' && typeof value.inputDraft === 'string' && categories.includes(value.categoryId) && ['title','relevance'].includes(value.sort);
@@ -118,7 +122,8 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   let composing = false; let matches = [];
   const resultLink = (id) => rows.find((row) => row.dataset.kcDocument === id)?.querySelector('h3 a');
   function params() {
-    const value = new URLSearchParams();
+    const value = new URLSearchParams(win.location.search);
+    for (const key of ['q','category','all','sort','kcReturn']) value.delete(key);
     if (entry.queryRaw) value.set('q', entry.queryRaw);
     value.set('category', entry.categoryId);
     if (entry.expanded) value.set('all', '1');
@@ -126,7 +131,9 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
     return value;
   }
   function entryHref() {
-    const url = new URL(win.location.href);url.search = params().toString();return url.href;
+    const url = new URL(win.location.href);url.search = params().toString();
+    if (hashCategory(url.hash)) url.hash = 'kc-category-' + entry.categoryId;
+    return url.href;
   }
   function focusKey() {
     const current = doc.activeElement;
@@ -173,7 +180,10 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
         reason.textContent = aliases.has(raw) || [row.dataset.kcQuestion, row.querySelector('h3 a')?.textContent].some((question) => normalize(question) === raw) ? '등록된 질문과 일치' : words.every((word) => normalize(row.dataset.kcTitle || row.querySelector('.kc-source')?.textContent).includes(word)) ? '문서 제목과 일치' : '소제목과 일치';
       }
     }
-    for (const button of root.querySelectorAll('button[data-kc-category]')) button.setAttribute('aria-pressed', String(button.dataset.kcCategory === entry.categoryId));
+    for (const button of root.querySelectorAll('button[data-kc-category]')) {
+      const selected = button.dataset.kcCategory === entry.categoryId;
+      button.setAttribute('aria-pressed', String(selected)); button.tabIndex = selected ? 0 : -1;
+    }
     $('[data-kc-category-select]').value = entry.categoryId;
     $('[data-kc-sort]').value = entry.sort;
     $('[data-kc-hero-title]').textContent = entry.queryRaw ? '개념 검색' : '막힌 개념을, 값의 변화로 이해하세요.';
@@ -211,6 +221,9 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
       next.entryId = uid();next.parentEntryId = entry.entryId;next.scroll = { absoluteY: win.scrollY };next.selectedDocId = null;next.focusKey = null;
     }
     entry = next;entry.href = entryHref();
+    if (Object.hasOwn(changes, 'categoryId')) {
+      const url = new URL(entry.href);url.hash = 'kc-category-' + entry.categoryId;entry.href = url.href;
+    }
     writeHistory(before === after ? 'replaceState' : 'pushState', entry, entry.href);
     safeWrite(session, ENTRY_PREFIX + entry.entryId, entry);render();
     if (focusResults) $('[data-kc-results-title]').focus({ preventScroll: true });
@@ -230,7 +243,7 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   for (const button of fieldButtons) button.addEventListener('keydown', (event) => {
     const index = fieldButtons.indexOf(button);
     const next = { ArrowLeft: (index + fieldButtons.length - 1) % fieldButtons.length, ArrowRight: (index + 1) % fieldButtons.length, Home: 0, End: fieldButtons.length - 1 }[event.key];
-    if (next !== undefined) { event.preventDefault();fieldButtons[next].focus(); }
+    if (next !== undefined) { event.preventDefault();fieldButtons[next].focus({preventScroll:true});filter(fieldButtons[next].dataset.kcCategory); }
   });
   $('[data-kc-category-select]').addEventListener('change', (event) => filter(event.target.value));
   $('[data-kc-sort]').addEventListener('change', (event) => { if (['title','relevance'].includes(event.target.value)) commit({ sort: event.target.value }); });
@@ -255,6 +268,12 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   });
   // popstate 시 URL/history.state는 이미 목적지다. 출발 snapshot은 세션에만 쓴다.
   win.addEventListener('popstate', () => { remember(false);entry = currentEntry();restore(); });
+  win.addEventListener('hashchange', () => {
+    const category = hashCategory(win.location.hash);
+    if (!category || category === entry.categoryId) return;
+    remember(false);entry = currentEntry();entry.categoryId = category;entry.href = win.location.href;
+    writeHistory('replaceState', entry, entry.href);safeWrite(session, ENTRY_PREFIX + entry.entryId, entry);restore();
+  });
   win.addEventListener('pageshow', (event) => { if (event.persisted) { entry = currentEntry();restore(); } });
   win.addEventListener('pagehide', () => remember(false));
   win.addEventListener('scroll', () => remember(false), { passive: true });

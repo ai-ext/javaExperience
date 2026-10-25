@@ -295,13 +295,56 @@
     page.classList.add('day-stepper-ready');
     if (toggle) {
       toggle.hidden = false;
-      toggle.addEventListener('click', function () { expanded = !expanded; paint(); });
+      toggle.addEventListener('click', function () {
+        if (expanded) {
+          var rail = page.querySelector('.day-today');
+          var edge = rail ? rail.getBoundingClientRect().bottom + 16 : 0;
+          var currentBox = active.getBoundingClientRect();
+          // 현재 순서가 보이는 동안에는 전환 직전의 선택을 유지한다.
+          if (currentBox.height > 0 && (currentBox.bottom <= edge || currentBox.top >= window.innerHeight)) {
+            var reading = panels.find(function (panel) { var box = panel.getBoundingClientRect(); return box.height > 0 && box.bottom > edge && box.top < window.innerHeight; });
+            if (reading) active = reading;
+          }
+        }
+        var before = active.getBoundingClientRect().top;
+        var panelMain = page.querySelector('.day-stepper-main');
+        panelMain.style.paddingTop = '';
+        panelMain.style.paddingBottom = '';
+        expanded = !expanded;
+        paint();
+        // 앞선 순서가 나타나거나 사라진 만큼만 보정하여 읽던 순서를 유지한다.
+        var delta = active.getBoundingClientRect().top - before;
+        var targetY = window.scrollY + delta;
+        if (targetY < 0) { panelMain.style.paddingTop = -targetY + 'px'; targetY = 0; }
+        var lastY = Math.max(0,document.documentElement.scrollHeight - window.innerHeight);
+        if (targetY > lastY) panelMain.style.paddingBottom = targetY - lastY + 'px';
+        if (delta) window.scrollTo({top:targetY,behavior:'instant'});
+      });
     }
-    window.addEventListener('hashchange', function () { revealHash(true); });
-    // 같은 앵커를 다시 누른 경우 hashchange가 없어도 패널을 연다.
+    window.addEventListener('hashchange', function () { revealHash(false); });
+    window.addEventListener('popstate', function () { revealHash(false); });
+    // 메뉴 선택은 주소만 갱신하므로 브라우저의 앵커 점프와 중복 스크롤이 없다.
     page.addEventListener('click', function (event) {
       var link = event.target.closest('a[href^="#"]');
-      if (link) revealHash(true, link.hash);
+      if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      var id; try { id = decodeURIComponent(link.hash.slice(1)); } catch (e) { return; }
+      var target = document.getElementById(id);
+      if (!target || !target.closest('[data-day-panel]')) return;
+      event.preventDefault();
+      var panelMain = page.querySelector('.day-stepper-main');
+      panelMain.style.paddingTop = '';
+      panelMain.style.paddingBottom = '';
+      history.pushState(history.state,'',link.hash);
+      revealHash(false, link.hash);
+      if (!link.closest('.day-today,.day-quick-links,.day-wrap-tabs,.practice-review')) {
+        if (target.scrollIntoView) target.scrollIntoView({block:'start'});
+      }
+    });
+    links.forEach(function (link,index) {
+      link.addEventListener('keydown',function (event) {
+        var next = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? (index + 1) % links.length : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? (index + links.length - 1) % links.length : event.key === 'Home' ? 0 : event.key === 'End' ? links.length - 1 : null;
+        if (next === null) return; event.preventDefault(); links[next].click(); links[next].focus({preventScroll:true});
+      });
     });
     var beforePrintExpanded;
     window.addEventListener('beforeprint', function () {
