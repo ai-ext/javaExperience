@@ -53,7 +53,7 @@ function featureLookup(features) {
 }
 
 export function mergeServiceFeatureEntry(entry = {}, body = {}) {
-  return { ...body, ...entry, ...body, id: entry.id || body.id, title: entry.title || body.title, summary: entry.summary || body.summary,
+  return { ...body, ...entry, ...body, id: entry.id || body.id, title: entry.title || body.title, summary: body.summary || entry.summary,
     group: entry.group || body.group, difficulty: entry.difficulty || body.difficulty,
     projects: entry.projects ?? body.projects, prerequisites: entry.prerequisites ?? body.prerequisites,
     preview: entry.preview ?? body.preview, status: entry.status || body.status };
@@ -186,9 +186,13 @@ function policyMarkup(policies, failures) {
   const sourceCriteria = items.filter((item) => String(human(item)).startsWith('원문 완료 기준:'));
   const cases = list(failures);
   if (!rules.length && !cases.length && !sourceCriteria.length) return '';
-  const policyRows = cases.map((item) => `<tr><th scope="row">${esc(human(item.when || item.condition || '조건'))}</th><td>${esc(human(item.result || item.expected || ''))}</td><td>${esc(human(item.unchanged || ''))}</td></tr>`).join('');
+  // 실패 정책은 {when,result,unchanged} 객체와 한 줄 문자열이 섞여 있다. 문자열은 표 대신 목록으로 그대로 보인다.
+  const caseObjects = cases.filter((item) => item && typeof item === 'object');
+  const caseTexts = cases.filter((item) => typeof item === 'string' && item.trim());
+  const policyRows = caseObjects.map((item) => `<tr><th scope="row">${esc(human(item.when || item.condition || '조건'))}</th><td>${esc(human(item.result || item.expected || ''))}</td><td>${esc(human(item.unchanged || ''))}</td></tr>`).join('');
+  const failureTexts = caseTexts.length ? `<ul class="sf-policy-failures">${caseTexts.map((item) => `<li>${esc(item)}</li>`).join('')}</ul>` : '';
   const criteria = sourceCriteria.length ? `<section class="sf-source-criteria"><h5>원문 완료 기준·검증 메모</h5><ul>${sourceCriteria.map((item) => `<li>${esc(human(item).replace(/^원문 완료 기준:\s*/, ''))}</li>`).join('')}</ul></section>` : '';
-  return `<section class="sf-brief-section sf-policy" data-content-kind="practice"><h4>업무 정책</h4>${policyRows ? `<div class="sf-policy-table-wrap"><table><thead><tr><th>조건</th><th>결과</th><th>유지할 상태</th></tr></thead><tbody>${policyRows}</tbody></table></div>` : ''}${rules.length ? `<ul>${rules.map((item) => `<li>${esc(human(item))}</li>`).join('')}</ul>` : ''}${criteria}</section>`;
+  return `<section class="sf-brief-section sf-policy" data-content-kind="practice"><h4>업무 정책</h4>${policyRows ? `<div class="sf-policy-table-wrap"><table><thead><tr><th>조건</th><th>결과</th><th>유지할 상태</th></tr></thead><tbody>${policyRows}</tbody></table></div>` : ''}${failureTexts}${rules.length ? `<ul>${rules.map((item) => `<li>${esc(human(item))}</li>`).join('')}</ul>` : ''}${criteria}</section>`;
 }
 
 function sourceUnitsMarkup(ids, sourceIndex, rootPrefix) {
@@ -217,7 +221,7 @@ function executionChecksMarkup(stage, feature, variant) {
   const checks = list(stage.executionChecks);
   if (!checks.length) return '';
   const sid = `${feature.id}-${variant.id}-${stage.id}`.replace(/[^a-zA-Z0-9_-]/g, '-');
-  return `<details class="sf-execution"><summary>직접 시도한 뒤 보기 · 실행 예시와 기록</summary><p>명령을 자동 실행하지 않습니다. 직접 실행한 뒤 결과를 기록하세요.</p><ol>${checks.map((check, index) => `<li><label><input type="checkbox" data-sf-execution-check="${index}"> <strong>${esc(check.title)}</strong></label>${check.command ? `<pre><code>${esc(check.command)}</code></pre>` : ''}${check.expected ? `<p><b>확인할 결과</b> · ${esc(check.expected)}</p>` : ''}<label class="sf-record-label" for="sf-record-${sid}-${index}">실행 기록</label><textarea id="sf-record-${sid}-${index}" rows="2" placeholder="직접 확인한 결과를 적어 두세요."></textarea></li>`).join('')}</ol></details>`;
+  return `<details class="sf-execution"><summary>직접 시도한 뒤 보기 · 실행 예시와 기록</summary><p>명령을 자동 실행하지 않습니다. 직접 실행한 뒤 결과를 기록하세요.</p><ol>${checks.map((check, index) => `<li><label><input type="checkbox" data-sf-execution-check="${index}"> <strong>${esc(check.title)}</strong></label>${check.command ? `<pre><code>${esc(check.command)}</code></pre>` : ''}${check.expected ? `<p><b>확인할 결과</b> · ${esc(check.expected)}</p>` : ''}${typeof check.record === 'string' && check.record.trim() ? `<p><b>기록할 것</b> · ${esc(check.record)}</p>` : ''}<label class="sf-record-label" for="sf-record-${sid}-${index}">실행 기록</label><textarea id="sf-record-${sid}-${index}" rows="2" placeholder="직접 확인한 결과를 적어 두세요."></textarea></li>`).join('')}</ol></details>`;
 }
 
 function hintMarkup(stage) {

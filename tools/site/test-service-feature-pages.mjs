@@ -105,6 +105,18 @@ test('feature renderer follows the requirement sequence without content tabs and
   assert.doesNotMatch(html, /<script[^>]+src=/);
 });
 
+test('feature body summary, string failure policies, and execution record guidance reach the page', () => {
+  // 기능 원본 요약이 목록 항목보다 우선하고, 문자열 실패 정책과 실행 기록 안내가 빈 칸 없이 보여야 한다.
+  const merged = mergeServiceFeatureEntry({ id: 'fixture-record', title: '목록 이름', summary: '예전 요약' }, { id: 'fixture-record', summary: '고친 요약', variants: feature.variants });
+  assert.equal(merged.summary, '고친 요약');
+  const stage = { ...feature.variants[0].stages[0], executionChecks: [{ title: '측정 기록', command: 'run', expected: '결과', record: '회원 12의 쿼리 수를 적는다' }], brief: { ...feature.variants[0].stages[0].brief, failures: ['지급 결과가 미확정이면 성공으로 표시하지 않는다.', { when: '제목 누락', result: '400 응답', unchanged: '기존 기록 유지' }] } };
+  const html = renderServiceFeature({ feature: { ...feature, variants: [{ ...feature.variants[0], stages: [stage] }] }, apiRecipes: [recipe], sourceIndex, rootPrefix: '../' });
+  assert.match(html, /sf-policy-failures"><li>지급 결과가 미확정이면 성공으로 표시하지 않는다\./);
+  assert.match(html, /<th scope="row">제목 누락<\/th><td>400 응답<\/td><td>기존 기록 유지<\/td>/);
+  assert.doesNotMatch(html, /<th scope="row">조건<\/th><td><\/td>/);
+  assert.match(html, /기록할 것<\/b> · 회원 12의 쿼리 수를 적는다/);
+});
+
 test('unmapped API binding displays its source id and leaves the actual method and path unset', () => {
   const binding = { id: 'binding-fixture', label: '내 글 요청', project: 'board', binding: { key: 'postId', label: '내 글 id', sourceId: 'unit-record-create' }, requestFields: [], expected: { statuses: [], description: '과제 자료를 확인한 뒤 직접 정할 계약' } };
   const boundFeature = { ...feature, variants: [{ ...feature.variants[0], stages: [{ ...feature.variants[0].stages[0], recipeIds: [binding.id] }] }] };
