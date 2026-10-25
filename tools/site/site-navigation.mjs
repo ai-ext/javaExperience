@@ -34,7 +34,7 @@ export function renderSiteNavigation(sourcePath) {
   ];
   const courseNav = sourcePath.startsWith('course/') || sourcePath === 'README.md'
     ? `<nav class="course-content-nav" aria-label="과정 콘텐츠 종류">${courseItems.map(([label, target, active]) => `<a href="${href(target)}"${active ? ' aria-current="page"' : ''}>${label}</a>`).join('')}</nav>` : '';
-  return `<header class="topbar site-topbar"><a class="home-brand" href="${href('index.html')}"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴">${links}</nav>${setup}${courseNav}</header>`;
+  return `<header class="topbar site-topbar"><a class="home-brand" href="${href('index.html')}"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴">${links}</nav>${setup}</header>${courseNav}`;
 }
 
 const catalogNames = {

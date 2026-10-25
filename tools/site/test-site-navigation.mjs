@@ -34,6 +34,13 @@ for (const [source, section] of examples) {
   const current = [...nav.querySelectorAll('[aria-current="page"]')];
   assert.deepEqual(current.map((link) => link.textContent), section ? [section] : [], `${source}: 현재 공간만 선택`);
   assert.equal(Boolean(header.querySelector('.home-header-setup')), source === 'README.md', `${source}: 환경 안내는 홈에만`);
+  assert.equal(header.querySelector('.course-content-nav'), null, `${source}: 과정 보조 탐색이 공통 헤더 높이를 바꾸지 않는다`);
+  const context = dom.window.document.querySelector('.course-content-nav');
+  if (source === 'README.md' || source.startsWith('course/')) {
+    assert.ok(context, `${source}: 과정 보조 탐색 보존`);
+    assert.equal(context.previousElementSibling, header, `${source}: 공통 헤더 다음 문서 영역에 배치`);
+    assert.equal(context.querySelectorAll('a').length, 5, `${source}: 기존 다섯 진입점 보존`);
+  } else assert.equal(context, null, `${source}: 다른 공간에 과정 보조 탐색을 추가하지 않는다`);
   dom.window.close();
 }
 assert.equal(siteSection('scenario-other/README.md'), null, '폴더 이름 접두어만 같아도 시나리오로 처리하지 않음');
@@ -65,7 +72,11 @@ if (process.argv.includes('--generated')) {
   for (const source of sources) {
     const html = fs.readFileSync(new URL(source.replace(/\.md$/, '.html'), root), 'utf8');
     const header = html.match(/<header class="topbar[^"\n]*">[\s\S]*?<\/header>/)?.[0];
-    assert.equal(header, renderSiteNavigation(source), `${source}: 생성된 메뉴·선택 상태 일치`);
+    const expected = renderSiteNavigation(source);
+    const expectedHeader = expected.match(/<header class="topbar[^"\n]*">[\s\S]*?<\/header>/)?.[0];
+    assert.equal(header, expectedHeader, `${source}: 생성된 메뉴·선택 상태 일치`);
+    const context = expected.slice(expectedHeader.length);
+    assert.ok(!context || html.includes(expectedHeader + context), `${source}: 헤더 밖 보조 탐색 보존`);
   }
   assert.equal(fs.readFileSync(new URL('index.html', root), 'utf8'), fs.readFileSync(new URL('README.html', root), 'utf8'), '홈 진입 두 경로 일치');
   for (const [source, expected] of [['scenario/README.md', '서비스 만들기'], ['practice/MISSIONS.md', '실전 미션'], ['docs/knowledge/README.md', '개념 학습']]) {
