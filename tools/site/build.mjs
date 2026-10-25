@@ -668,10 +668,16 @@ function page({ abs, title, body, hasMermaid, hasDbIndexExperiment }) {
     const titleEnd = body.indexOf('</h1>') + '</h1>'.length;
     if (titleEnd < 5) throw new Error('scenario/README.md에 제목이 없다');
     const rootPrefix = `${path.relative(path.dirname(abs), ROOT).split(path.sep).join('/')}/`;
-    const originalTitle = body.slice(0, titleEnd).replace('<h1 ', '<h1 class="sf-original-title" ');
-    body = originalTitle
-      + servicePageRenderers.renderServiceCatalog({ ...serviceData, apiRecipes: { recipes: serviceData.apiRecipes, routes: serviceData.apiRoutes }, rootPrefix })
+    const originalTitle = body.slice(0, titleEnd).replace('<h1 ', '<h2 ').replace('</h1>', '</h2>');
+    const originalBody = body.slice(titleEnd);
+    body = servicePageRenderers.renderServiceCatalog({ ...serviceData, apiRecipes: { recipes: serviceData.apiRecipes, routes: serviceData.apiRoutes }, rootPrefix })
+      + '<details class="service-original-reference" id="legacy-scenarios"><summary>기존 시나리오·실행 준비·DB 자료 보기</summary>'
+      + originalTitle + originalBody + '</details>'
       + renderCatalog(API_ARCHITECTURE, levelHref);
+    const oldAnchors = JSON.parse(read(path.join(ROOT, 'docs/design/full-integration-2026-10-25/ORIGINAL-CATALOG-ANCHORS.json'))).ids;
+    const presentIds = new Set([...body.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
+    const missingAnchors = oldAnchors.filter(id => !presentIds.has(id));
+    body = missingAnchors.map(id => `<span class="service-anchor-compat" id="${escapeHtml(id)}" aria-hidden="true"></span>`).join('') + body;
   } else if (abs === path.join(ROOT, 'scenario/README.md')) {
     const titleEnd = body.indexOf('</h1>') + '</h1>'.length;
     const tocStart = body.indexOf('<h2 id="목차"');

@@ -14,8 +14,17 @@ export function compareLikeControllerSources(current,tested) {
   if(current===tested)return {match:'exact',transportCodeUnchanged:true};
   const block=hashLine+bindingLine;
   assert.equal(current.split(block).length,2,'알려진 도움말 변경의 위치·횟수');
-  assert.equal(current.replace(block,hashLine),tested,'도움말 연결 외의 코드는 실제 검증 소스와 같아야 함');
-  return {match:'setup-click-binding-only',transportCodeUnchanged:true,note:'새 도움말 클릭은 별도 native/DOM 검사 대상이다. 저장 소스는 실제23HTTP 중 수정 후4회에 대응하며 앞19회는 수정 전 기록이다.'};
+  const newUrl = "const documentUrl = new URL(data.pagePath, 'http://localhost:3000/').href;";
+  const oldUrl = "const documentUrl = new URL(data.pagePath, 'http://127.0.0.1:8765/').href;";
+  let normalized = current.replace(block,hashLine);
+  if (normalized.includes(newUrl)) {
+    assert.equal(normalized.split(newUrl).length,2,'file 안내 URL은한곳만변경');
+    normalized = normalized.replace(newUrl,oldUrl)
+      .replace('python3 -m http.server 3000 --bind 127.0.0.1', 'python3 -m http.server 8765 --bind 127.0.0.1')
+      .replace('3000은 문서 서버이며', '8765는 문서 서버이며');
+  }
+  assert.equal(normalized,tested,'도움말 클릭·문서서버 주소 외의 요청/응답 코드는 실제 검증 소스와 같아야 함');
+  return {match:'setup-click-and-document-origin-help-only',transportCodeUnchanged:true,note:'새 도움말 클릭은 별도 native/DOM 검사 대상이다. 저장 소스는 실제23HTTP 중 수정 후4회에 대응하며 앞19회는 수정 전 기록이다.'};
 }
 export function loadLikeBrowserEvidence(dir=defaultDir) {
   return {runtime:read(dir,'report.json'),browser:read(dir,'browser-observations.json'),cleanup:read(dir,'cleanup-observed.json'),

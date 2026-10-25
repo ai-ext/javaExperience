@@ -4,6 +4,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { marked } from 'marked';
+import { JSDOM } from 'jsdom';
 import { P09_LESSONS } from './p09-lesson-data.mjs';
 import { P04_LESSONS } from './p04-lesson-data.mjs';
 import { P16_CONTRACT_LESSONS } from './p16-contract-data.mjs';
@@ -38,6 +39,9 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const output = path.join(root, 'docs/design/visual-inventory.jsonl');
 const summaryPath = path.join(root, 'docs/design/visual-inventory-summary.json');
 const checklistPath = path.join(root, 'docs/design/VISUAL-PAGES.md');
+const serviceRecipesPath = path.join(root, 'service/api-contracts.json');
+const serviceRecipes = fs.existsSync(serviceRecipesPath)
+  ? JSON.parse(fs.readFileSync(serviceRecipesPath, 'utf8')).recipes ?? [] : [];
 const states = ['unreviewed', 'mockup_ready', 'implemented', 'verified'];
 const now = new Date().toISOString().slice(0, 10);
 
@@ -292,6 +296,121 @@ function collectHtml(page, html) {
   return maxDepth;
 }
 
+function collectServiceFeature(page, html) {
+  const dom = new JSDOM(html);
+  const document = dom.window.document;
+  const sectionLabel = (featureId, variantId, stageId, section) =>
+    `서비스 기능 · ${featureId}/${variantId}/${stageId} · ${section}`;
+  const addService = (pagePath, feature, variant, stage, kind, section, label, length = 0, extra = {}) => {
+    const recipeIds = [...new Set((stage?.recipeIds ?? []).filter(Boolean))];
+    const ids = (stage?.sourceUnits ?? []).filter(Boolean);
+    add(pagePath, sectionLabel(feature.id, variant?.id ?? '', stage?.id ?? '', section), `service_functional_${kind}`, label, length, {
+      featureId: feature.id,
+      variantId: variant?.id ?? '',
+      stageId: stage?.id ?? '',
+      recipeCount: recipeIds.length,
+      recipeIds,
+      sourceId: `service/features/${feature.id}.json`,
+      sourceIds: ids,
+      ...extra,
+    });
+  };
+  const scalarList = (pagePath, feature, variant, stage, key, values) => {
+    for (const [index, value] of (values ?? []).entries()) {
+      const text = typeof value === 'string' ? value : JSON.stringify(value);
+      if (text) addService(pagePath, feature, variant, stage, 'prose', key, text, text.length, { itemIndex: index });
+    }
+  };
+  const catalog = document.querySelector('[data-sf-catalog]');
+  if (catalog) {
+    for (const card of catalog.querySelectorAll('[data-sf-feature-card][data-sf-id]')) {
+      const featureId = card.getAttribute('data-sf-id');
+      const sourceJson = `service/features/${featureId}.json`;
+      const sourcePath = path.join(root, sourceJson);
+      if (!fs.existsSync(sourcePath)) continue;
+      const feature = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+      const title = card.querySelector('h2,h3,h4')?.textContent?.trim() || feature.title || featureId;
+      const summary = card.querySelector('.sf-feature-summary')?.textContent?.trim() || feature.summary || '';
+      add(page, '서비스 기능 목차', 'service_functional_catalog_feature', `${featureId}: ${title}`, summary.length, {
+        featureId, sourceId: sourceJson, route: `scenario/features/${featureId}.html`,
+      });
+    }
+  }
+
+  const featureRoot = document.querySelector('[data-sf-feature]');
+  if (featureRoot) {
+    const featureId = featureRoot.getAttribute('data-sf-feature');
+    const sourceJson = `service/features/${featureId}.json`;
+    const sourcePath = path.join(root, sourceJson);
+    if (!fs.existsSync(sourcePath)) throw new Error(`서비스 기능 원본 JSON이 없습니다: ${sourceJson}`);
+    const feature = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+    if (feature.id !== featureId) throw new Error(`서비스 기능 ID 불일치: ${sourceJson} (${feature.id} != ${featureId})`);
+    const sourcePage = `scenario/features/${featureId}.md`;
+    for (const variant of feature.variants ?? []) {
+      for (const stage of variant.stages ?? []) {
+        const recipeIds = [...new Set((stage.recipeIds ?? []).filter(Boolean))];
+        const recipeById = new Map(serviceRecipes.map((recipe) => [recipe.id, recipe]));
+        const brief = stage.brief ?? {};
+        const proseSections = [
+          ['purpose', '목적'], ['task', '요구사항'], ['work', '구현 작업'],
+          ['inputs', '입력'], ['success', '성공 조건'],
+        ];
+        const typedText = [stage.title, ...proseSections.flatMap(([key]) => Array.isArray(brief[key]) ? brief[key] : [brief[key]])]
+          .filter((value) => typeof value === 'string').join(' ');
+        addService(sourcePage, feature, variant, stage, 'stage', '단계 메타데이터', `${stage.id}: ${stage.title}`, typedText.length, {
+          route: `scenario/features/${featureId}.html`,
+          registeredRecipeCount: recipeIds.length,
+          resolvedRecipeCount: recipeIds.filter((id) => recipeById.has(id)).length,
+        });
+
+        for (const [key, label] of proseSections) {
+          const values = Array.isArray(brief[key]) ? brief[key] : [brief[key]];
+          scalarList(sourcePage, feature, variant, stage, label, values.filter(Boolean));
+        }
+        for (const [index, condition] of (brief.preconditions ?? []).entries()) {
+          addService(sourcePage, feature, variant, stage, 'prose', '사전 조건', condition, condition.length, { itemIndex: index });
+        }
+        for (const [scenarioIndex, scenario] of (brief.scenario ?? []).entries()) {
+          for (const key of ['start', 'action', 'result', 'after']) if (scenario[key]) {
+            addService(sourcePage, feature, variant, stage, 'prose', `시나리오 ${scenarioIndex + 1} · ${key}`, scenario[key], scenario[key].length, { scenarioIndex });
+          }
+        }
+        for (const [index, item] of (brief.data ?? []).entries()) {
+          const value = [item.name, item.reason].filter(Boolean).join(' | ');
+          addService(sourcePage, feature, variant, stage, 'data_table', '설계 데이터 표', value, value.length, { rowIndex: index, columns: ['name', 'reason'] });
+        }
+        scalarList(sourcePage, feature, variant, stage, '정책과 제약', brief.policies);
+        for (const [index, failure] of (brief.failures ?? []).entries()) {
+          const value = [failure.when, failure.result, failure.unchanged].filter(Boolean).join(' · ');
+          addService(sourcePage, feature, variant, stage, 'failure_condition', '실패 조건', value, value.length, { failureIndex: index });
+        }
+        scalarList(sourcePage, feature, variant, stage, '완료 체크', brief.done);
+        scalarList(sourcePage, feature, variant, stage, '힌트', [...new Set([
+          ...(feature.hints ?? []), ...(brief.hints ?? []), ...(stage.hints ?? []),
+        ])]);
+
+        for (const recipeId of recipeIds) {
+          const recipe = recipeById.get(recipeId);
+          if (!recipe) {
+            addService(sourcePage, feature, variant, stage, 'api_form', 'API 요청 양식', recipeId, 0, { recipeId, recipeResolved: false });
+            continue;
+          }
+          const failures = recipe.sourceCases ?? recipe.failures ?? recipe.expected?.failures ?? [];
+          const fields = (recipe.requestFields ?? []).map((field) => `${field.in ?? ''} ${field.name ?? ''} ${field.type ?? ''} ${field.constraint ?? ''}`.trim());
+          const failureLabels = failures.map((failure) => `${failure.label ?? failure.condition ?? ''} ${failure.expected?.statuses ?? failure.status ?? ''}`.trim());
+          const label = [recipeId, `${recipe.method ?? ''} ${recipe.path ?? ''}`.trim(), ...(recipe.expected?.statuses ?? []).map(String), ...fields, ...failureLabels]
+            .filter(Boolean).join(' · ');
+          addService(sourcePage, feature, variant, stage, 'api_form', 'API 요청 양식', label, label.length, {
+            recipeId, recipeResolved: true, method: recipe.method ?? '', path: recipe.path ?? '',
+            requestFieldCount: (recipe.requestFields ?? []).length, failureCount: failures.length,
+          });
+        }
+      }
+    }
+  }
+  dom.window.close();
+}
+
 function markdownFiles(dir) {
   return fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((entry) => {
     const relative = path.join(dir, entry.name);
@@ -310,7 +429,9 @@ for (const file of sourceFiles) {
   const htmlFile = file.replace(/\.md$/, '.html');
   const before = rows.length;
   collectMarkdown(file, fs.readFileSync(path.join(root, file), 'utf8'));
-  const maxToggleDepth = collectHtml(file, fs.readFileSync(path.join(root, htmlFile), 'utf8'));
+  const html = fs.readFileSync(path.join(root, htmlFile), 'utf8');
+  const maxToggleDepth = collectHtml(file, html);
+  if (html.includes('data-sf-catalog') || html.includes('data-sf-feature')) collectServiceFeature(file, html);
   const functionalTask = [...FUNCTIONAL_TASKS, ...FUNCTIONAL_LIKE_TASKS].find((task) => task.sourcePath === file);
   if (functionalTask) {
     add(file, '기능 과제', 'functional_task', `${functionalTask.id}: ${functionalTask.title}`, functionalTask.goal?.length ?? 0,

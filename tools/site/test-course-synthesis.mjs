@@ -265,7 +265,8 @@ test('실행안 4: D11 선택은 기존 진도를 보존하고 D14·홈에 같�
 test('실행안 5: 어디서나 일자 목록·지도로 이동하고 D11 준비 기록은 진도와 분리된다', async () => {
   for (const from of ['README.md','course/java/J09.md','scenario/ch1-create-post/1-1-project-setup.md']) {
     const doc = new JSDOM(renderSiteNavigation(from), {url:`https://learn.test/${from}`}).window.document;
-    assert.ok([...doc.querySelectorAll('a')].some(a => a.href === 'https://learn.test/course/spring/README.html'));
+    assert.ok([...doc.querySelectorAll('a')].some(a => a.href === 'https://learn.test/scenario/README.html'), '통합 서비스 만들기 대표 진입');
+    if (from === 'README.md' || from.startsWith('course/')) assert.ok([...doc.querySelectorAll('a')].some(a => a.href === 'https://learn.test/course/spring/README.html'), '일자 목록은 기존 자료로 보존');
     assert.ok([...doc.querySelectorAll('a')].some(a => a.href === 'https://learn.test/course/map.html'));
   }
   const page = await open('course/spring/D11.html');
@@ -344,7 +345,7 @@ test('P9: D15 체크 후 D16을 추천하고 45일·3단계를 표시한다', as
   const dom=await open('index.html',saved);
   const doc=dom.window.document;
   assert.equal(doc.querySelector('[data-today-id]').textContent,'D16');
-  assert.equal(doc.querySelector('.ch-progress-head h2').textContent,'45일 진도');
+  assert.equal(doc.querySelector('.ch-progress-head h2').textContent,'45일 기존 일자별 진행 기록');
   assert.equal(doc.querySelectorAll('.ch-day').length,45);
   assert.match([...doc.querySelectorAll('.ch-phase')].map(x=>x.textContent).join(' '),/3단계/);
   assert.equal(doc.querySelectorAll('.ch-days [data-day="D45"]').length,1);

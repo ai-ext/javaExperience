@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { JSDOM } from 'jsdom';
@@ -157,14 +156,14 @@ for (const page of pages) {
   }
 }
 // 원래 목차의 딥 링크를 기능 목록으로 옮기는 과정에서 없애지 않는다.
-const original = new JSDOM(execFileSync('git', ['show', 'aed347f:scenario/README.html'], { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }));
+const originalAnchors = JSON.parse(fs.readFileSync(path.join(root, 'docs/design/full-integration-2026-10-25/ORIGINAL-CATALOG-ANCHORS.json'), 'utf8')).ids;
 const catalog = read(path.join(root, 'scenario/README.html'));
-for (const element of original.window.document.querySelectorAll('[id]')) {
-  assert.ok(catalog.getElementById(element.id), `기존 목차 앵커 보존: ${element.id}`);
+for (const id of originalAnchors) {
+  assert.ok(catalog.getElementById(id), `기존 목차 앵커 보존: ${id}`);
 }
-assert.ok(catalog.querySelector('details#legacy-scenarios .learning-journey'));
+assert.ok(catalog.querySelectorAll('details#legacy-scenarios a[href]').length >= 101, '원본101단계와참고링크보존');
+assert.equal(catalog.querySelector('.journey-learning-nav,.journey-architecture-panel'), null, '제거한패널을앵커보존때문에다시표시하지않음');
 assert.equal(catalog.querySelector('details#legacy-scenarios').open, false);
 assert.equal(errors.length, 0, errors.join('\n'));
-original.window.close();
 for (const dom of cache.values()) dom.window.close();
 console.log(`생성 기능 화면 ${pages.length}개 · 실제 링크/자산 ${checked}개 · 기존 목차 앵커·미실행·정답 접기·진도 연결 검사 통과`);

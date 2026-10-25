@@ -779,7 +779,7 @@ export function renderCourseHome(course) {
   </div>
     <section class="ch-progress" aria-labelledby="ch-progress-title">
       <div class="ch-progress-head"><h2 id="ch-progress-title">${main.length}일 기존 일자별 진행 기록</h2><p data-progress-summary>체크한 순서 0/${stepTotal}</p></div>
-      <p class="ch-progress-note">기능 진도와 자동으로 환산되지 않습니다. 이곳은 기존 일자별 확인 기록이며, 직접 체크한 진도는 채점 결과가 아닙니다. 공통 구현과 선택한 티켓을 집계하며, 고르지 않은 후보는 제외합니다. Java 수행 여부와 역량은 따로 확인합니다.</p>
+      <p class="ch-progress-note">기능 진도와 자동으로 환산되지 않습니다. 이곳은 기존 일자별 확인 기록입니다. 직접 체크한 진도이며 채점 결과가 아닙니다. 공통 구현과 선택한 티켓을 집계하며, 고르지 않은 후보는 제외합니다. Java 수행 여부와 역량은 따로 확인합니다.</p>
       <p class="ch-progress-key"><span class="ch-key-current">추천 구현일</span><span class="ch-key-done">구현 체크 끝</span><span>각 칸의 수치 = 체크한 순서 / 집계 순서</span></p>
       ${phases.map(([phase, label]) => {
         const days = main.filter(d => d.phase === phase);
