@@ -75,12 +75,13 @@
 
   // ------------------------------------------------------------ 일자 페이지
   function initDay(page) {
+    var scope = page.closest('main') || page;
     var store = storage();
     var state = readProgress(store);
     // 쓰기에 실패해 저장값에 아직 없는 이 화면의 체크·해제(id → true/false). 저장에 성공하면 비운다.
     // 저장값을 다시 읽을 때 이 키만 덮고 나머지 키(다른 탭이 저장한 진도)는 그대로 둔다.
     var pending = {};
-    var inputs = Array.prototype.slice.call(page.querySelectorAll('input.step-check[data-step]'));
+    var inputs = Array.prototype.slice.call(scope.querySelectorAll('input.step-check[data-step]'));
     var ids = [];
     inputs.forEach(function (input) { if (ids.indexOf(input.dataset.step) < 0) ids.push(input.dataset.step); });
     // 홈 진도와 같은 기준: 선택·연습 티켓 순서(data-extra)는 따로 센다. 그날 순서가 모두 추가면 전부 센다.
@@ -89,15 +90,15 @@
     if (extraIds.length === ids.length) extraIds = [];
     var coreIds = ids.filter(function (id) { return extraIds.indexOf(id) < 0; });
     var day = { steps: ids.map(function (id) {
-      var chip = page.querySelector('.day-chip[data-step="' + id + '"]');
+      var chip = scope.querySelector('.day-chip[data-step="' + id + '"]');
       return { id: id, extra: extraIds.indexOf(id) >= 0, choiceTickets: chip && chip.dataset.choiceTickets ? chip.dataset.choiceTickets.split(',') : [] };
     }) };
-    var counter = page.querySelector('[data-day-progress]');
-    var meter = page.querySelector('[data-day-meter]');
-    var resume = page.querySelector('[data-day-resume]');
+    var counter = scope.querySelector('[data-day-progress]');
+    var meter = scope.querySelector('[data-day-meter]');
+    var resume = scope.querySelector('[data-day-resume]');
     function paint() {
       inputs.forEach(function (input) { input.checked = state.done.has(input.dataset.step); });
-      page.querySelectorAll('.day-chip[data-step], .day-step[data-step]').forEach(function (node) {
+      scope.querySelectorAll('.day-chip[data-step], .day-step[data-step]').forEach(function (node) {
         node.classList.toggle('is-done', state.done.has(node.dataset.step));
       });
       var doneOf = function (list) { return list.filter(function (id) { return state.done.has(id); }).length; };
@@ -110,11 +111,11 @@
       if (meter) { meter.max = countedIds.length; meter.value = doneOf(countedIds); }
       if (counter) counter.classList.toggle('is-complete', doneOf(countedIds) === countedIds.length);
       var nextId = countedIds.find(function (id) { return !state.done.has(id); });
-      page.querySelectorAll('.day-chip[data-step]').forEach(function (node) {
+      scope.querySelectorAll('.day-chip[data-step]').forEach(function (node) {
         node.classList.toggle('is-current', node.dataset.step === nextId);
       });
       if (resume) {
-        var nextChip = nextId && page.querySelector('.day-chip[data-step="' + nextId + '"]');
+        var nextChip = nextId && scope.querySelector('.day-chip[data-step="' + nextId + '"]');
         resume.href = nextChip ? nextChip.querySelector('a').getAttribute('href') : '#오늘의-sql';
         resume.textContent = nextChip ? nextChip.querySelector('.chip-no').textContent + ' ' + (doneOf(coreIds) ? '이어서 하기' : '시작하기') + ' →' : '구현 체크 완료 · 오늘의 SQL 확인 →';
       }
@@ -142,7 +143,7 @@
     paint();
 
     // 정답은 펼칠 때만 하이라이트한다. syntax-highlight.js가 새로 붙은 code 노드를 처리하도록 노드를 바꿔 끼운다.
-    page.querySelectorAll('details.step-answer').forEach(function (details) {
+    scope.querySelectorAll('details.step-answer').forEach(function (details) {
       details.addEventListener('toggle', function () {
         if (!details.open) return;
         details.querySelectorAll('code[data-lazy-lang]').forEach(function (code) {
@@ -158,11 +159,12 @@
 
   // 해시를 기존 앵커 그대로 사용한다. 숨겨진 패널의 내부 앵커도 해당 패널을 먼저 연다.
   function initDayStepper(page) {
-    var panels = Array.prototype.slice.call(page.querySelectorAll('.day-stepper-main > [data-day-panel]'));
+    var scope = page.closest('main') || page;
+    var panels = Array.prototype.slice.call(scope.querySelectorAll('.day-stepper-main > [data-day-panel]'));
     if (!panels.length) return;
-    var toggle = page.querySelector('[data-day-expand]');
-    var position = page.querySelector('[data-day-position]');
-    var links = Array.prototype.slice.call(page.querySelectorAll('[data-panel-link]'));
+    var toggle = scope.querySelector('[data-day-expand]');
+    var position = scope.querySelector('[data-day-position]');
+    var links = Array.prototype.slice.call(scope.querySelectorAll('[data-panel-link]'));
     var expanded = false, active = panels.find(function (panel) { return panel.matches('.day-step'); }) || panels[0];
     var canonicalPanels = panels.slice();
     var defaultActive = active;
@@ -170,17 +172,17 @@
       if (page.dataset.dayPage !== 'D14') return;
       var selection = typeof selectedTicket === 'string' ? selectedTicket : readProgress(storage()).selectedTicket;
       var choicePanels = canonicalPanels.filter(function (panel) {
-        var chip = page.querySelector('.day-chip[data-step="' + panel.dataset.step + '"]');
+        var chip = scope.querySelector('.day-chip[data-step="' + panel.dataset.step + '"]');
         return chip && chip.hasAttribute('data-choice-tickets');
       });
       var selectedPanel = choicePanels.find(function (panel) {
-        var chip = page.querySelector('.day-chip[data-step="' + panel.dataset.step + '"]');
+        var chip = scope.querySelector('.day-chip[data-step="' + panel.dataset.step + '"]');
         return (chip.dataset.choiceTickets || '').split(',').indexOf(selection) >= 0;
       });
       var additional = choicePanels.filter(function (panel) { return panel !== selectedPanel; });
       panels = canonicalPanels.filter(function (panel) { return additional.indexOf(panel) < 0; }).concat(additional);
       defaultActive = selectedPanel || (selection ? canonicalPanels.find(function (panel) { return panel.id === 'step-d14-5'; }) : canonicalPanels[0]);
-      var list = page.querySelector('.day-chips');
+      var list = scope.querySelector('.day-chips');
       panels.forEach(function (panel, index) {
         panel.style.order = index;
         var link = links.find(function (item) { return item.getAttribute('href') === '#' + panel.id; });
@@ -210,19 +212,19 @@
     rebuildChoiceRoute();
     if (page.dataset.dayPage === 'D14') active = defaultActive;
     var printDetails = [];
-    var wrapPanels = Array.prototype.slice.call(page.querySelectorAll('[data-wrap-panel]'));
-    var wrapLinks = Array.prototype.slice.call(page.querySelectorAll('[data-wrap-target]'));
+    var wrapPanels = Array.prototype.slice.call(scope.querySelectorAll('[data-wrap-panel]'));
+    var wrapLinks = Array.prototype.slice.call(scope.querySelectorAll('[data-wrap-target]'));
     var wrapActive = wrapPanels[0];
-    var wrapTabs = page.querySelector('.day-wrap-tabs');
+    var wrapTabs = scope.querySelector('.day-wrap-tabs');
     if (wrapTabs) wrapTabs.hidden = false;
     var stageKey = 'javaexperience.course.stages.v1';
-    var stageInputs = Array.prototype.slice.call(page.querySelectorAll('[data-stage-check]'));
+    var stageInputs = Array.prototype.slice.call(scope.querySelectorAll('[data-stage-check]'));
     var stageState = {}, stagePending = {}, stageStore = storage();
     function loadStages() {
       try { var value = stageStore && JSON.parse(stageStore.getItem(stageKey) || '{}'); if (value && typeof value === 'object') stageState = value; } catch (e) { /* 저장 불가 시 현재 화면의 기록을 유지한다. */ }
       Object.keys(stagePending).forEach(function (id) { stageState[id] = stagePending[id]; });
       stageInputs.forEach(function (input) { input.checked = stageState[input.dataset.stageCheck] === true; input.parentElement.classList.toggle('is-done', input.checked); });
-      var stageProgress = page.querySelector('[data-stage-progress]');
+      var stageProgress = scope.querySelector('[data-stage-progress]');
       if (stageProgress) stageProgress.textContent = stageInputs.map(function(input) {
         var label = /-prep$/.test(input.dataset.stageCheck) ? '준비' : /-data$/.test(input.dataset.stageCheck) ? '데이터' : '마무리';
         return label + (input.checked ? ' 확인' : ' 미확인');
@@ -297,7 +299,7 @@
       toggle.hidden = false;
       toggle.addEventListener('click', function () {
         if (expanded) {
-          var rail = page.querySelector('.day-today');
+          var rail = scope.querySelector('.day-today');
           var edge = rail ? rail.getBoundingClientRect().bottom + 16 : 0;
           var currentBox = active.getBoundingClientRect();
           // 현재 순서가 보이는 동안에는 전환 직전의 선택을 유지한다.
@@ -307,7 +309,7 @@
           }
         }
         var before = active.getBoundingClientRect().top;
-        var panelMain = page.querySelector('.day-stepper-main');
+        var panelMain = scope.querySelector('.day-stepper-main');
         panelMain.style.paddingTop = '';
         panelMain.style.paddingBottom = '';
         expanded = !expanded;
@@ -324,14 +326,14 @@
     window.addEventListener('hashchange', function () { revealHash(false); });
     window.addEventListener('popstate', function () { revealHash(false); });
     // 메뉴 선택은 주소만 갱신하므로 브라우저의 앵커 점프와 중복 스크롤이 없다.
-    page.addEventListener('click', function (event) {
+    scope.addEventListener('click', function (event) {
       var link = event.target.closest('a[href^="#"]');
       if (!link || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       var id; try { id = decodeURIComponent(link.hash.slice(1)); } catch (e) { return; }
       var target = document.getElementById(id);
       if (!target || !target.closest('[data-day-panel]')) return;
       event.preventDefault();
-      var panelMain = page.querySelector('.day-stepper-main');
+      var panelMain = scope.querySelector('.day-stepper-main');
       panelMain.style.paddingTop = '';
       panelMain.style.paddingBottom = '';
       history.pushState(history.state,'',link.hash);
@@ -350,7 +352,7 @@
     window.addEventListener('beforeprint', function () {
       beforePrintExpanded = expanded;
       expanded = true;
-      printDetails = Array.prototype.slice.call(page.querySelectorAll('details:not([open])'));
+      printDetails = Array.prototype.slice.call(scope.querySelectorAll('details:not([open])'));
       printDetails.forEach(function (fold) { fold.open = true; });
       paint();
     });
@@ -645,7 +647,7 @@
         var bar = cell.querySelector('.ch-bar i');
         if (bar) bar.style.width = Math.round((n / counted.length) * 100) + '%';
       });
-      $('[data-progress-summary]').textContent = choiceTotal
+      if ($('[data-progress-summary]')) $('[data-progress-summary]').textContent = choiceTotal
         ? '공통 구현 ' + (checked - choiceChecked) + '/' + (total - choiceTotal) + ' · 선택 티켓 ' + state.selectedTicket + ' ' + choiceChecked + '/' + choiceTotal
         : '체크한 순서 ' + checked + '/' + total;
       storageNote(state.ok ? '' : 'blocked');
@@ -653,7 +655,7 @@
     window.addEventListener('pageshow', render);
     // 다른 탭(일자 페이지)에서 체크하면 열린 홈의 오늘 할 일·진도도 다시 그린다. 홈은 저장값을 쓰지 않으므로 덮을 변경이 없다.
     window.addEventListener('storage', function (e) { if (e.key === null || e.key === KEY) render(); });
-    render();
+    if (readProgress(store).done.size || readProgress(store).selectedTicket) render();
   }
 
   // 설정 형식은 모든 블록에서 공유한다. 저장 실패는 현재 화면 조작을 막지 않는다.
@@ -837,5 +839,6 @@
     initSchedule();
     initRecords();
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+  if (document.currentScript && document.currentScript.hasAttribute('data-course-initial')) start();
+  else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();

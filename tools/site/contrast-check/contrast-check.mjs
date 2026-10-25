@@ -24,7 +24,8 @@ async function main() {
   files = discover();
   if (!files.length) throw new Error('검사할 HTML이 없습니다. --root와 --match를 확인하세요.');
   fs.mkdirSync(out, {recursive:true});
-  server = http.createServer((req,res) => {
+  const externalBase = process.env.SITE_BASE_URL;
+  if (!externalBase) server = http.createServer((req,res) => {
     let file;
     try { file = path.resolve(root, '.' + decodeURIComponent(new URL(req.url,'http://localhost').pathname)); } catch { res.writeHead(400).end(); return; }
     if (!file.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
@@ -34,8 +35,8 @@ async function main() {
     res.setHeader('Content-Type', mime[path.extname(file)] || 'application/octet-stream');
     fs.createReadStream(file).pipe(res);
   });
-  await new Promise((resolve,reject) => { server.once('error',reject); server.listen(0,'127.0.0.1',resolve); });
-  const base = `http://127.0.0.1:${server.address().port}/`;
+  if (server) await new Promise((resolve,reject) => { server.once('error',reject); server.listen(0,'127.0.0.1',resolve); });
+  const base = externalBase ? externalBase.replace(/\/$/, '') + '/' : `http://127.0.0.1:${server.address().port}/`;
   browser = await chromium.launch({headless:true});
   let cursor = 0;
   async function worker() {

@@ -14,53 +14,50 @@ function render(source, data = course) {
   return new JSDOM(renderNavigationCatalog(source, body, data), {url: new URL(source, 'https://example.test/').href});
 }
 
-test('자료 목록은 Java·티켓 실제 메타를 연결하며 원인 영역을 노출하지 않는다', () => {
-  const dom = render('course/resources.md'), doc = dom.window.document;
-  assert.equal(doc.querySelectorAll('h1').length, 1);
-  assert.equal(doc.querySelectorAll('.guide-index').length, 1);
-  assert.equal(doc.querySelectorAll('.guide-index a').length, 5);
-  assert.equal(doc.querySelectorAll('.resource-java-list li').length, course.java.length);
-  const tickets = course.tickets.filter(ticket => /^B\d{2}$/.test(ticket.id));
-  assert.equal(doc.querySelectorAll('.resource-ticket-list li').length, tickets.length);
-  for (const entry of course.java) {
-    assert.equal(doc.querySelector(`.resource-java-list a[href="java/${entry.id}.html"] span`).textContent, entry.title);
+test('Java와 티켓은 각자의 직접 목록에서 실제 메타를 연결한다', () => {
+  for (const [source, entries, selector] of [
+    ['course/java/README.md', course.java, '.resource-java-list'],
+    ['course/tickets/README.md', course.tickets, '.resource-ticket-list'],
+  ]) {
+    const dom = render(source), doc = dom.window.document;
+    assert.equal(doc.querySelectorAll('h1').length, 1);
+    assert.equal(doc.querySelectorAll(`${selector} li`).length, entries.length);
+    for (const entry of entries) {
+      const link = doc.querySelector(`${selector} a[href="${entry.page.split('/').pop()}"]`);
+      assert.equal(link.querySelector('span').textContent, entry.title);
+    }
+    assert.doesNotMatch(doc.querySelector(selector).textContent, /self-invocation|gap lock|캐시 무효화|인가 규칙 순서/);
+    dom.window.close();
   }
-  for (const ticket of tickets) {
-    const link = doc.querySelector(`.resource-ticket-list a[href="tickets/${ticket.id}.html"]`);
-    assert.equal(link.querySelector('span').textContent, ticket.title);
-    assert.equal(link.querySelector('small').textContent, ticket.required ? '필수' : ticket.pool ? '선택 후보' : '추가 연습');
-  }
-  assert.equal(doc.querySelector('.resource-ticket-list [data-area]'), null);
-  assert.doesNotMatch(doc.querySelector('.resource-ticket-list').textContent, /self-invocation|gap lock|캐시 무효화|인가 규칙 순서/);
-  for (const link of doc.querySelectorAll('.guide-index a')) assert.ok(doc.getElementById(link.hash.slice(1)), link.hash);
-  dom.window.close();
 });
 
 test('미준비 목록은 링크 대신 상태를 표시하고 메타의 HTML 문자를 이스케이프한다', () => {
-  const dom = render('course/resources.md', {java:[{id:'J99',title:'<script>예시</script>',page:null}], tickets:[{id:'B99',title:'관찰 & 비교',page:null}]});
+  const dom = render('course/java/README.md', {java:[{id:'J99',title:'<script>예시</script>',page:null}], tickets:[]});
   const doc = dom.window.document;
   assert.equal(doc.querySelector('.resource-java-list a'), null);
   assert.equal(doc.querySelector('.resource-java-list script'), null);
   assert.equal(doc.querySelector('.resource-java-list span span').textContent, '<script>예시</script>');
-  assert.equal(doc.querySelector('.resource-ticket-list span span').textContent, '관찰 & 비교');
   dom.window.close();
 });
 
-test('이전 과정은 서비스·미션과 모든 레슨·기존 티켓의 실제 경로를 제공한다', () => {
-  const dom = render('course/archive.md'), doc = dom.window.document;
-  assert.equal(doc.querySelectorAll('h1').length, 1);
-  for (const [section, folder] of [['archive-lessons', 'lessons'], ['archive-tickets', 'tickets']]) {
-    const names = fs.readdirSync(new URL(`${folder}/`, root)).filter(name => name.endsWith('.md'));
-    const links = [...doc.querySelectorAll(`#${section}-view .navigation-resource-list a`)];
+test('레슨과 구현 티켓은 서로 다른 전체 목록으로 한 번씩 연결한다', () => {
+  for (const folder of ['lessons', 'tickets']) {
+    const dom = render(`${folder}/README.md`), doc = dom.window.document;
+    const names = fs.readdirSync(new URL(`${folder}/`, root)).filter(name => name.endsWith('.md') && name !== 'README.md');
+    const links = [...doc.querySelectorAll('.navigation-resource-list a')];
     assert.equal(links.length, names.length);
-    for (const name of names) assert.ok(links.some(link => link.getAttribute('href') === `../${folder}/${name.replace(/\.md$/, '.html')}`), name);
+    for (const name of names) assert.ok(links.some(link => link.getAttribute('href') === name.replace(/\.md$/, '.html')), name);
+    dom.window.close();
   }
-  assert.ok(doc.querySelector('a[href="../scenario/README.md"]'));
-  assert.ok(doc.querySelector('a[href="../practice/MISSIONS.md"]'));
-  dom.window.close();
 });
 
-test('목록 밖의 학습 본문은 변경하지 않는다', () => {
+test('묶음 주소는 짧은 안내만 남기며 학습 본문에는 목록을 주입하지 않는다', () => {
+  for (const source of ['course/resources.md', 'course/archive.md']) {
+    const body = fs.readFileSync(new URL(source, root), 'utf8');
+    assert.doesNotMatch(body, /navigation-catalog:|이전 과정|옛 과정|예전 과정/);
+    assert.equal(renderNavigationCatalog(source, body, course), body);
+    assert.ok(body.length < 350);
+  }
   const body = '<h1>기존 실습</h1><pre>한 줄 코드</pre>';
   assert.equal(renderNavigationCatalog('course/java/J01.md', body, course), body);
 });

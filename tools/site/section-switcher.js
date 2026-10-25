@@ -14,7 +14,7 @@
     var entries = [], panels = [], originalHidden = new WeakMap();
     function addPanel(panel) {
       if (!panel) return null;
-      if (panels.indexOf(panel) < 0) { panels.push(panel); originalHidden.set(panel,panel.hidden); panel.dataset.sectionPanel = ''; }
+      if (panels.indexOf(panel) < 0) { panels.push(panel); originalHidden.set(panel,panel.hidden); panel.dataset.sectionOriginalHidden = String(panel.hidden); panel.dataset.sectionPanel = ''; }
       return panel;
     }
     function owner(target) {
@@ -34,6 +34,19 @@
       panel.id ||= 'section-panel-' + (panels.indexOf(panel) + 1);
       entries.push({id:id,label:label.replace(/^#\s*/, '').trim(),panel:panel,phase:phase || ''});
     }
+    var baked = main.querySelector('.page-navigation-layout');
+    var nav, layout, sidebar, content, filters = [], all;
+    if (baked) {
+      layout = baked; sidebar = main.querySelector('.page-sidebar');
+      content = layout.querySelector('.page-navigation-content'); nav = sidebar.querySelector('.section-switcher');
+      panels = Array.from(content.querySelectorAll('[data-section-panel]'));
+      panels.forEach(function(panel) { originalHidden.set(panel,panel.dataset.sectionOriginalHidden === 'true'); });
+      entries = Array.from(nav.querySelectorAll('button')).map(function(button) {
+        return {id:button.dataset.sectionTarget,label:button.textContent,panel:button.dataset.panelId ? document.getElementById(button.dataset.panelId) : null,phase:button.dataset.phase || '',button:button};
+      });
+      all = entries[0];
+      filters = Array.from(sidebar.querySelectorAll('.page-sidebar-filters')).map(function(group) {return {group:group,panel:document.getElementById(group.dataset.ownerPanel)};});
+    } else {
     var guide = main.querySelector('.course-guide');
     if (guide) {
       // 일정 원문에는 표 앞의 대제목이 독립 노드로 남아 있다.
@@ -49,6 +62,7 @@
       });
     });
     var home = main.querySelector('[data-course-home]');
+    if (home) return;
     if (home) {
       [['.ch-hero','home-today','오늘 할 일'],['.ch-progress','home-progress','45일 진도'],['.ch-ticket-summary','home-tickets','선택 티켓'],['.ch-entries','home-resources','학습 자료'],['.home-reference','home-reference','참고 도감']].forEach(function (item) {
         var panel = main.querySelector(item[0]); if (!panel) return;
@@ -95,29 +109,25 @@
       main.querySelectorAll(':scope > h2').forEach(function (heading) { entry(heading.id,heading.textContent,owner(heading)); });
     }
     if (!entries.length) return;
-    var nav = document.createElement('nav'); nav.className = 'section-switcher';
+    nav = document.createElement('nav'); nav.className = 'section-switcher';
     nav.setAttribute('aria-label','이 페이지 내용 선택'); nav.setAttribute('role','tablist'); nav.setAttribute('aria-orientation','vertical');
-    var all = {id:'section-all',label:'전체',panel:null,phase:''};
+    all = {id:'section-all',label:'전체',panel:null,phase:''};
     entries.unshift(all);
     entries.forEach(function (item,index) {
       var button = document.createElement('button'); button.type = 'button'; button.id = 'section-tab-' + index;
       button.setAttribute('role','tab'); button.textContent = item.label; button.dataset.sectionTarget = item.id;
       if (item.panel) button.setAttribute('aria-controls',item.panel.id);
-      button.addEventListener('click',function () { choose(item,true); });
-      button.addEventListener('keydown',function (event) {
-        var next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % entries.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + entries.length - 1) % entries.length : event.key === 'Home' ? 0 : event.key === 'End' ? entries.length - 1 : null;
-        if (next === null) return; event.preventDefault(); choose(entries[next],true); entries[next].button.focus({preventScroll:true});
-      });
+      button.dataset.panelId = item.panel ? item.panel.id : ''; button.dataset.phase = item.phase;
       item.button = button; nav.append(button);
     });
-    var layout = document.createElement('div'); layout.className = 'page-navigation-layout';
-    var sidebar = document.createElement('aside'); sidebar.className = 'page-sidebar'; sidebar.setAttribute('aria-label','페이지 탐색');
+    layout = document.createElement('div'); layout.className = 'page-navigation-layout';
+    sidebar = document.createElement('aside'); sidebar.className = 'page-sidebar'; sidebar.setAttribute('aria-label','페이지 탐색');
     var caption = document.createElement('p'); caption.className = 'page-sidebar-caption'; caption.textContent = '이 페이지';
     sidebar.append(caption,nav);
-    var content = document.createElement('div'); content.className = 'page-navigation-content';
+    content = document.createElement('div'); content.className = 'page-navigation-content';
     content.append.apply(content,Array.from(main.childNodes)); layout.append(sidebar,content); main.append(layout);
     main.classList.add('has-section-switcher');
-    var filters = [];
+    filters = [];
     content.querySelectorAll('.kc-filters,.visual-catalog-controls,.cm-relation-tabs,.cm-relation-filters,.first-java-rail').forEach(function (control) {
       if (control.parentElement.closest('.kc-filters,.visual-catalog-controls')) return;
       var group = document.createElement('section'); group.className = 'page-sidebar-filters';
@@ -125,7 +135,25 @@
       if(control.matches('.kc-filters')) ownerPanel = main.querySelector('.kc-browse');
       var label = document.createElement('p'); label.className = 'page-sidebar-caption';
       label.textContent = control.matches('.kc-filters') ? '개념 분야' : control.matches('.visual-catalog-controls') ? '단계 찾기' : '연결 목록';
+      if (ownerPanel && !ownerPanel.id) ownerPanel.id = 'section-filter-owner-' + filters.length;
+      group.dataset.ownerPanel = ownerPanel ? ownerPanel.id : '';
       group.append(label,control); sidebar.append(group); filters.push({group:group,panel:ownerPanel});
+
+    });
+    menus.forEach(function (menu) { menu.hidden = true; menu.dataset.replacedBySections = ''; });
+    main.querySelectorAll('.journey-learning-nav').forEach(function (menu) { menu.hidden = true; menu.dataset.replacedBySections = ''; });
+    }
+    entries.forEach(function(item,index) { var button = item.button;
+      button.addEventListener('click',function () { choose(item,true); });
+      button.addEventListener('keydown',function (event) {
+        var next = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? (index + 1) % entries.length : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? (index + entries.length - 1) % entries.length : event.key === 'Home' ? 0 : event.key === 'End' ? entries.length - 1 : null;
+        if (next === null) return; event.preventDefault(); choose(entries[next],true); entries[next].button.focus({preventScroll:true});
+      });
+    });
+    filters.forEach(function(filter) {
+      var control = filter.group.querySelector('.kc-filters,.visual-catalog-controls,.cm-relation-tabs,.cm-relation-filters,.first-java-rail');
+      var ownerPanel = filter.panel, label = filter.group.querySelector('.page-sidebar-caption');
+      if (!control) return;
       if(control.matches('.first-java-rail')) {
         label.textContent = '학습 장면';
         control.addEventListener('click',function () { if(ownerPanel) { var view=entries.find(function(candidate) { return candidate.panel === ownerPanel; }); if(view) paint(view); } },true);
@@ -135,8 +163,6 @@
         control.addEventListener('click',function () { var view = entries.find(function (candidate) { return candidate.id === 'course-relations-view'; }); if(view) { paint(view); align(); } });
       }
     });
-    menus.forEach(function (menu) { menu.hidden = true; menu.dataset.replacedBySections = ''; });
-    main.querySelectorAll('.journey-learning-nav').forEach(function (menu) { menu.hidden = true; menu.dataset.replacedBySections = ''; });
     var active = all;
     function paint(item) {
       active = item;
@@ -208,5 +234,6 @@
     window.addEventListener('afterprint',function () { paint(beforePrint || all); });
     paint(all); reveal(false);
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',start); else start();
+  if (document.currentScript && document.currentScript.hasAttribute('data-section-initial')) start();
+  else if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',start); else start();
 })();

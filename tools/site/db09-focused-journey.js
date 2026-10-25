@@ -1,12 +1,12 @@
 document.querySelectorAll('.db09-focused').forEach((journey)=>{
   const panels=[...journey.querySelectorAll('[data-db09-panel]')];
-  const show=(name)=>{
+  const show = (name, scroll = true) =>{
     const active=panels.find((panel)=>panel.dataset.db09Panel===name);
     if(!active)return;
     for(const panel of panels)panel.hidden=panel!==active;
     journey.dataset.db09Screen=name;
     for(const button of journey.querySelectorAll('.db09-progress [data-db09-go]'))button.setAttribute('aria-current',button.dataset.db09Go===name?'step':'false');
-    journey.scrollIntoView({block:'start',behavior:'instant'});
+    if (scroll) journey.scrollIntoView({block:'start',behavior:'instant'});
   };
   for(const button of journey.querySelectorAll('[data-db09-go]'))button.addEventListener('click',()=>show(button.dataset.db09Go));
   const copy=journey.querySelector('[data-db09-copy]');
@@ -30,5 +30,5 @@ document.querySelectorAll('.db09-focused').forEach((journey)=>{
   const save=()=>{try{localStorage.setItem(key,JSON.stringify(Object.fromEntries([...fields.map((item)=>[item.dataset.db09Record,item.value]),...checks.map((item)=>[`check-${item.dataset.db09Check}`,item.checked])])));}catch{/* 저장소를 쓸 수 없어도 화면 입력은 계속된다. */}};
   for(const field of fields)field.addEventListener('input',save);
   for(const check of checks)check.addEventListener('change',save);
-  show('scenario');
+  show('scenario', false);
 });

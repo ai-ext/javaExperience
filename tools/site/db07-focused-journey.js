@@ -1,12 +1,12 @@
 document.querySelectorAll('.db07-focused').forEach((journey) => {
   const panels = [...journey.querySelectorAll('[data-db07-panel]')];
   const names = { derived: '파생 메서드', jpql: 'JPQL @Query', native: 'native SQL', mybatis: 'MyBatis XML', querydsl: 'QueryDSL' };
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     const active = panels.find((panel) => panel.dataset.db07Panel === name);
     if (!active) return;
     for (const panel of panels) panel.hidden = panel !== active;
     journey.dataset.db07Screen = name;
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-db07-go]')) button.addEventListener('click', () => show(button.dataset.db07Go));
   for (const button of journey.querySelectorAll('[data-db07-method]')) button.addEventListener('click', () => {
@@ -49,5 +49,5 @@ document.querySelectorAll('.db07-focused').forEach((journey) => {
   };
   for (const record of records) record.addEventListener('input', refresh);
   refresh();
-  show('scenario');
+  show('scenario', false);
 });

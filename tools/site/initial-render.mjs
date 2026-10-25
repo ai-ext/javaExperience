@@ -1,0 +1,85 @@
+import fs from 'node:fs';
+import { renderSectionNavigation } from './site-navigation.mjs';
+import { JSDOM } from 'jsdom';
+import { initKnowledgeCatalog } from './knowledge-catalog-controller.mjs';
+const switcher = fs.readFileSync(new URL('./section-switcher.js', import.meta.url),'utf8');
+// 런타임과 같은 탐색 규칙으로 레이아웃을 먼저 확정한다.
+export function renderInitialPage(html, sourcePath = 'README.md') {
+  const dom = new JSDOM(html,{url:'https://learn.example/',runScripts:'outside-only'});
+  const win=dom.window,doc=win.document;
+  win.scrollTo=()=>{};
+  if(doc.querySelector('.kc-catalog')){
+    initKnowledgeCatalog(doc,win);
+    delete doc.querySelector('.kc-catalog').dataset.ready;
+  }
+  const map=doc.querySelector('[data-course-map]');
+  if(map){
+    const explore=doc.createElement('button');explore.type='button';explore.className='cm-explore';explore.dataset.cmExplore='';explore.textContent='전체 연결 탐색';explore.setAttribute('aria-pressed','false');map.querySelector('[data-cm-current]').after(explore);
+    const tools=doc.createElement('details');tools.className='cm-tools';tools.innerHTML='<summary>관계 범례·보기 설정</summary>';
+    const legend=map.querySelector('.cm-legend'),toolbar=map.querySelector('.cm-toolbar');legend.before(tools);tools.append(legend,toolbar);
+  }
+  if(map){
+    win.matchMedia=()=>({matches:false});
+    const script=fs.readFileSync(new URL('./course-map.js',import.meta.url),'utf8').replace("var tables = document.querySelector('.cm-tables');",'var tables = null;');
+    win.eval(script);
+  }
+  win.eval(switcher);doc.dispatchEvent(new win.Event('DOMContentLoaded'));
+  const main=doc.querySelector('main');
+  if(main)delete main.dataset.sectionViewsReady;
+  const day=doc.querySelector('[data-day-page]');
+  if(day){
+    const panels=[...day.querySelectorAll('.day-stepper-main > [data-day-panel]')];
+    const active=panels.find(p=>p.matches('.day-step'))||panels[0];
+    panels.forEach(panel=>{panel.hidden=panel!==active;});
+    day.classList.add('day-stepper-ready');
+    day.querySelectorAll('[data-panel-link]').forEach(link=>{const selected=link.hash===`#${active?.id}`;link.parentElement.classList.toggle('is-active',selected);if(selected)link.setAttribute('aria-current','step');});
+    day.querySelectorAll('[data-day-expand],.day-wrap-tabs').forEach(el=>{el.hidden=false;});
+    const wraps=[...day.querySelectorAll('[data-wrap-panel]')];wraps.forEach((panel,i)=>{panel.hidden=i!==0;});
+    const position=day.querySelector('[data-day-position]');if(position)position.textContent='현재 화면 · '+(active?.matches('.day-step')?'구현 '+active.querySelector('.step-number')?.textContent:'준비');
+  }
+  doc.querySelectorAll('[data-config-tabs]').forEach(group=>{
+    group.querySelector('[role="tablist"]').hidden=false;
+    group.querySelectorAll('[data-config-panel]').forEach(panel=>{panel.hidden=panel.dataset.configPanel!=='yml';});
+  });
+  // 모든 문서에 동일한 바깥 틀을 만들고 기존 페이지 탐색을 같은 레일에 둔다.
+  if(main){
+    const frame=doc.createElement('div');frame.className='site-frame';
+    const sidebar=doc.createElement('aside');sidebar.className='site-frame-sidebar';sidebar.setAttribute('aria-label','영역 및 페이지 탐색');
+    sidebar.innerHTML=renderSectionNavigation(sourcePath);
+    const local=main.querySelector('.page-sidebar,.day-today');
+    if(local){local.classList.add('site-local-navigation');sidebar.append(local);}
+    const content=doc.createElement('div');content.className='site-frame-content';
+    content.append(...main.childNodes);frame.append(sidebar,content);main.append(frame);
+    main.classList.add('site-main');
+  }
+  // 해시와 저장된 탭은 문서 파싱 전에 CSS 상태로 반영한다.
+  const panelMap={};
+  for(const node of doc.querySelectorAll('[id]')){
+    const owner=node.closest('[data-day-panel],[data-section-panel]');
+    if(owner)panelMap[node.id]=owner.id;
+  }
+  const dayPanels=[...doc.querySelectorAll('.day-stepper-main > [data-day-panel]')].map(e=>({id:e.id,display:e.matches('.day-stage-wrap')?'grid':'block',initial:!e.hidden}));
+  const prepare=doc.createElement('script');
+  prepare.textContent=`(${prepareFirstPaint.toString()})(${JSON.stringify({panelMap,dayPanels})});`;
+  doc.head.append(prepare);
+  const release=doc.createElement('script');release.textContent="document.getElementById('first-paint-state')?.remove();";doc.body.append(release);
+  const fallback=doc.createElement('noscript');
+  const fallbackStyle=doc.createElement('style');fallbackStyle.textContent='body main [data-day-panel][hidden],body main [data-wrap-panel][hidden],body main [data-section-panel][hidden],body main [data-config-panel][hidden]{display:block!important}body .section-switcher,body .day-wrap-tabs,body [data-day-expand]{display:none!important}';fallback.append(fallbackStyle);
+  doc.head.append(fallback);
+  const result=dom.serialize().replace(/^[ \t]+$/gm,'');win.close();return result;
+}
+
+// head에서 실행된다. 런타임이 같은 선택을 인계받은 뒤 임시 CSS만 제거한다.
+function prepareFirstPaint({panelMap,dayPanels}) {
+  const root=document.documentElement;
+  root.classList.add('js');
+  let format='yml';try {if(localStorage.getItem('javaexperience.course.config-format.v1')==='properties')format='properties';}catch{}
+  root.dataset.configFormat=format;
+  let id='';try{id=decodeURIComponent(location.hash.slice(1));}catch{}
+  const style=document.createElement('style');style.id='first-paint-state';
+  const active=panelMap[id]||dayPanels.find(p=>p.initial)?.id;
+  if(dayPanels.length)style.textContent+=dayPanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===active?p.display:'none'}!important}`).join('');
+  // 설정 형식은 CSS가 첫 페인트부터, controller가 DOM·키보드 상태를 이어받는다.
+  style.textContent+=`html.js body main [data-config-panel]{display:none!important}html.js body main [data-config-panel="${format}"]{display:block!important}`;
+  document.head.append(style);
+}

@@ -3,7 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { JSDOM } from 'jsdom';
-import { renderSiteNavigation } from './site-navigation.mjs';
+import { renderSiteNavigation, renderSectionNavigation } from './site-navigation.mjs';
 import { renderTicketSelection, loadCourse, renderDayPage } from './course-pages.mjs';
 import { renderD00 } from '../course/build-days.mjs';
 import { marked } from 'marked';
@@ -190,13 +190,14 @@ test('일자 머리: 긴 안내보다 먼저 Java·구현 목록이 보이고 �
     assert.ok(overview, day.id);
     assert.equal((doc.querySelector('.day-context') || doc.querySelector('.day-head')).nextElementSibling, overview, `${day.id}: 일자 제목 다음 단계 작업대`);
     assert.ok(overview.querySelector('.day-java'), `${day.id}: Java 접근`);
-    assert.equal(overview.firstElementChild, overview.querySelector('.day-today'), `${day.id}: 순서 목록 다음에 본문 패널`);
+    assert.ok(doc.querySelector('.site-frame-sidebar .day-today'), `${day.id}: 같은 왼쪽 열에 순서 목록`);
+    assert.ok(overview.firstElementChild.matches('.day-stepper-main'), `${day.id}: 오른쪽 열에 본문 패널`);
     assert.ok(overview.querySelector('.day-stage-prep .day-java'), `${day.id}: Java는 별도 준비 자료 단계`);
-    assert.equal(overview.querySelectorAll('.day-chip').length, day.steps.length);
-    const meter = overview.querySelector('progress');
+    assert.equal(doc.querySelectorAll('.day-chip').length, day.steps.length);
+    const meter = doc.querySelector('progress');
     assert.ok(meter && meter.getAttribute('aria-label').includes('구현'), `${day.id}: 하루 전체 진도로 오인하지 않음`);
     assert.ok(doc.querySelector('.day-crumbs [aria-current="page"]'), `${day.id}: 현재 일자`);
-    for (const link of overview.querySelectorAll('.day-today a[href^="#"]')) assert.ok(doc.getElementById(decodeURIComponent(link.hash.slice(1))), `${day.id}: 작업대 링크 목적지`);
+    for (const link of doc.querySelectorAll('.day-today a[href^="#"]')) assert.ok(doc.getElementById(decodeURIComponent(link.hash.slice(1))), `${day.id}: 작업대 링크 목적지`);
     if (['D44','D45'].includes(day.id)) {
       assert.match(overview.querySelector('.day-java').textContent, /수행 중.*사후 확인/);
       assert.doesNotMatch(overview.querySelector('.day-java').textContent, /먼저 연습하기/);
@@ -247,7 +248,7 @@ test('실행안 4: D11 선택은 기존 진도를 보존하고 D14·홈에 같�
   assert.equal(JSON.parse(stored).steps['D01-1'], true);
   for (const file of ['course/spring/D14.html','index.html']) {
     const page = await open(file, stored);
-    assert.match(page.window.document.querySelector('[data-selected-ticket]').textContent, /B14/);
+    assert.match(page.window.document.querySelector('[data-selected-ticket],[data-selected-ticket-compact]').textContent, /B14/);
     if (file.includes('D14')) {
       assert.match(page.window.document.querySelector('[data-selected-ticket]').textContent, /E01/);
       assert.match(page.window.document.querySelector('[data-step="D14-1"] [data-step-kind]').textContent, /고르지 않은 후보/);
@@ -262,9 +263,10 @@ test('실행안 4: D11 선택은 기존 진도를 보존하고 D14·홈에 같�
 });
 test('실행안 5: 어디서나 일자 목록·지도로 이동하고 D11 준비 기록은 진도와 분리된다', async () => {
   for (const from of ['README.md','course/java/J09.md','scenario/ch1-create-post/1-1-project-setup.md']) {
-    const doc = new JSDOM(renderSiteNavigation(from), {url:`https://learn.test/${from}`}).window.document;
+    const doc = new JSDOM(renderSiteNavigation(from) + renderSectionNavigation(from), {url:`https://learn.test/${from}`}).window.document;
     assert.ok([...doc.querySelectorAll('a')].some(a => a.href === 'https://learn.test/course/spring/README.html'));
-    assert.ok([...doc.querySelectorAll('a')].some(a => a.href === 'https://learn.test/course/map.html'));
+    if(from.startsWith('course/')) assert.ok([...doc.querySelectorAll('.section-navigation a')].some(a => a.href === 'https://learn.test/course/map.html'));
+    assert.equal(doc.querySelectorAll('.site-topbar nav a').length,5);
   }
   const page = await open('course/spring/D11.html');
   const prep = page.window.document.querySelector('[data-preparation]');
@@ -342,10 +344,9 @@ test('P9: D15 체크 후 D16을 추천하고 45일·3단계를 표시한다', as
   const dom=await open('index.html',saved);
   const doc=dom.window.document;
   assert.equal(doc.querySelector('[data-today-id]').textContent,'D16');
-  assert.equal(doc.querySelector('.ch-progress-head h2').textContent,'45일 진도');
-  assert.equal(doc.querySelectorAll('.ch-day').length,45);
-  assert.match([...doc.querySelectorAll('.ch-phase')].map(x=>x.textContent).join(' '),/3단계/);
-  assert.equal(doc.querySelectorAll('.ch-days [data-day="D45"]').length,1);
+  assert.equal(doc.querySelector('.ch-progress'), null);
+  assert.equal(doc.querySelectorAll('.ch-milestones li').length,3);
+  assert.match(doc.querySelector('.ch-milestones').textContent,/D16–D45/);
   dom.window.close();
 });
 
@@ -354,7 +355,7 @@ test('P9: 확장 화면은 작업 대상·선행·개인 경로와 정상적인 
     const doc=new JSDOM(read(`course/spring/D${n}.html`)).window.document;
     assert.match(doc.body.textContent,/작업 대상/);
     assert.match(doc.body.textContent,/먼저 확인/);
-    assert.doesNotMatch(doc.body.textContent,/undefined/);
+    const content=doc.body.cloneNode(true);content.querySelectorAll('script,style,noscript').forEach(e=>e.remove());assert.doesNotMatch(content.textContent,/undefined/);
     assert.ok(doc.querySelector(`a[href="../java/J${n}.html"]`));
     const java=new JSDOM(read(`course/java/J${n}.html`)).window.document;
     assert.ok(java.querySelector(`a[href="../spring/D${n}.html"]`));
@@ -422,7 +423,7 @@ test('통합: D11 인수인계·구현 작업대·순서 칸은 서로 독립된
   const handoff = doc.querySelector('.handoff-sheet');
   assert.equal(handoff.querySelectorAll('[data-prep]').length, 6);
   assert.equal(handoff.querySelectorAll('.day-overview, .day-step, .practice-panel').length, 0);
-  assert.equal(doc.querySelectorAll('.day-stepper-layout > .day-today').length, 1);
+  assert.equal(doc.querySelectorAll('.site-frame-sidebar > .day-today').length, 1);
   assert.equal(doc.querySelectorAll('.day-step').length, 4);
   assert.ok(doc.querySelector('.day-stage-prep').contains(handoff), '인수인계는 준비 자료 단계에서 읽는다');
 });

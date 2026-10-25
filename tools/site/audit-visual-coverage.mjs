@@ -22,9 +22,9 @@ for (const filename of fs.readdirSync(path.join(root, 'docs/knowledge')).filter(
   const htmlPath = sourcePath.replace(/\.md$/, '.html');
   if (!fs.existsSync(htmlPath)) { failures.push(`${filename}: 공부자료 HTML 없음`); continue; }
   const html = fs.readFileSync(htmlPath, 'utf8');
-  const headings = [...html.matchAll(/<details class="knowledge-chapter"><summary id="([^"]+)"/g)];
-  const topics = [...html.matchAll(/<details class="knowledge-topic"><summary id="([^"]+)"/g)];
-  const cards = (html.match(/<details class="knowledge-chapter">/g) || []).length;
+  const headings = [...html.matchAll(/<details class="knowledge-chapter"[^>]*><summary id="([^"]+)"/g)];
+  const topics = [...html.matchAll(/<details class="knowledge-topic"[^>]*><summary id="([^"]+)"/g)];
+  const cards = (html.match(/<details class="knowledge-chapter"[^>]*>/g) || []).length;
   const mapSteps = (html.match(/class="knowledge-page-step"/g) || []).length;
   if (!cards || cards !== headings.length || cards !== mapSteps) failures.push(`${filename}: 공부자료 주제 지도 ${mapSteps}, 접기 카드 ${cards}, 앵커 ${headings.length}`);
   if (topics.length !== expectedTopics) failures.push(`${filename}: 하위 주제 카드 ${topics.length}/${expectedTopics}`);

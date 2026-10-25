@@ -204,7 +204,7 @@ export function initLearning(doc = document, win = window) {
     const begin = doc.createElement('button'); begin.type = 'button'; begin.textContent = '이 과제 시작하기';
     const complete = doc.createElement('button'); complete.type = 'button'; complete.textContent = '직접 확인 완료';
     const home = doc.createElement('a'); home.href = root.href; home.textContent = '홈으로';
-    bar.append(status, begin, complete, home); doc.querySelector('main').prepend(bar);
+    bar.append(status, begin, complete, home); (doc.querySelector('.site-frame-sidebar') || doc.querySelector('main')).append(bar);
     let journey = task.journey ? doc.querySelector(task.journey) : null;
     function currentScene() {
       const panel = journey && [...journey.querySelectorAll(`[${task.panel}]`)].find((el) => !el.hidden);

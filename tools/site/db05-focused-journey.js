@@ -1,11 +1,11 @@
 document.querySelectorAll('.db05-focused').forEach((journey) => {
   const panels = [...journey.querySelectorAll('[data-db05-panel]')];
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     const active = panels.find((panel) => panel.dataset.db05Panel === name);
     if (!active) return;
     for (const panel of panels) panel.hidden = panel !== active;
     journey.dataset.db05Screen = name;
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-db05-go]')) button.addEventListener('click', () => show(button.dataset.db05Go));
   for (const button of journey.querySelectorAll('[data-db05-like]')) {
@@ -33,5 +33,5 @@ document.querySelectorAll('.db05-focused').forEach((journey) => {
       }
     });
   }
-  show('scenario');
+  show('scenario', false);
 });

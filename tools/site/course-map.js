@@ -19,15 +19,16 @@
   var EDGE_LABEL = { practice: '같은 날 연결 실험 (J44·J45는 수행 중·사후)', ticket: '그날 다루는 티켓', area: '결함 영역' };
   var selected = root.dataset.currentDay || 'D01';
   var exploring = false;
-  var explore = document.createElement('button');
-  explore.type = 'button'; explore.className = 'cm-explore'; explore.dataset.cmExplore = '';
-  explore.textContent = '전체 연결 탐색'; explore.setAttribute('aria-pressed', 'false');
-  root.querySelector('[data-cm-current]').after(explore);
-  var tools = document.createElement('details'); tools.className = 'cm-tools';
-  var toolsTitle = document.createElement('summary'); toolsTitle.textContent = '관계 범례·보기 설정';
-  tools.appendChild(toolsTitle);
-  var legend = root.querySelector('.cm-legend'), toolbar = root.querySelector('.cm-toolbar');
-  legend.before(tools); tools.append(legend, toolbar);
+  var explore = root.querySelector('[data-cm-explore]');
+  if (!explore) {
+    explore = document.createElement('button');explore.type='button';explore.className='cm-explore';explore.dataset.cmExplore='';explore.textContent='전체 연결 탐색';explore.setAttribute('aria-pressed','false');root.querySelector('[data-cm-current]').after(explore);
+  }
+  var tools=root.querySelector('.cm-tools');
+  if (!tools) {
+    tools=document.createElement('details');tools.className='cm-tools';
+    var toolsTitle=document.createElement('summary');toolsTitle.textContent='관계 범례·보기 설정';tools.appendChild(toolsTitle);
+    var legend=root.querySelector('.cm-legend'),toolbar=root.querySelector('.cm-toolbar');legend.before(tools);tools.append(legend,toolbar);
+  }
   tools.addEventListener('toggle', function () { draw(selected ? related(selected, view()).edges : null); });
   explore.addEventListener('click', function () { exploring = !exploring; explore.setAttribute('aria-pressed', String(exploring)); explore.textContent = exploring ? '현재 연결만 보기' : '전체 연결 탐색'; apply(); });
 

@@ -39,11 +39,11 @@ document.querySelectorAll('.validation-journey').forEach((journey) => {
     }
     if (serverUrl) panel.querySelector(`[data-validation-server="${id}"]`)?.append(serverUrl);
   };
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     for (const panel of panels) panel.hidden = panel.dataset.validationPanel !== name;
     journey.dataset.validationScreen = name;
     if (caseGroups[name]) showCase(name, activeCase[name]);
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-validation-go]')) {
     button.addEventListener('click', () => show(button.dataset.validationGo));
@@ -69,16 +69,16 @@ document.querySelectorAll('.validation-journey').forEach((journey) => {
       }
     });
   }
-  const revealRequest = () => {
+  const revealRequest = (scroll = true) => {
     const request = [...requests.entries()].find(([, node]) => node && location.hash === `#${node.id}`);
     if (!request) return;
     const panel = Object.entries(caseGroups).find(([, ids]) => ids.includes(request[0]))?.[0];
     if (!panel) return;
     activeCase[panel] = request[0];
-    show(panel);
+    show(panel, scroll);
   };
   window.addEventListener('hashchange', revealRequest);
   for (const [panel, ids] of Object.entries(caseGroups)) showCase(panel, ids[0]);
-  show('scenario');
-  revealRequest();
+  show('scenario', false);
+  revealRequest(false);
 });

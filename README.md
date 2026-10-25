@@ -21,25 +21,25 @@ Java·Spring 서버 전환 과정 v2 · 45일이다. D15 중간 점검 뒤 D16~D
 
 [후반 설계·분량 근거](docs/course-redesign/plans/2026-10-24-p9-d16-d30.md) · [과정 안내·티켓 규칙](course/README.md) · [명세서 v2](course/spec-v2.md) · [일자 목록](course/spring/README.md)
 
-## 참고 자료(이전 과정)
+## 서비스 만들기와 실습
 
-아래 101단계 과정과 루트 앱·DB 실행법은 이전 과정의 참고 자료다. v2 D01~D10의 작업 대상과 실행 위치는 위 안내를 따른다.
+아래는 계속 사용할 수 있는 게시판 API 101단계와 루트 앱·DB 실행법이다. v2 D01~D10의 작업 대상과 실행 위치는 위 안내를 따른다.
 
 Spring Boot 백엔드를 **직접 만들면서** 배우는 공개 실습 레포다. 게시판 API 101단계를 이어서 만들고, Codex 또는 Claude Code로 단계별 채점과 피드백을 받을 수 있다. 시나리오와 HTML은 GitHub 로그인 없이 읽거나 다운로드할 수 있다.
 
-> 과정 v2(일자 페이지 D00~D45·Java 트랙·2단계 티켓)는 [과정 안내](course/README.md)와 [학습 홈](index.html)에서 시작한다. 아래 `scenario/`·`practice/`·`docs/knowledge/`·`tickets/`는 그 과정에서 찾아보는 참고 도감이다.
+> 과정 v2(일자 페이지 D00~D45·Java 트랙·2단계 티켓)는 [과정 안내](course/README.md)와 [학습 홈](index.html)에서 시작한다. 서비스 만들기·실전 미션·개념 학습은 상단 대주제에서 계속 사용할 수 있다. 구현 티켓은 서비스 만들기 영역의 사이드바에서 찾는다.
 
 | 폴더 | 내용 |
 |---|---|
-| [`index.html`](index.html) | 학습 홈 — 시작점 선택, 6개 과제의 진도·마지막 장면 이어하기, 게시판 예시와 환경 준비 안내 |
-| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 101단계 요구사항·난이도·역할별 전체 코드 접기, 쿼리 연습 18개, JWT 이후 세션 인증과 interface/impl 선택 실습. 이전 과정을 순서대로 볼 때 사용한다 |
+| [`index.html`](index.html) | 학습 홈 — 오늘 할 일·과정 전체 설명·대주제 안내 |
+| [`scenario/`](scenario/README.md) | **따라 만들기 시나리오** — 101단계 요구사항·난이도·역할별 전체 코드 접기, 쿼리 연습 18개, JWT 이후 세션 인증과 interface/impl 선택 실습. 게시판 API를 순서대로 구현할 때 사용한다 |
 | [`practice/`](practice/MISSIONS.md) | 학습용 미션 — 함정이 섞인 많은 데이터(`practice` DB)로 조회·쿼리 연습 |
 | [`docs/knowledge/`](docs/knowledge/README.md) | 공부자료 134개 — 단계마다 "필요한 지식"으로 링크된다 |
 | `docker/` | 실습 DB(MySQL 8.4) 초기 데이터 dump(`mysql/init/`)와 CloudBeaver(웹 DBeaver) 설정 |
 | `src/` | 직접 이어서 구현할 Spring Boot 4.1 프로젝트 — `/hello`와 Todo·Post 학습 코드가 있으며 구현 상태는 브랜치에 따라 다르다 |
 | `tools/site/` | `.md` → `.html` 빌드 도구(문서를 고칠 때만 쓴다) |
 
-### 이전 과정 시작하기
+### 서비스 만들기 시작하기
 
 준비물: Docker 런타임(`docker`·`docker compose` 명령이 동작하면 된다), IntelliJ IDEA, JDK 21(없으면 Gradle이 찾는다 — `gradle/gradle-daemon-jvm.properties`). AI 채점을 원하면 Codex 또는 Claude Code를 선택해 쓸 수 있다.
 
@@ -52,7 +52,7 @@ docker compose up -d        # DB와 CloudBeaver 띄우기(처음 한 번은 1~2�
 
 1. IntelliJ로 폴더를 열고(Gradle 프로젝트로 가져오기), `org.example.Main`을 실행한다.
 2. 브라우저로 `http://localhost:8080/hello` → `hello`가 보이면 준비 끝.
-3. 아래 명령으로 문서 서버를 켜고 브라우저에서 `http://127.0.0.1:8765/index.html`을 연다. 홈에서 백엔드 첫걸음(0-1), 게시글 작성(1-1), DB 학습(DB-01) 중 시작점을 고른다. 전체 단계는 상단의 **이전 과정 → 서비스 만들기**에서 볼 수 있다. GitHub에서는 `scenario/README.md`를 바로 읽을 수 있다.
+3. 아래 명령으로 문서 서버를 켜고 브라우저에서 `http://127.0.0.1:8765/index.html`을 연다. 홈에서 백엔드 첫걸음(0-1), 게시글 작성(1-1), DB 학습(DB-01) 중 시작점을 고른다. 전체 단계는 상단의 **서비스 만들기**에서 볼 수 있다. GitHub에서는 `scenario/README.md`를 바로 읽을 수 있다.
 
 ```bash
 python3 -m http.server 8765 --bind 127.0.0.1
@@ -62,7 +62,7 @@ python3 -m http.server 8765 --bind 127.0.0.1
 
 홈의 이어하기는 0-1·0-2·1-1·1-2·DB-01·DB-02의 진도와 마지막 장면을 같은 브라우저의 저장소에 보관한다. 완료 표시는 학습자가 직접 기록하며 서버 구현의 자동 채점 결과는 아니다.
 
-상단의 **자료 → 개념 학습**에서는 기존 공부자료 134개를 분류별로 찾고 제목·소제목을 검색한 뒤 목록이나 하던 과제로 돌아올 수 있다. 대표 상세인 [P16 JSON·Jackson](docs/knowledge/P16-json-jackson-practical.html)은 원문 §3.2의 요청 JSON → Java 객체 → 응답 JSON 예상값을 비교한다. 134개 모두의 고유 상세 화면을 새로 완성한 범위는 아니다.
+상단의 **개념 학습**에서는 기존 공부자료 134개를 분류별로 찾고 제목·소제목을 검색한 뒤 목록이나 하던 과제로 돌아올 수 있다. 대표 상세인 [P16 JSON·Jackson](docs/knowledge/P16-json-jackson-practical.html)은 원문 §3.2의 요청 JSON → Java 객체 → 응답 JSON 예상값을 비교한다. 134개 모두의 고유 상세 화면을 새로 완성한 범위는 아니다.
 
 ## 실행
 

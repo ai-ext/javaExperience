@@ -238,8 +238,8 @@ export function initKnowledgeCatalog(doc, win, { navigate = (href) => win.locati
   $('[data-kc-search-clear]').addEventListener('click', () => clear(true));
   for (const button of root.querySelectorAll('[data-kc-query]')) button.addEventListener('click', () => search(button.dataset.kcQuery));
   const filter = (category) => { if (!categories.includes(category)) return; commit({ categoryId: category, expanded: false }); };
-  for (const button of root.querySelectorAll('button[data-kc-category]')) button.addEventListener('click', () => filter(button.dataset.kcCategory));
-  const fieldButtons = [...root.querySelectorAll('button[data-kc-category]')];
+  for (const button of doc.querySelectorAll('button[data-kc-category]')) button.addEventListener('click', () => filter(button.dataset.kcCategory));
+  const fieldButtons = [...doc.querySelectorAll('button[data-kc-category]')];
   for (const button of fieldButtons) button.addEventListener('keydown', (event) => {
     const index = fieldButtons.indexOf(button);
     const next = { ArrowLeft: (index + fieldButtons.length - 1) % fieldButtons.length, ArrowRight: (index + 1) % fieldButtons.length, Home: 0, End: fieldButtons.length - 1 }[event.key];

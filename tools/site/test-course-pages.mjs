@@ -195,12 +195,12 @@ await test('R4-01: 모든 지도 노드 title은 전체 이름과 같다', () =>
   assert.ok(!span['text-overflow'] && span.overflow !== 'hidden' && !span['-webkit-line-clamp'], '긴 이름도 높이 제한으로 자르지 않는다');
   assert.ok(mapNodes(course).every(node => node.title), 'PC에서 모든 노드의 전체 제목을 제공한다');
 });
-await test('P10: 홈 진도는 수동 체크이며 채점 결과가 아님을 알린다', async () => {
+await test('P10: 홈은 전체 진도를 복제하지 않고 오늘 일자와 구현 순서를 안내한다', async () => {
   const home = await open('index.html');
-  const note = home.$('[data-progress-summary]').parentElement.parentElement.textContent;
-  assert.match(note, /직접 체크한 진도이며 채점 결과가 아닙니다\./);
-  assert.match(note, /공통 구현과 선택한 티켓을 집계하며, 고르지 않은 후보는 제외합니다\./);
-  assert.match(note, /Java 수행 여부와 역량은 따로 확인합니다\./);
+  assert.equal(home.$('[data-progress-summary]'), null);
+  assert.ok(home.$('[data-today-id]'));
+  assert.ok(home.$('[data-today-steps]'));
+  assert.ok(home.$('.ch-course-links a[href="course/map.html"]'));
 });
 await test('R4-08: PC 지도에 노드·연결선 범례와 모든 연결 흐름을 남긴다', async () => {
   const map = await open('course/map.html', { script: mapScript });
@@ -487,11 +487,7 @@ await test('선택한 B16이 남으면 홈은 D14로 복귀하고 완료하면 D
   assert.match(home.$('[data-today-open]').textContent, /B16 이어서/);
   assert.match(home.$('[data-today-meta]').textContent, /공통 구현 2\/2.*선택 티켓 B16 0\/1/);
   assert.match(home.$('[data-today-steps] a[href$="#step-d14-4"]').textContent, /내 선택 B16/);
-  const cell = home.$('.ch-day[data-day="D14"]');
-  assert.equal(cell.querySelector('[data-day-count]').textContent, '2/3');
-  assert.equal(cell.classList.contains('is-done'), false);
-  assert.notEqual(cell.querySelector('.ch-bar i').style.width, '100%');
-  assert.match(home.$('[data-progress-summary]').textContent, /공통 구현.*선택 티켓 B16 0\/1/);
+  assert.equal(home.$('.ch-progress'), null, '진도 목록은 과정 메뉴에서 확인한다');
   assert.equal(home.$('[data-course-wrapup]').textContent, '', '선택 티켓이 남은 날을 완료로 처리하지 않는다');
   const later = await open('index.html', { saved: JSON.stringify({ version: 1, selectedTicket: 'B16', steps: { 'D14-5': true, 'D14-6': true, 'D15-1': true } }) });
   assert.equal(later.$('[data-today-id]').textContent, 'D14', '다음 날을 열었어도 미완료 선택 티켓을 안내한다');
@@ -501,8 +497,7 @@ await test('선택한 B16이 남으면 홈은 D14로 복귀하고 완료하면 D
   assert.equal(home.$('[data-today-id]').textContent, 'D15', '열린 홈도 완료 기록에 맞춰 갱신한다');
   const finished = await open('index.html', { saved: d14.window.localStorage.getItem(KEY) });
   assert.equal(finished.$('[data-today-id]').textContent, 'D15');
-  assert.equal(finished.$('.ch-day[data-day="D14"] [data-day-count]').textContent, '3/3');
-  assert.ok(finished.$('.ch-day[data-day="D14"]').classList.contains('is-done'));
+  assert.match(finished.$('[data-course-wrapup]').textContent, /D14.*SQL/);
 });
 
 await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제도 반영한다', async () => {
@@ -524,7 +519,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
     assert.equal(meter.value, step === 1 ? 3 : 2);
     const home = await open('index.html', { saved: saved(ticket) });
     assert.equal(home.$('[data-today-id]').textContent, step === 1 ? 'D15' : 'D14');
-    assert.equal(home.$('.ch-day[data-day="D14"] [data-day-count]').textContent, step === 1 ? '3/3' : '2/3');
+    assert.equal(home.$('.ch-progress'), null);
   }
   page.window.localStorage.setItem(KEY, saved(''));
   page.window.dispatchEvent(new page.window.StorageEvent('storage', { key: KEY }));
@@ -553,26 +548,22 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   assert.equal(d15only.$('[data-today-id]').textContent, 'D01');
 
   const home = await open('index.html');
-  assert.ok(home.$('main').firstElementChild.matches('section.course-home'), '과정 v2가 첫 화면');
+  assert.ok(home.$('main').firstElementChild.matches('.site-frame'), '홈 메뉴와 공부 영역이 첫 화면');
   assert.equal(home.$$('h1').filter((h) => !h.closest('details')).length, 1, '보이는 h1은 하나');
   assert.equal(home.$('h1').id, 'course-home-title');
   assert.equal(home.$('[data-today-id]').textContent, 'D01', '진도 없으면 D01');
   assert.equal(home.$('[data-today-note]').hidden, false, 'D00 워밍업 안내');
-  assert.equal(home.$$('.ch-day').length, course.days.length - 1, '전체 일자 진도');
-  assert.equal(home.$$('.ch-milestones > li').length, 3, '홈에서 세 단계의 범위를 먼저 보여 준다');
-  assert.ok(!home.$('.ch-progress').closest('.ch-hero'), '전체 진도는 오늘 할 일 열과 분리한다');
+  assert.equal(home.$$('.ch-day').length, 0, '홈에서 전체 진도 중복 제거');
+  assert.equal(home.$$('.ch-milestones > li').length, 3);
   for (const [i, a] of home.$$('[data-today-steps] a').entries()) {
     assert.equal(a.getAttribute('href'), `course/spring/D01.html#step-d01-${i + 1}`, '첫 방문의 구현 항목이 작업 위치로 연결된다');
   }
-  assert.ok(home.$('.ch-entries a[href="course/spring/README.html"]') && home.$('.ch-entries a[href="course/map.html"]'), 'Spring 일자·지도 진입');
-  assert.equal(home.$$('.ch-entries .ch-chips a[href^="course/java/J"]').length, course.java.length, '전체 Java 트랙 진입');
-  assert.equal(home.$$('.ch-ticket-chips > *').length, 16, '2단계 티켓 B01~B16');
+  assert.equal(home.$$('.ch-menu-guide li').length, 4, '각 목적지의 용도를 안내');
   for (const a of home.$$('.course-home a[href], .home-reference-head a[href]')) {
     const href = a.getAttribute('href');
     assert.ok(fs.existsSync(new URL(href.split('#')[0].replace(/\.html$/, '.md'), root)) || fs.existsSync(new URL(href.split('#')[0], root)), `홈 링크 ${href}`);
   }
-  assert.ok(home.$('section.home-reference .home-visual [data-home-start]'), '기존 시나리오 시작은 참고 도감 안에 유지');
-  assert.equal(home.$('#home-title').tagName, 'H2');
+  assert.equal(home.$('.home-reference'), null);
 
   const resumed = await open('index.html', { saved: JSON.stringify({ version: 1, steps: { 'D04-1': true, 'D04-2': true } }) });
   assert.equal(resumed.$('[data-today-id]').textContent, 'D04');
@@ -581,9 +572,6 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   assert.equal(resumed.$('[data-today-note]').hidden, true);
   assert.equal(resumed.$$('[data-today-steps] a').length, course.days.find(d => d.id === 'D04').steps.length);
   assert.equal(resumed.$('[data-today-steps] a').getAttribute('href'), 'course/spring/D04.html#step-d04-1', '이어하기로 날이 바뀌면 작업 링크도 바뀐다');
-  assert.equal(resumed.$('.ch-day[data-day="D04"] [data-day-count]').textContent, '2/5');
-  assert.ok(resumed.$('.ch-day[data-day="D04"]').classList.contains('is-today'));
-  assert.equal(resumed.$('[data-progress-summary]').textContent, `체크한 순서 2/${JSON.parse(resumed.$('#course-days-data').textContent).filter((d) => d.steps.length).reduce((n, d) => n + (d.steps.filter((s) => !s.extra).length || d.steps.length), 0)}`);
   // 선택·연습 티켓만 다루는 순서는 진도에서 뺀다. 필수 B03만 끝낸 D13은 끝난 날이다(P8-4 리뷰 ②).
   const homeDays = JSON.parse(home.$('#course-days-data').textContent).filter((d) => d.steps.length);
   const extraIds = homeDays.flatMap((d) => d.steps.filter((s) => s.extra).map((s) => s.id));
@@ -594,15 +582,13 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
   const allCore = homeDays.flatMap((d) => d.steps.filter((s) => !s.extra).map((s) => s.id));
   assert.equal(nextDay(homeDays, set(...allCore)).mode, 'complete', '추가 순서 없이도 과정 완료');
   const d13 = await open('index.html', { saved: JSON.stringify({ version: 1, steps: Object.fromEntries(coreUpToD13.map((id) => [id, true])) }) });
-  assert.equal(d13.$('.ch-day[data-day="D13"] [data-day-count]').textContent, '1/1');
-  assert.ok(d13.$('.ch-day[data-day="D13"]').classList.contains('is-done'));
+  assert.equal(d13.$('.ch-progress'), null, '홈은 전체 진도를 복제하지 않는다');
   assert.equal(d13.$('[data-today-id]').textContent, 'D14');
   assert.match(d13.$('[data-today-meta]').textContent, /순서 2개 · 선택·연습 4개/);
-  assert.equal(d13.$('[data-progress-summary]').textContent, `체크한 순서 ${coreUpToD13.length}/${allCore.length}`);
+  assert.equal(d13.$('[data-progress-summary]'), null);
   // JS 없이 서버가 처음 그린 숫자도 같은 기준이다(재검토 지적: JS가 고쳐 그리면 초기 HTML 회귀를 못 잡는다)
   const rawHome = await open('index.html', { script: '' });
-  assert.equal(rawHome.$('.ch-day[data-day="D13"] [data-day-count]').textContent, '0/1', '처음 그린 칸도 진도로 세는 순서 수');
-  assert.equal(rawHome.$('[data-progress-summary]').textContent, `체크한 순서 0/${allCore.length}`);
+  assert.equal(rawHome.$$('.ch-day').length, 0);
   // 일자 페이지도 홈과 같은 저장값을 같은 기준으로 센다(P8-4 재검토 ①)
   const savedUpToD13 = JSON.stringify({ version: 1, steps: Object.fromEntries(coreUpToD13.map((id) => [id, true])) });
   const d13page = await open('course/spring/D13.html', { saved: savedUpToD13 });
@@ -615,8 +601,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
     const page = await open(`course/spring/${id}.html`, { saved: savedUpToD13 });
     const core = d.steps.filter((x) => !x.extra), extra = d.steps.filter((x) => x.extra);
     const n = core.filter((x) => coreUpToD13.includes(x.id)).length;
-    assert.equal(page.$('[data-day-progress]').textContent, `구현 완료 ${n}/${core.length} · 선택·연습 0/${extra.length}`, `${id} 일자 진도 = 홈 칸 ${d13.$(`.ch-day[data-day="${id}"] [data-day-count]`).textContent}`);
-    assert.equal(d13.$(`.ch-day[data-day="${id}"] [data-day-count]`).textContent, `${n}/${core.length}`);
+    assert.equal(page.$('[data-day-progress]').textContent, `구현 완료 ${n}/${core.length} · 선택·연습 0/${extra.length}`);
   }
   const d04page = await open('course/spring/D04.html', { saved: savedUpToD13 });
   assert.doesNotMatch(d04page.$('[data-day-progress]').textContent, /선택·연습/, '추가 순서가 없는 날은 예전 표시 그대로');
@@ -731,7 +716,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
     assert.equal(fold.querySelectorAll('.flow-step').length, flow.steps.filter((s) => s.side === 'cause').length, `${id}: 원인 단계 수`);
     assert.equal(section.querySelectorAll('.flow-step:not(.is-cause)').length, flow.steps.filter((s) => s.side === 'open').length, `${id}: 증상 단계 수`);
     const bare = doc.body.cloneNode(true);
-    bare.querySelectorAll('details').forEach((d) => d.remove());
+    bare.querySelectorAll('details,script,style,noscript').forEach((d) => d.remove());
     const visible = bare.textContent.replace(/\s+/g, ' ') + [...bare.querySelectorAll('[aria-label],[title]')].map((e) => `${e.getAttribute('aria-label')} ${e.getAttribute('title')}`).join(' ');
     for (const s of flow.steps.filter((x) => x.side === 'cause')) {
       for (const piece of [s.title, ...s.values.map((v) => v[1])]) assert.ok(!visible.includes(plainText(piece)), `${id}: 원인 문장 "${plainText(piece)}"이 접기 밖에 보인다`);
@@ -759,7 +744,7 @@ await test('일자 진도는 선택 티켓만 포함하고 선택 변경·해제
     const attrs = [...doc.body.querySelectorAll('[aria-label],[title]')].filter(shown).map((e) => ` ${e.getAttribute('aria-label') ?? ''} ${e.getAttribute('title') ?? ''}`).join('');
     const summaries = [...doc.body.querySelectorAll('summary')].map((e) => ` ${e.textContent}`).join('');
     const bare = doc.body.cloneNode(true);
-    bare.querySelectorAll('details').forEach((d) => d.remove());
+    bare.querySelectorAll('details,script,style,noscript').forEach((d) => d.remove());
     return plainText(bare.textContent + summaries + attrs);
   };
   // 낱말 목록이 놓친 해법·메커니즘 문구(codex P8-3 리뷰 ①)와 동의 표현. 진단 도구 이름은 넣지 않는다.
@@ -1057,7 +1042,7 @@ await test('단계형 일자: 무스크립트 원문, 해시·뒤로 가기, 전
   const raw = new JSDOM(fs.readFileSync(new URL('course/spring/D05.html', root), 'utf8')).window.document;
   const rawPanels = [...raw.querySelectorAll('.day-stepper-main > [data-day-panel]')];
   assert.ok(rawPanels.length > 4);
-  assert.equal(rawPanels.filter(panel => panel.hidden).length, 0, 'JS가 없으면 모든 단계 원문을 읽을 수 있다');
+  assert.ok(raw.querySelector('noscript')?.textContent.includes('[data-day-panel][hidden]'), 'JS가 없으면 모든 단계 원문을 여는 fallback CSS가 있다');
   assert.ok(raw.querySelector('.day-stage-data .day-data'), '적재 원문은 데이터 단계에 있다');
   for (const cls of ['day-sql', 'day-talk', 'day-grade']) assert.ok(raw.querySelector(`.day-stage-wrap .${cls}`), cls);
   for (const step of raw.querySelectorAll('.day-step')) {

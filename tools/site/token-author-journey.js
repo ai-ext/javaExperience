@@ -67,11 +67,11 @@ document.querySelectorAll('.token-journey').forEach((journey) => {
       panel.querySelector('[data-token-role-result]').textContent = id === 'T10' ? '허용' : '거절';
     }
   };
-  const show = (name) => {
+  const show = (name, scroll = true) => {
     for (const panel of panels) panel.hidden = panel.dataset.tokenPanel !== name;
     journey.dataset.tokenScreen = name;
     if (cases[name]) showCase(name, selected[name]);
-    journey.scrollIntoView({ block: 'start', behavior: 'instant' });
+    if (scroll) journey.scrollIntoView({ block: 'start', behavior: 'instant' });
   };
   for (const button of journey.querySelectorAll('[data-token-go]')) {
     button.addEventListener('click', () => show(button.dataset.tokenGo));
@@ -115,6 +115,6 @@ document.querySelectorAll('.token-journey').forEach((journey) => {
   };
   window.addEventListener('hashchange', revealRequest);
   for (const [name, values] of Object.entries(cases)) showCase(name, values[0]);
-  show('scenario');
+  show('scenario', false);
   revealRequest();
 });

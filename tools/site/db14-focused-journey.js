@@ -2,14 +2,14 @@ document.querySelectorAll('.db14-focused').forEach((journey)=>{
   const panels=[...journey.querySelectorAll('[data-db14-panel]')];
   const fields=[...journey.querySelectorAll('[data-db14-record]')];
   const idField=(key)=>journey.querySelector(`[data-db14-record="${key}"]`);
-  const show=(name)=>{
+  const show = (name, scroll = true) =>{
     const active=panels.find((panel)=>panel.dataset.db14Panel===name);
     if(!active)return;
     if(name==='compare'&&!idField('before-ids').value.trim()&&idField('baseline-ids').value.trim())idField('before-ids').value=idField('baseline-ids').value;
     for(const panel of panels)panel.hidden=panel!==active;
     journey.dataset.db14Screen=name;
     for(const button of journey.querySelectorAll('.db14-progress [data-db14-go]'))button.setAttribute('aria-current',button.dataset.db14Go===name?'step':'false');
-    journey.scrollIntoView({block:'start',behavior:'instant'});
+    if (scroll) journey.scrollIntoView({block:'start',behavior:'instant'});
   };
   for(const button of journey.querySelectorAll('[data-db14-go]'))button.addEventListener('click',()=>show(button.dataset.db14Go));
   for(const button of journey.querySelectorAll('[data-db14-copy]'))button.addEventListener('click',async()=>{
@@ -39,5 +39,5 @@ document.querySelectorAll('.db14-focused').forEach((journey)=>{
     try{localStorage.setItem(storageKey,JSON.stringify(Object.fromEntries(fields.map((item)=>[item.dataset.db14Record,item.value]))));}catch{/* 저장 실패에도 현재 입력은 유지된다. */}
     refresh();
   });
-  refresh();show('scenario');
+  refresh();show('scenario', false);
 });

@@ -3,7 +3,8 @@
 사이트의 모든 HTML을 실제 Chromium에서 열어 검사한다. 패키지를 자동 설치하지 않는다. `playwright`가 기존 `node_modules`에 있으면 그대로 사용하고, 별도 제공된 모듈은 `PLAYWRIGHT_MODULE` 환경 변수로 지정한다. 모듈이 없으면 설정 안내와 종료 코드 2를 반환한다.
 
 - `npm run check:contrast`: 전체 HTML
-- `npm run check:contrast:quick`: 홈·과정 안내·D01·D05·D11·J01·B01과 이전 과정 대표 6쪽
+- `npm run check:contrast:quick`: 홈·과정 안내·D01·D05·D11·J01·B01과 서비스 만들기·개념 학습 대표 6쪽
+- `SITE_BASE_URL=http://127.0.0.1:18998`: 기존 서버 공유. 지정한 서버는 검사에서 종료하지 않는다.
 - `--out <결과 디렉터리>`: JSON 결과 저장 위치. 기본값은 운영체제 임시 디렉터리 아래 `javaexperience-contrast`다.
 - `--root <사이트 루트>`, `--workers <동시 페이지 수>`, `--limit <페이지 수>`: 격리 fixture와 도구 자체 검증용 옵션
 

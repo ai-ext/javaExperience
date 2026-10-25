@@ -109,10 +109,11 @@ test('선택 티켓은 단일 Tab 정지점에서 방향키·Home·End로 선택
  dom.window.close();
 });
 
-test('진도 45일은 기본 공개하며 시각 완료 조건과 중복 목록을 함께 출력하지 않는다', async () => {
+test('홈은 진도 목록을 복제하지 않으며 일자는 시각 완료 조건과 중복 목록을 함께 출력하지 않는다', async () => {
  const home=open('README.html'); await ready(home);
  assert.equal(home.window.document.querySelectorAll('.ch-phase-details:not([open])').length,0);
- assert.equal(home.window.document.querySelectorAll('.ch-phase-details .ch-day').length,45);
+ assert.equal(home.window.document.querySelectorAll('.ch-phase-details .ch-day').length,0);
+ assert.equal(home.window.document.querySelectorAll('.ch-menu-guide li').length,4);
  home.window.close();
  const {loadCourseSources}=await import('../course/sources.mjs');
  for(const day of loadCourseSources().roadmap.days) {

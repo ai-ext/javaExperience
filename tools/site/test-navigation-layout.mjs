@@ -56,31 +56,32 @@ test('학습 장면 선택을 사이드바로 옮겨도 패널과 현재 표시�
 });
 
 const browserModule=process.env.PLAYWRIGHT_MODULE;
-test('1440px 실제 화면의 전역 메뉴는 한 층·5개 이하이고 본문 위 떠다니는 바는 없다', {skip:!browserModule,timeout:120000}, async () => {
+test('1440px 실제 화면의 전역 메뉴는 한 층·5개이고 본문 위 떠다니는 바는 없다', {skip:!browserModule,timeout:120000}, async () => {
   const require=createRequire(import.meta.url),{chromium}=require(browserModule);
-  const server=spawn('python3',['-u','-m','http.server','0','--bind','127.0.0.1'],{cwd:root,stdio:['ignore','pipe','ignore']});
-  const port=await new Promise((resolve,reject)=>{server.stdout.on('data',chunk=>{const match=String(chunk).match(/port (\d+)/);if(match)resolve(match[1]);});server.once('error',reject);});
+  const externalBase=process.env.SITE_BASE_URL;
+  const server=externalBase?null:spawn('python3',['-u','-m','http.server','0','--bind','127.0.0.1'],{cwd:root,stdio:['ignore','pipe','ignore']});
+  const port=externalBase?null:await new Promise((resolve,reject)=>{server.stdout.on('data',chunk=>{const match=String(chunk).match(/port (\d+)/);if(match)resolve(match[1]);});server.once('error',reject);});
   let browser;
   try {
     browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:900},colorScheme:'dark'});
-    for (const file of ['index.html','course/README.html','course/spring/README.html','course/spring/D00.html','course/spring/D11.html','course/map.html','course/resources.html','course/archive.html','course/java/J05.html','course/tickets/B01.html','course/start/README.html','docs/knowledge/README.html','docs/knowledge/P16-json-jackson-practical.html','scenario/README.html','scenario/ch0-first-steps/0-1-ts-to-java.html','docs/knowledge/P02-mvc-layered-architecture.html','practice/MISSIONS.html','tickets/001-board-list-api.html']) {
-      const response=await page.goto(`http://127.0.0.1:${port}/${file}`,{waitUntil:'load'});
+    for (const file of ['index.html','course/README.html','course/spring/README.html','course/spring/D00.html','course/spring/D11.html','course/map.html','course/resources.html','course/archive.html','course/java/README.html','course/tickets/README.html','lessons/README.html','tickets/README.html','course/java/J05.html','course/tickets/B01.html','course/start/README.html','docs/knowledge/README.html','docs/knowledge/P16-json-jackson-practical.html','scenario/README.html','scenario/ch0-first-steps/0-1-ts-to-java.html','docs/knowledge/P02-mvc-layered-architecture.html','practice/MISSIONS.html','tickets/001-board-list-api.html']) {
+      const response=await page.goto(`${externalBase || `http://127.0.0.1:${port}`}/${file}`,{waitUntil:'load'});
       assert.equal(response.status(),200,file);
       assert.equal(await page.locator('.site-topbar nav[aria-label="주 메뉴"]').count(),1,file);
       const inspect=()=>{
         const visible=e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0&&!e.closest('[hidden]')&&getComputedStyle(e).visibility!=='hidden';
         const nav=document.querySelector('.site-topbar nav[aria-label="주 메뉴"]');
-        return {items:nav.children.length,layers:new Set([...nav.children].map(e=>Math.round(e.getBoundingClientRect().top))).size,headerMenus:document.querySelectorAll('.site-topbar nav').length,floating:[...document.querySelectorAll('main *')].filter(visible).filter(e=>['sticky','fixed'].includes(getComputedStyle(e).position)&&!e.matches('.page-sidebar,.day-today')&&!e.closest('.page-sidebar,.day-today')).map(e=>e.className),sidebars:[...document.querySelectorAll('.page-sidebar,.day-today')].filter(visible).length,overflow:document.documentElement.scrollWidth>1444};
+        return {items:nav.children.length,layers:new Set([...nav.children].map(e=>Math.round(e.getBoundingClientRect().top))).size,headerMenus:document.querySelectorAll('.site-topbar nav').length,floating:[...document.querySelectorAll('main *')].filter(visible).filter(e=>['sticky','fixed'].includes(getComputedStyle(e).position)&&!e.matches('.site-frame-sidebar,.page-sidebar,.day-today')&&!e.closest('.site-frame-sidebar,.page-sidebar,.day-today')).map(e=>e.className),sidebars:[...document.querySelectorAll('.page-sidebar,.day-today')].filter(visible).length,navOverflow:nav.scrollWidth-nav.clientWidth,overflow:document.documentElement.scrollWidth>1440};
       };
-      if (/^course\/(?:java|tickets)\//.test(file)) {
+      if (/^course\/(?:java\/J\d+|tickets\/(?:B\d+|E\d+|drill))/.test(file)) {
         assert.equal(await page.locator('.exercise-kind').count(),0,`${file}: 종류 표시 중복 제거`);
         assert.equal(await page.locator('.content-page-kind').count(),1,`${file}: 종류 표시 한 번`);
       }
       let data=await page.evaluate(inspect);
-      assert.ok(data.items<=5,`${file}: ${data.items} 항목`);assert.equal(data.layers,1,file);assert.equal(data.headerMenus,1,file);assert.deepEqual(data.floating,[],file);assert.ok(data.sidebars<=1,`${file}: 사이드바 중복`);assert.equal(data.overflow,false,`${file}: 가로 넘침`);
+      assert.equal(data.navOverflow,0,`${file}: 메뉴 가로 넘침`);assert.equal(data.items,5,`${file}: ${data.items} 항목`);assert.equal(data.layers,1,file);assert.equal(data.headerMenus,1,file);assert.deepEqual(data.floating,[],file);assert.ok(data.sidebars<=1,`${file}: 사이드바 중복`);assert.equal(data.overflow,false,`${file}: 가로 넘침`);
       if (file==='course/spring/D11.html') {await page.locator('[data-day-expand]').click();data=await page.evaluate(inspect);assert.deepEqual(data.floating,[],`${file}: 전체 보기`);assert.equal(data.sidebars,1);}
       const targets=page.locator('.page-sidebar .section-switcher button[data-section-target]');
       if(await targets.count()>1){await targets.nth(1).click();const samples=[await page.evaluate(()=>scrollY)];for(let n=0;n<10;n++){await page.waitForTimeout(100);samples.push(await page.evaluate(()=>scrollY));}assert.equal(Math.max(...samples)-Math.min(...samples),0,`${file}: 선택 후 지연 스크롤`);}
     }
-  } finally {await browser?.close();server.kill('SIGTERM');}
+  } finally {await browser?.close();server?.kill('SIGTERM');}
 });

@@ -3,27 +3,19 @@ import fs from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { renderSiteNavigation, renderSiteBreadcrumb, siteSection } from './site-navigation.mjs';
 
-const labels = ['홈', '과정', '지도', '자료', '이전 과정'];
-const destinations = ['index.html', 'course/spring/README.html', 'course/map.html', 'course/resources.html', 'course/archive.html'];
+const labels = ['홈', '45일 과정', '서비스 만들기', '실전 미션', '개념 학습'];
+const destinations = ['index.html', 'course/spring/README.html', 'scenario/README.html', 'practice/MISSIONS.html', 'docs/knowledge/README.html'];
 const examples = [
-  ['README.md', '홈'],
-  ['course/spring/D11.md', '과정'],
-  ['course/map.md', '지도'],
-  ['course/README.md', '자료'],
-  ['course/resources.md', '자료'],
-  ['course/archive.md', '이전 과정'],
-  ['course/java/J01.md', '자료'],
-  ['course/tickets/B01.md', '자료'],
-  ['course/start/dummy/README.md', '자료'],
-  ['scenario/README.md', '이전 과정'],
-  ['scenario/ch1-create-post/1-2-dto-response.md', '이전 과정'],
-  ['scenario/labs/l12-query-methods/README.md', '이전 과정'],
-  ['practice/MISSIONS.md', '이전 과정'],
-  ['tickets/README.md', '이전 과정'],
-  ['docs/knowledge/README.md', '자료'],
-  ['docs/knowledge/P02-mvc-layered-architecture.md', '자료'],
-  ['lessons/nested/example.md', '이전 과정'],
-  ['errors.md', null],
+  ['README.md', '홈'], ['course/spring/D11.md', '45일 과정'], ['course/map.md', '45일 과정'],
+  ['course/README.md', '45일 과정'], ['course/resources.md', '45일 과정'], ['course/archive.md', '45일 과정'],
+  ['course/java/README.md', '45일 과정'], ['course/java/J01.md', '45일 과정'],
+  ['course/tickets/README.md', '45일 과정'], ['course/tickets/B01.md', '45일 과정'],
+  ['course/start/dummy/README.md', '45일 과정'], ['scenario/README.md', '서비스 만들기'],
+  ['scenario/ch1-create-post/1-2-dto-response.md', '서비스 만들기'],
+  ['scenario/labs/l12-query-methods/README.md', '서비스 만들기'], ['practice/MISSIONS.md', '실전 미션'],
+  ['tickets/README.md', '서비스 만들기'], ['tickets/001-board-list-api.md', '서비스 만들기'],
+  ['docs/knowledge/README.md', '개념 학습'], ['docs/knowledge/P02-mvc-layered-architecture.md', '개념 학습'],
+  ['lessons/nested/example.md', '개념 학습'], ['course/spec-v2.md', '45일 과정'], ['errors.md', null],
 ];
 for (const [source, section] of examples) {
   const pageUrl = new URL(source, 'https://learn.example/');
@@ -40,6 +32,7 @@ for (const [source, section] of examples) {
   const current = [...nav.querySelectorAll('[aria-current="page"]')];
   assert.deepEqual(current.map((link) => link.textContent), section ? [section] : [], `${source}: 현재 공간만 선택`);
   assert.equal(links.length, 5, `${source}: 전역 항목은 다섯 개`);
+  assert.equal(new Set(links.map(link => link.href)).size, 5, '중복 목적지 없음');
   assert.equal(header.querySelectorAll('nav').length, 1, `${source}: 전역 메뉴 한 층`);
   assert.equal(header.querySelector('.course-content-nav,.home-header-setup'), null, `${source}: 보조 전역 메뉴 제거`);
   const crumb = new JSDOM(renderSiteBreadcrumb(source), {url:pageUrl.href});

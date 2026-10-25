@@ -9,6 +9,9 @@
 # 사이트 공통 추가 검사: 가로 넘침(hscroll) — 가로 스크롤, 또는 html·body overflow-x 로 화면 밖에서 잘린 요소.
 # 검사 전에 화면 낭독기 전용 글(1px sr-only)을 뺀다 — 잘림·반복 오탐(extra.js __hideSrOnly).
 set -euo pipefail
+if [[ -n "${SITE_BASE_URL:-}" ]]; then
+  exec node "$(dirname "$0")/run-shared.mjs" "$1"
+fi
 SCN=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 HERE=$(cd "$(dirname "$0")" && pwd)
 ROOT=$(cd "$HERE/../../.." && pwd)

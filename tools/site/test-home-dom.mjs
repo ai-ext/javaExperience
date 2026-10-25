@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { JSDOM } from 'jsdom';
+import { renderHomeVisual } from './home-visual.mjs';
 import { initLearning } from './home-learning.mjs';
 import { TASKS, PROGRESS_KEY } from './home-state.mjs';
 const root = new URL('../../', import.meta.url);
 function page(file = 'index.html', saved) {
-  const dom = new JSDOM(fs.readFileSync(new URL(file, root), 'utf8'), { url: `https://learn.example/${file}`, runScripts: 'outside-only' });
+  const dom = new JSDOM(file === 'index.html' ? `<main>${renderHomeVisual(root.pathname, new URL('README.md',root).pathname, '<h2 id="javaexperience">실행 안내</h2>')}</main><script data-home-controller data-home-root="index.html" src="tools/site/home-learning.bundle.js"></script>` : fs.readFileSync(new URL(file, root), 'utf8'), { url: `https://learn.example/${file}`, runScripts: 'outside-only' });
   const { window } = dom;
   window.scrollTo = () => {};
   window.HTMLElement.prototype.scrollIntoView = () => {};
@@ -179,7 +180,7 @@ assert.match(cursorHome.$('[data-demo-response]').textContent, /published_at/);
 assert.match(cursorHome.$('[data-demo=cursor]').textContent, /144/);
 cursorHome.close();
 
-// 실제 배포용 classic script도 import 없이 파일 문서에서 초기화 가능한지 검사한다.
+// 시나리오 이어하기 컨트롤러의 classic script도 import 없이 파일 문서에서 초기화 가능한지 검사한다.
 const direct = page();
 const script = direct.$('script[data-home-controller]');
 assert.notEqual(script.getAttribute('type'), 'module', '직접 파일 열기에서 ESM 의존 제거');
