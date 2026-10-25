@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox syntax for tracking.
 
-> 구현 및 정의된 하네스 검증 완료. OS clipboard round-trip은 inconclusive로 별도 추적하며, 기존 134개 원문의 전체 내용·실행 완료를 뜻하지 않는다. 이번 새 raster는 없어 imagegen/parity 조건부 단계는 N/A이며 시안·parity 검증을 뜻하지 않는다.
+> 구현 및 정의된 하네스 검증 완료. 후속 C05 3단계에서 사용자 UI 복사 후 실제 macOS `/usr/bin/pbpaste` 결과와 예상 UTF-8 원문 139바이트가 일치함을 확인했다. 전체 6개 단원의 자동 OS 붙여넣기 인증은 미실시이며, 기존 134개 원문의 전체 내용·실행 완료를 뜻하지 않는다. 이번 새 raster는 없어 imagegen/parity 조건부 단계는 N/A이며 시안·parity 검증을 뜻하지 않는다.
 
 **Goal:** 필수 여부·학습 깊이·분야를 분리한 개념 목록과 C01–C06 핵심 단원, 예제별 공식 근거·실행 범위를 제공한다.
 
