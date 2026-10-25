@@ -52,7 +52,8 @@
               }
             ],
             "policies": [
-              "SCHEDULED에는 publish_at 필수; DRAFT와 같이 작성자만 상세 접근, 목록/검색 제외. Clock 사용, 초 단위 정밀도. practice fixed clock에서는 13-5 rate limit bypass 예외 보존. 배치는 기존 endpoint 사용."
+              "SCHEDULED에는 publish_at 필수; DRAFT와 같이 작성자만 상세 접근, 목록/검색 제외. Clock 사용, 초 단위 정밀도. practice fixed clock에서는 13-5 rate limit bypass 예외 보존. 배치는 기존 endpoint 사용.",
+              "publishAt은 정확한 초 단위 문자열이며 now보다 뒤여야 하고 now+30일은 포함합니다. 생략/null은 즉시 발행, 빈 값·공백·형식 오류·status와 동시 입력은 400/errors.publishAt입니다. SCHEDULED 저장 시 published_at=NULL, 발행 후 published_at=예약 publish_at입니다. 배치가 실행된 시각으로 발행 시각을 덮지 않습니다."
             ],
             "inputs": [
               "legacy:15-3:P1: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 예약 발행 09:00\",\"content\":\"예약 발행 확인용 글\",\"tags\":[],\"publishAt\":\"2026-10-05T09:00:00\"}; case=09:00; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"P1\",\"expect\":{\"status\":201,\"json\":[{\"path\":\"$.status\",\"equals\":\"SCHEDULED\"},{\"path\":\"$.publishAt\",\"equals\":\"2026-10-05T09:00:00\"},{\"path\":\"$.publishedAt\",\"type\":\"null\"}]}}]",
@@ -78,12 +79,7 @@
               }
             ],
             "examples": [
-              {
-                "title": "교육용 데이터로 전후 확인",
-                "start": "미래 publish_at이 있는 SCHEDULED 글은 작성자만 읽을 수 있습니다.",
-                "action": "고정 시각을 예약 직전·경계·직후로 옮기며 기존 예약 발행 배치를 실행합니다.",
-                "result": "발행 전 비로그인 상세 404이며 게시 목록/검색에도 빠집니다. 잘못된 at 값 400에서는 기존 예약 시각과 상태를 유지합니다."
-              }
+              "실제생성id P와publishAt=2026-10-05T09:00:00을기록합니다. at=08:59:59에서는P가published배열에없고SCHEDULED,at=09:00:00에서는P가포함되고PUBLISHED/publishedAt=09:00:00입니다. 같은at재실행의published에는P가없으며값은변하지않습니다. 생성검증의Clock과배치at입력은별개로기록합니다."
             ],
             "work": [
               "예약 저장과 주기 실행의 Clock·상태조건을 일치시키고 중복 실행에 멱등하게 전이한다."
@@ -108,7 +104,14 @@
             "legacy:15-3:P10",
             "legacy:15-3:P4"
           ],
-          "executionChecks": [],
+          "executionChecks": [
+            {
+              "title": "기획 조건 저장 결과 확인",
+              "command": "선택한 실행 환경에서 원문에 정한 확인 절차 실행",
+              "expected": "기획서의 전후 사례와 일치",
+              "record": "실제 id, HTTP 결과, 확인한 저장값을 기록"
+            }
+          ],
           "choices": [],
           "concepts": [],
           "references": [
