@@ -1,0 +1,107 @@
+{
+  "id": "notifications",
+  "title": "내게 온 알림을 확인하고 읽음 처리하기",
+  "result": "COMMENT와 MENTION/NEW_POST 알림을 알림함에서 조회하고 읽음·커서 정책과 연결한다.",
+  "brief": {
+    "purpose": "COMMENT와 MENTION/NEW_POST 알림을 알림함에서 조회하고 읽음·커서 정책과 연결한다.",
+    "story": "김자바가 쓴 댓글에 활성 회원의 닉네임을 멘션합니다. 같은 닉네임이 반복될 수 있습니다. 댓글을 등록하고 받는 회원의 알림함·안 읽은 수를 조회한 뒤 읽음 처리합니다. 유효한 멘션 대상에게 한 번씩 알림이 생기고 읽음 상태와 안 읽은 수가 함께 맞습니다.",
+    "scope": "댓글·멘션·새 글 알림을 알림함에서 읽고, 페이지 이동과 읽음 처리 뒤 건수 변화를 확인합니다.",
+    "excluded": "원본 기획서에 별도 제외 범위가 명시되어 있지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "회원 3이 멘션 댓글",
+      "columns": [
+        "content"
+      ],
+      "actions": "POST /api/posts/15/comments 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "글 작성자(2)의 알림",
+      "columns": [],
+      "actions": "GET /api/me/notifications?size=2 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "회원 5 좋아요",
+      "columns": [],
+      "actions": "PUT /api/posts/1/like 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "모두 읽음",
+      "columns": [],
+      "actions": "POST /api/me/notifications/read-all 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "size=0(하한 바로 밖)",
+      "columns": [],
+      "actions": "GET /api/me/notifications?size=0 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "내 알림 읽음",
+      "columns": [],
+      "actions": "PATCH /api/me/notifications/{{N.body.items[0].id}}/read 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "회원 4가 새 글",
+      "columns": [
+        "boardSlug",
+        "title",
+        "content",
+        "tags",
+        "visibility"
+      ],
+      "actions": "POST /api/posts 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "팔로워(회원 2)의 최신 알림",
+      "columns": [],
+      "actions": "GET /api/me/notifications?size=1 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "첫 실행",
+      "columns": [],
+      "actions": "POST /api/admin/jobs/like-milestone/run 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "회원 8이 #140 좋아요(9 → 10)",
+      "columns": [],
+      "actions": "PUT /api/posts/140/like 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "좋아요 취소(10 → 9)",
+      "columns": [],
+      "actions": "DELETE /api/posts/140/like 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "회원 9의 축하 알림",
+      "columns": [],
+      "actions": "GET /api/me/notifications?type=LIKE_MILESTONE 요청을 보내고 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "MENTION은 본문 @닉네임 중 유효·활동 회원, 자기 자신/차단/접근불가/이미 알린 대상 제외; 중복 닉네임은 한 번, 최대 10명. NEW_POST는 글 커밋 후 활동 팔로워에게만. MENTION 댓글 생성 알림은 커밋 뒤 별도 트랜잭션; 새 글 알림은 AFTER_COMMIT.",
+    "같은 transaction 안에서 저장하는 LIKE/COMMENT 알림은 원인 작업이 rollback되면 함께 남지 않습니다. MENTION의 커밋 후 별도 transaction, NEW_POST의 AFTER_COMMIT 알림에는 이 설명을 일반화하지 말고 각 원문 경계를 확인합니다.",
+    "알림함은 읽음 여부 필터, cursor 페이지, 읽음 처리와 read-all 결과를 확인합니다. `size=0`은 400이며 notification 행·read_at·unreadCount는 그대로입니다.",
+    "NEW_POST는 ACTIVE follower만, 양방향 block 제외, 작성자 제외, DRAFT는 publish 때; AFTER_COMMIT. milestone은 실제 post_like 행 수, UNIQUE(post_id,milestone) INSERT 성공 시 알림; 기록과 알림은 한 transaction.",
+    "milestone 재현은 실제 좋아요 수 9→10→9→10 순서입니다. 알림은 처음 10회 도달 때만 1건 생성되며 같은 조건의 반복 배치는 중복 알림을 만들지 않습니다."
+  ],
+  "acceptance": [
+    "유효한 멘션 대상에게 한 번씩 알림이 생기고 읽음 상태와 안 읽은 수가 함께 맞습니다.",
+    "자기 자신·차단·접근 불가 대상은 제외하며 멘션 최대 10명 조건을 지킵니다. 실패한 댓글 등록에는 새 알림이 남지 않습니다.",
+    "GET /api/me/notifications?unreadOnly=1 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 notification 행, read_at 및 unreadCount가 실패 전 그대로며 rollback 원인에는 새 알림이 없다.",
+    "GET /api/me/notifications?size=0 · [교육용 fixture · legacy:12-3:S0] size=0(하한 바로 밖) → HTTP 400 (S0) notification/read_at/unreadCount는 실패 전과 같고 원인 transaction rollback에는 새 알림이 없다.",
+    "cursor order created_at DESC,id DESC; 동률 시간도 id로 이어진다. bulk read는 한 UPDATE, 이미 읽은 것은 변경 0."
+  ],
+  "days": {
+    "community:inbox": {
+      "title": "알림 저장과 커서 목록·읽음 상태 연결하기",
+      "goal": "댓글·멘션·새 글 알림을 알림함에서 읽고, 페이지 이동과 읽음 처리 뒤 건수 변화를 확인합니다.",
+      "concept": "notification.member_id, type, read_at, created_at, id · comment/post 및 mention/follow 관계"
+    },
+    "community:events": {
+      "title": "커밋한 글과 좋아요 달성에 알림 연결하기",
+      "goal": "새 글과 좋아요 milestone 알림을 만들고, 같은 작업을 다시 실행해도 중복 알림이 생기지 않는지 확인합니다.",
+      "concept": "notification.member_id, type, read_at, created_at, id · comment/post 및 mention/follow 관계"
+    }
+  }
+}

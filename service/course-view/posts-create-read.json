@@ -1,0 +1,162 @@
+{
+  "id": "posts-create-read",
+  "title": "글을 등록하고 다시 읽기",
+  "result": "로그인한 회원이 쓴 제목·본문·태그를 저장해 다음 요청에서도 같은 글을 읽을 수 있게 만듭니다.",
+  "brief": {
+    "purpose": "로그인한 회원이 쓴 제목·본문·태그를 저장해 다음 요청에서도 같은 글을 읽을 수 있게 만듭니다.",
+    "story": "로그인한 회원이 제목 ‘첫 기록’, 본문 ‘오늘 배운 내용’, 태그 ‘spring’을 입력합니다. 정상 글 등록 요청을 보냅니다. 작성자 번호를 임의의 본문 값으로 바꾸어 신뢰하지 않습니다. 생성된 글의 위치를 Location으로 받습니다. 응답 본문을 받은 것으로 가정하지 않습니다.",
+    "scope": "작성자는 로그인한 회원으로 정하고 글과 태그 연결을 저장하세요. 생성한 글의 위치를 응답하고, 잘못된 요청은 저장하지 마세요.",
+    "excluded": "원본 기획서에 별도 제외 범위가 명시되어 있지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "post-create",
+      "columns": [
+        "title",
+        "content",
+        "tags",
+        "postId",
+        "boardSlug",
+        "visibility",
+        "id",
+        "author",
+        "createdAt"
+      ],
+      "actions": "POST /api/posts 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "post-detail",
+      "columns": [
+        "postId",
+        "id",
+        "authorId",
+        "authorNickname",
+        "title",
+        "content",
+        "tags",
+        "likeCount",
+        "createdAt",
+        "updatedAt"
+      ],
+      "actions": "GET /api/posts/{postId} 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "게시글 상세 조회",
+      "columns": [
+        "id",
+        "boardSlug",
+        "title",
+        "content",
+        "tags",
+        "visibility",
+        "author",
+        "viewCount",
+        "likeCount",
+        "commentCount",
+        "createdAt"
+      ],
+      "actions": "GET /api/posts/{id} 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "로그인(김자바)",
+      "columns": [
+        "email",
+        "password"
+      ],
+      "actions": "POST /api/v1/auth/login 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "정상(authorId는 무시)",
+      "columns": [
+        "title",
+        "content",
+        "tags",
+        "authorId",
+        "visibility"
+      ],
+      "actions": "POST /api/v1/posts 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "비로그인 상세(글 1)",
+      "columns": [],
+      "actions": "GET /api/v1/posts/1 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "김자바가 좋아요한 글 11",
+      "columns": [],
+      "actions": "GET /api/v1/posts/11 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "김자바가 안 누른 글 12",
+      "columns": [],
+      "actions": "GET /api/v1/posts/12 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "비공개 글 — 비로그인",
+      "columns": [],
+      "actions": "GET /api/v1/posts/24 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "삭제된 글",
+      "columns": [],
+      "actions": "GET /api/v1/posts/25 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "없는 글",
+      "columns": [],
+      "actions": "GET /api/v1/posts/999999 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "숫자 아님",
+      "columns": [],
+      "actions": "GET /api/v1/posts/abc 요청을 보내고 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "작성자는 인증한 회원이며 본문의 authorId로 정하지 않습니다.",
+    "이번 요청의 글·태그 변경은 같은 트랜잭션으로 확정되거나 취소되어야 합니다. 이전부터 있던 공유 태그를 요청 실패를 이유로 지우면 안 됩니다.",
+    "테이블·키·제약을 직접 선택하되 글과 작성자, 글과 태그의 관계가 일관돼야 합니다. 요청 DTO와 저장 Entity의 역할을 구분합니다.",
+    "삭제됐거나 없는 글은 정상 상세 응답으로 돌려주지 않습니다.",
+    "경로 id가 양수가 아니거나 숫자로 해석되지 않는 실패와 대상이 없는 실패를 구분합니다.",
+    "직렬화 시점에 닫힌 DB 연결에 기대지 말고 필요한 작성자·태그 정보를 응답 가능한 형태로 준비합니다."
+  ],
+  "acceptance": [
+    "정상 요청의 상태·Location을 확인하고 같은 id로 저장 결과를 다시 읽었습니다.",
+    "제목 공백과 미인증 요청에서 새 글이 남지 않는 것을 확인했습니다.",
+    "중간 저장 실패의 취소 범위와 기존 공유 태그 보존을 코드·격리 테스트 또는 DB 관찰로 설명할 수 있습니다.",
+    "새 글이 저장되고 생성 위치를 응답합니다. 실제 응답의 id를 사용해 조회와 DB 재확인을 이어갑니다.",
+    "생성 때 보낸 값과 상세 응답이 같은 글임을 비교했습니다."
+  ],
+  "days": {
+    "board:create": {
+      "title": "글 등록하기",
+      "goal": "작성자는 로그인한 회원으로 정하고 글과 태그 연결을 저장하세요. 생성한 글의 위치를 응답하고, 잘못된 요청은 저장하지 마세요.",
+      "concept": "게시글 · 태그와 글별 연결"
+    },
+    "board:read": {
+      "title": "저장한 글 상세 보기",
+      "goal": "조회할 실제 글 id를 받아 상세 응답을 만드세요. 없는 글과 잘못된 id를 정상 글처럼 응답하지 마세요.",
+      "concept": "조회할 글 id · 글·작성자·태그의 응답 정보"
+    },
+    "community:create": {
+      "title": "글 등록하기",
+      "goal": "로그인 회원의 게시판·제목·본문·태그·공개 범위를 저장하고 생성한 글의 정보와 주소를 응답하세요.",
+      "concept": "게시글 · 태그와 글별 연결"
+    },
+    "community:read": {
+      "title": "저장한 글 상세 보기",
+      "goal": "조회할 실제 글 id를 받아 상세 응답을 만드세요. 없는 글과 잘못된 id를 정상 글처럼 응답하지 마세요.",
+      "concept": "조회할 글 id · 글·작성자·태그의 응답 정보"
+    },
+    "project-v1:create": {
+      "title": "명세에 맞춰 글 등록하기",
+      "goal": "제목·태그를 다듬은 뒤 검증하고 작성자·공유 태그·글을 한 번에 저장하세요.",
+      "concept": "글과 토큰 작성자 · 이름별 공유 태그와 연결"
+    },
+    "project-v1:read": {
+      "title": "명세 상세에서 조회수와 댓글 트리 보여 주기",
+      "goal": "볼 수 있는 글의 조회수만 원자적으로 1 올리고 삭제 댓글/답글 규칙과 정렬·쿼리 수를 맞추세요.",
+      "concept": "공개 범위와 로그인 회원 · 댓글 부모/답글/삭제 상태"
+    }
+  }
+}

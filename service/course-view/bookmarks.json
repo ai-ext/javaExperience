@@ -1,0 +1,55 @@
+{
+  "id": "bookmarks",
+  "title": "북마크를 폴더에 보관하기",
+  "result": "글을 내 폴더에 저장하고 메모를 고칠 수 있게 하세요. 같은 글을 다시 저장해도 북마크는 하나이며 폴더를 지워도 글은 기본 폴더에 남아야 합니다.",
+  "brief": {
+    "purpose": "글을 내 폴더에 저장하고 메모를 고칠 수 있게 하세요. 같은 글을 다시 저장해도 북마크는 하나이며 폴더를 지워도 글은 기본 폴더에 남아야 합니다.",
+    "story": "post2 bookmark 없음; Kim folder \"스프링 공부\" id11에 2 bookmarks, folder12 \"나중에 읽기\"에도 2 bookmarks. 운영 담당자 김민수는 이 요구를 맡습니다. 팀원 이지은과 함께 PUT /api/posts/2/bookmark memo=\"[북마크실습] 복습\"; 같은 PUT 반복; 6-2 folder rename/create/delete·move; 6-4 memo PATCH.",
+    "scope": "글 2를 내 폴더에 저장하고 목록에서 다시 찾아보세요. 같은 글을 반복 저장하고 메모 수정·폴더 삭제 뒤에도 북마크가 하나로 유지되는지 확인합니다.",
+    "excluded": "원문에 적힌 요청과 완료 기준 밖의 기능은 이번 범위에 넣지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "글을 폴더에 담고 메모·목록 관리 화면",
+      "columns": [
+        "memo"
+      ],
+      "actions": "PUT /api/posts/2/bookmark 요청 후 명시된 응답을 확인합니다."
+    },
+    {
+      "name": "글을 폴더에 담고 메모·목록 관리 화면",
+      "columns": [
+        "name"
+      ],
+      "actions": "POST /api/me/bookmark-folders 요청 후 명시된 응답을 확인합니다."
+    },
+    {
+      "name": "글을 폴더에 담고 메모·목록 관리 화면",
+      "columns": [
+        "name"
+      ],
+      "actions": "PATCH /api/me/bookmark-folders/11 요청 후 명시된 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "6-0 PUT는 token member와 post, optional folderId/memo; 누락/null folder는 기본 폴더, memo는 null; memo max200. 반복 PUT은 같은 bookmarkId, 행은 한 개. 내 글 북마크 허용, like_count는 건드리지 않는다.",
+    "folderId 존재뿐 아니라 folder.member_id=token member인지 확인한다. invalid folder면 새 bookmark를 만들지 않는다. UNIQUE(member_id,post_id).",
+    "6-1 upsert는 existing folder/memo를 요청값으로 갱신한다. 6-2 folder max10, duplicate normalized name 409, 빈/51자 400, 삭제 시 bookmark 유지하면서 folder_id=NULL.",
+    "6-3 GET /api/me/bookmarks 생략=전체, folder=default/null-folder, numeric folder own only; size 1..100/default10; sort bookmarkedAt desc then bookmark id desc, cursor opaque. Unavailable row는 남기고 available=false,title=null,author=null.",
+    "6-4 PATCH existing bookmark memo: {} means unchanged, {memo:null} clears; string incl empty allowed up to 200, >200/wrong type 400, missing bookmark 404, no new row; folderId ignored and folderId/bookmarkId/created_at stable."
+  ],
+  "acceptance": [
+    "중복 PUT은 bookmarkId와 row 하나를 유지했다.",
+    "폴더 소유/limit/name/delete 이관 규칙을 확인했다.",
+    "6-3 unavailable 보존 및 6-4 absent/null/empty memo 의미를 구분했다.",
+    "실패 후 bookmark/folder 관계가 unchanged다.",
+    "PUT bookmark 200; repeated PUT same bookmarkId, one row; response bookmarked=true, folderId/memo actual."
+  ],
+  "days": {
+    "community:save": {
+      "title": "글을 폴더에 담고 메모·목록 관리하기",
+      "goal": "글 2를 내 폴더에 저장하고 목록에서 다시 찾아보세요.",
+      "concept": "북마크와 폴더 관계"
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "counter-reconcile",
+  "title": "실제 관계와 어긋난 숫자 바로잡기",
+  "result": "게시글의 좋아요·댓글 숫자가 실제 관계 수와 다른 행만 고치세요. 운영자 실행 후 불일치가 0이고 두 번째 실행은 값을 더 바꾸지 않으면 끝입니다.",
+  "brief": {
+    "purpose": "게시글의 좋아요·댓글 숫자가 실제 관계 수와 다른 행만 고치세요. 운영자 실행 후 불일치가 0이고 두 번째 실행은 값을 더 바꾸지 않으면 끝입니다.",
+    "story": "deleted_at is null인 post 중 저장 count와 relation count가 다른 id 및 각 값을 기록한다. 운영 담당자 김민수는 이 요구를 맡습니다. 팀원 이지은과 함께 ADMIN token으로 POST /api/admin/recount 후 같은 SELECT를 재실행한다.",
+    "scope": "저장된 좋아요 수와 실제 좋아요 행 수가 다른지 확인하고 바로잡으세요. 실행 전후를 조회해 차이가 0이 되고 두 번째 실행은 값을 바꾸지 않는지 검사합니다.",
+    "excluded": "원문에 적힌 요청과 완료 기준 밖의 기능은 이번 범위에 넣지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "집계 값 보정 결과",
+      "columns": [
+        "likeFixed",
+        "commentFixed",
+        "보정 전·후 like_count",
+        "보정 전·후 comment_count"
+      ],
+      "actions": "POST /api/admin/recount 요청 후 응답과 재조회 결과를 비교합니다."
+    }
+  ],
+  "policies": [
+    "POST /api/admin/recount는 ADMIN(member1 tok-p01) only; no token 401, ordinary member 403.",
+    "진단 SELECT를 먼저 남기고 active posts만 처리한다. likes는 post_like 행수, comments는 미삭제 comment 행수의 합이다.",
+    "post를 한 개씩 entity load/save하지 않고 집합형 update로 대상 mismatch만 보정한다.",
+    "scheduled/background job이 아니라 명시적인 학습용 ADMIN request다."
+  ],
+  "acceptance": [
+    "D1 and D2 are zero afterward.",
+    "Only mismatch active records changed; deleted records excluded.",
+    "401/403 keep counts and second run is stable.",
+    "ADMIN의 POST /api/admin/recount는 200이며 likeFixed/commentFixed에 보정 내역을 돌려줍니다. 원문 fixture의 글 93 like_count는 6→4, 글 22 comment_count는 9→8입니다. 이미 보정했다면 두 배열은 비어야 합니다.",
+    "repeated recount produces no further count changes."
+  ],
+  "days": {
+    "community:repair": {
+      "title": "관계 수를 다시 세고 필요한 행만 보정하기",
+      "goal": "저장된 좋아요 수와 실제 좋아요 행 수가 다른지 확인하고 바로잡으세요.",
+      "concept": "관계 데이터와 집계 값"
+    }
+  }
+}

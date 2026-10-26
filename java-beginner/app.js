@@ -1,6 +1,7 @@
 // Embedded into java-beginner.html by build.mjs. No imports or network dependencies.
 const course=JSON.parse(document.getElementById('course-data').textContent);
-const apis=course.modules.flatMap(m=>m.apis.map(a=>({...a,module:m})));
+const allModules=[...course.modules,...(course.attachedModules||[])];
+const apis=allModules.flatMap(m=>m.apis.map(a=>({...a,module:m})));
 const byId=new Map(apis.map(a=>[a.id,a]));
 const progressKey='java-beginner.standalone.progress.v2';
 const content=document.getElementById('content');
@@ -16,7 +17,7 @@ function navigationState(){
   if(location.hash==='#setup') return {view:'setup'};
   const params=new URLSearchParams(location.hash.slice(1));
   if(['beginner','service'].includes(params.get('group'))) return {view:'home',group:params.get('group')};
-  const m=course.modules.find(m=>m.id===(params.has('feature')?params.get('feature'):params.get('m')));
+  const m=allModules.find(m=>m.id===(params.has('feature')?params.get('feature'):params.get('m')));
   if(!m) return {view:'home'};
   const d=m.source==='service'?(m.days.find(d=>d.project===params.get('project')&&d.sourceStageId===params.get('stage'))||m.days.find(d=>d.day===Number(params.get('d')))||m.days[0]):m.days.find(d=>d.day===Number(params.get('d'))) || m.days[0];
   const tab=['task','brief','data','api'].includes(params.get('t'))?params.get('t'):'task';
@@ -33,14 +34,14 @@ function render(keepScroll=false){
   for(const link of document.querySelectorAll('[data-module]')) {
     link.classList.toggle('active',link.dataset.module===current.m?.id);
     if(link.classList.contains('active')) link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
-    const m=course.modules.find(m=>m.id===link.dataset.module);
+    const m=allModules.find(m=>m.id===link.dataset.module);
     const count=m.days.filter(d=>completed.includes(d.day)).length;
     const label=link.querySelector('.nav-complete');label.textContent=count===m.days.length?'✓':'';
   }
   $('nav-overview').classList.toggle('active',current.view==='home');
   const courseSwitch=$('course-switch');
   if(courseSwitch){const targetGroup=current.m?.source==='service'?'beginner':'service';courseSwitch.href=`#group=${targetGroup}`;courseSwitch.textContent=targetGroup==='service'?'실무 묶음으로 이동':'입문 묶음으로 이동';}
-  const total=course.modules.flatMap(m=>m.days).length;
+  const total=new Set(allModules.flatMap(m=>m.days).map(day=>day.progressId||`${day.featureId||''}:${day.day}`)).size;
   $('progress-count').textContent=`${completed.length} / ${total}`;
   $('progress-fill').style.width=`${completed.length/total*100}%`;
   $('header-status').textContent=current.d?`Day ${dayLabel(current.d)} / ${total}`:`${completed.length}회차 완료`;
@@ -73,7 +74,7 @@ async function mountApi(){
   const pageGeneration=generation;
   const preferred=[...new Set(current.d.apiIds.length?current.d.apiIds:current.m.apis.map(a=>a.id))];
   const options=ids=>ids.map(id=>byId.get(id)).filter(Boolean).map(a=>`<option value="${esc(a.id)}">${esc(a.method)} · ${esc(a.title)}</option>`).join('');
-  const sourceModules=course.modules.filter(module=>module.source===current.m.source);
+  const sourceModules=allModules.filter(module=>module.source===current.m.source);
   $('api-select').innerHTML=`<optgroup label="오늘 확인할 API">${options(preferred)}</optgroup>${sourceModules.map(m=>`<optgroup label="${m.number} ${esc(m.title)}">${options(m.apis.map(a=>a.id).filter(id=>!preferred.includes(id)))}</optgroup>`).join('')}`;
   $('api-select').value=preferred[0] || current.m.apis[0].id;
   $('csrf-token').value=csrf;$('bearer-token').value=bearer;
@@ -226,7 +227,7 @@ $('course-search').addEventListener('input',event=>{
   const query=event.target.value.trim().toLocaleLowerCase();
   const node=$('search-results');
   if(!query){node.hidden=true;node.replaceChildren();return;}
-  const found=course.modules.flatMap(m=>m.days.map(d=>({m,d}))).filter(({m,d})=>`${m.title} ${d.day} day${d.day} ${d.title} ${d.concept}`.toLocaleLowerCase().includes(query)).slice(0,10);
+  const found=allModules.flatMap(m=>m.days.map(d=>({m,d}))).filter(({m,d})=>`${m.title} ${d.day} day${d.day} ${d.title} ${d.concept}`.toLocaleLowerCase().includes(query)).slice(0,10);
   node.hidden=false;node.innerHTML=found.length?found.map(({m,d})=>`<a href="${route(m,d)}"><span>DAY ${pad(d.day)} · ${esc(m.title)}</span><strong>${esc(d.title)}</strong></a>`).join(''):'<p>검색 결과가 없습니다. 게시판·로그인·재고 같은 기능 이름으로 찾아보세요.</p>';
 });
 $('search-results').addEventListener('click',event=>{if(event.target.closest('a')){$('course-search').value='';$('search-results').hidden=true;}});
@@ -243,3 +244,6 @@ document.addEventListener('keydown',event=>{
 });
 window.addEventListener('hashchange',()=>render());
 render();
+
+// 출처별 보기: 통합 / 🌱 입문 과정(팀원)만 / 🐝 서비스 만들기 통합분만. 고른 보기는 이 브라우저에 기억한다.
+(()=>{const key='java-workshop.source-view';const apply=v=>{const view=['all','beginner','service'].includes(v)?v:'all';document.documentElement.dataset.view=view;for(const b of document.querySelectorAll('[data-view-switch]'))b.setAttribute('aria-pressed',String(b.dataset.viewSwitch===view));return view;};let saved='all';try{saved=localStorage.getItem(key)||'all';}catch{}apply(saved);document.addEventListener('click',e=>{const b=e.target.closest('[data-view-switch]');if(!b)return;const v=apply(b.dataset.viewSwitch);try{localStorage.setItem(key,v);}catch{}});new MutationObserver(()=>apply(document.documentElement.dataset.view)).observe(document.body,{childList:true,subtree:true});})();

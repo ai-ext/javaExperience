@@ -1,0 +1,76 @@
+{
+  "id": "post-copy",
+  "title": "기존 글을 복사해 새 글 만들기",
+  "result": "공개 글을 복사하고 새 글과 원본의 내용·작성자·태그 차이를 확인합니다.",
+  "brief": {
+    "purpose": "1-8 원본 공개 글을 새 게시글로 복사하면서 새 id/작성자를 쓰고 선택한 경우에만 tag 연결을 복사한다.",
+    "story": "post2 original owner/content/tags and post/tag relation counts를 기록한다. POST /api/posts/2/copies?copyTags=true with title [복사실습] JPA 복습, 이어 copyTags=false로 두 번째 복사한다. 각 성공 201+Location 새 id; true copy는 tags [spring,jpa], false copy는 tags []; 새 글 author는 Kim, original fields unchanged.",
+    "scope": "공개 글 2번을 복사하고 새 글의 id·작성자·태그를 확인한 뒤 원본 2번이 그대로인지 비교합니다.",
+    "excluded": "원본 기획서에 별도 제외 범위가 명시되어 있지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "태그까지 복사",
+      "columns": [
+        "title"
+      ],
+      "actions": "POST /api/posts/2/copies?copyTags=true 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "태그 없이 복사",
+      "columns": [
+        "title"
+      ],
+      "actions": "POST /api/posts/2/copies?copyTags=false 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "잘못된 옵션",
+      "columns": [
+        "title"
+      ],
+      "actions": "POST /api/posts/2/copies?copyTags=maybe 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "제목 누락",
+      "columns": [
+        "title"
+      ],
+      "actions": "POST /api/posts/2/copies 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "비공개 원본",
+      "columns": [
+        "title"
+      ],
+      "actions": "POST /api/posts/6/copies 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "공지 쓰기 권한 없음",
+      "columns": [
+        "title"
+      ],
+      "actions": "POST /api/posts/1/copies 요청을 보내고 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "POST /api/posts/{sourceId}/copies?copyTags=true|false; omitted copyTags defaults false. Body contains title only, 1..200 nonblank after trim.",
+    "source must be PUBLISHED+PUBLIC and not deleted; unreadable/missing source 404. Apply target board write permission again; unauthorized 403.",
+    "author comes from token. New entity/new id; do not reuse source id or author id. copyTags true shares tag associations; false creates no associations.",
+    "Post and post_tag writes are one transaction. Any failure leaves source and new rows unchanged.",
+    "복사 응답의 실제 새 id로 상세를 다시 조회해 작성자·본문·태그를 확인합니다. 원본 post2의 작성자·본문·태그는 복사 전후 동일해야 합니다. source 예시의 태그와 현재 seed 데이터가 다르면 seed의 실제 값으로 비교합니다."
+  ],
+  "acceptance": [
+    "source/new id and author separation confirmed.",
+    "true/false tag outcomes match query.",
+    "400/401/403/404 failures leave source and new-row counts unchanged.",
+    "201 with Location /api/posts/{newId}; response title and new id.",
+    "true returns spring/jpa tags; false returns empty tags; author is token member2."
+  ],
+  "days": {
+    "community:copy": {
+      "title": "원본을 보존하고 새 id로 글 복사하기",
+      "goal": "공개 글 2번을 복사하고 새 글의 id·작성자·태그를 확인한 뒤 원본 2번이 그대로인지 비교합니다.",
+      "concept": "source post2 fields/status/visibility/author/tags · new post id and Kim author_id"
+    }
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "id": "points-coupon-shop",
+  "title": "포인트와 쿠폰으로 상품 구매하기",
+  "result": "포인트를 적립하고 쿠폰을 발급해 실제 보유 쿠폰으로 상품을 구매합니다.",
+  "brief": {
+    "purpose": "글·댓글 활동이 포인트 원장과 잔액에 반영되고, 내 잔액·이력을 일관되게 확인합니다.",
+    "story": "격리 수업 fixture의 회원 `learner@example.test` 잔액 100점, point ledger 합계 100점이다. 게시글이 0개다. 동시에 글 작성 50건을 보내고, 각 `POST /api/posts`가 201인지 확인한다. 이어 GET /api/me/points와 GET /api/me/points/history?size=20을 호출한다. 같은 값을 RC/RR에서 clear 전후·같은 연결·새 transaction으로 관찰한다. 50개 글 작성은 각각 10점 적립해 잔액과 signed ledger 합계가 600점이 된다. balance API는 200 `{balance:600}`, history는 200 `{items,nextCursor}`다. 동일한 적립 이벤트당 원장 한 줄이 남는다.",
+    "scope": "글·댓글 활동 포인트를 적립하고 잔액과 원장 합계가 맞는지 확인합니다. 쿠폰 발급과 구매는 뒤 단계에서 별도로 완료합니다.",
+    "excluded": "원본 기획서에 별도 제외 범위가 명시되어 있지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "points-balance",
+      "columns": [
+        "Authorization",
+        "balance"
+      ],
+      "actions": "GET /api/me/points 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "points-history",
+      "columns": [
+        "cursor",
+        "size",
+        "Authorization",
+        "items",
+        "nextCursor"
+      ],
+      "actions": "GET /api/me/points/history 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "post-create",
+      "columns": [
+        "title",
+        "content",
+        "tags",
+        "postId"
+      ],
+      "actions": "POST /api/posts 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "coupon-issue",
+      "columns": [
+        "couponId",
+        "Authorization",
+        "memberCouponId"
+      ],
+      "actions": "POST /api/coupons/{couponId}/issue 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "coupon-list",
+      "columns": [
+        "Authorization"
+      ],
+      "actions": "GET /api/me/coupons 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "shop-items",
+      "columns": [],
+      "actions": "GET /api/shop/items 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "shop-order",
+      "columns": [
+        "Idempotency-Key",
+        "itemId",
+        "quantity",
+        "memberCouponId",
+        "orderId",
+        "paidAmount"
+      ],
+      "actions": "POST /api/shop/orders 요청을 보내고 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "잔액은 원자적 UPDATE로 바꾸고 같은 트랜잭션에서 원장에 기록해 잔액과 이력 합을 맞춥니다.",
+    "잔액 조회 후 저장 방식의 동시 갱신 손실을 먼저 재현하고, 50건 후 잔액과 원장 합의 불일치 여부를 확인합니다.",
+    "글 저장·포인트 잔액·이력의 트랜잭션 경계를 기록하고 실패 시 함께 취소되는 범위를 실행으로 설명합니다.",
+    "포인트 이력의 수정·삭제는 허용하지 않는 정책으로 시험합니다.",
+    "원문 완료 기준: `PointConcurrencyTest`가 \"조회 후 저장\" 방식에서 먼저 실패하는 것(50건 동시 적립 후 잔액 < 합계)을 보고, 원자적 UPDATE로 바꾼 뒤 통과: 잔액 = 포인트 이력 합",
+    "원문 완료 기준: USER 토큰으로 `POST /api/posts` → 201 뒤 작성자 잔액이 늘어난다"
+  ],
+  "acceptance": [
+    "50개 동시 글 요청의 성공 수·잔액·원장 합이 일치하고 글 활동당 10점으로 반영됐다.",
+    "balance/history의 200 계약, 빈 회원의 `{balance:0}`·`items:[]`, 미인증 401을 확인했다.",
+    "clear/격리수준별 관찰과 실패 rollback, 추가 전용 ledger 근거를 기록했다.",
+    "50개 POST /api/posts 성공이면 글 적립 500점이 더해져 잔액 600, 원장 합계 600이다. GET /api/me/points → 200 `{balance:600}`; history?size=20 → 200 `{items,nextCursor}`.",
+    "원장과 잔액 갱신은 같은 transaction에서 확정되며 잔액은 음수가 되지 않는다. ledger 수정/삭제는 허용하지 않는다."
+  ],
+  "days": {
+    "board:points": {
+      "title": "활동 포인트 적립·잔액·이력 확인하기",
+      "goal": "글·댓글 활동 포인트를 적립하고 잔액과 원장 합계가 맞는지 확인합니다. 쿠폰 발급과 구매는 뒤 단계에서 별도로 완료합니다.",
+      "concept": "member.point_balance · point_ledger의 signed amount·reason·reference"
+    },
+    "board:coupons": {
+      "title": "한 사람에게 쿠폰 한 장 발급하기",
+      "goal": "DB 제약과 발급 서비스 경계를 설계해 같은 회원의 중복과 총량 초과를 막고, 내 쿠폰 목록으로 저장 결과를 확인하세요.",
+      "concept": "coupon.total_quantity·issued_quantity · coupon.expires_at"
+    },
+    "board:purchase": {
+      "title": "상품을 조회하고 포인트·쿠폰으로 구매하기",
+      "goal": "상품을 조회하고 보유 쿠폰을 선택해 구매한 뒤 재고·잔액·쿠폰 사용·주문 결과를 확인합니다.",
+      "concept": "shop_item.price·stock · member.point_balance와 ORDER ledger"
+    }
+  }
+}

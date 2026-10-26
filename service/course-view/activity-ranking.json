@@ -1,0 +1,67 @@
+{
+  "id": "activity-ranking",
+  "title": "회원 활동에 따라 순위 보여 주기",
+  "result": "글과 댓글을 작성한 회원의 활동 순위를 보여 주세요. 글은 10점, 댓글은 2점이며 잘못된 size 요청은 점수를 바꾸지 않아야 합니다.",
+  "brief": {
+    "purpose": "글과 댓글을 작성한 회원의 활동 순위를 보여 주세요. 글은 10점, 댓글은 2점이며 잘못된 size 요청은 점수를 바꾸지 않아야 합니다.",
+    "story": "fixture에서 회원 A 활동점수 20, 회원 B 10으로 시작한다. A가 글 1개, B가 댓글 1개를 작성한다. 운영 담당자 김민수는 이 요구를 맡습니다. 팀원 이지은과 함께 각 POST 성공 뒤 GET /api/rankings/activity를 호출하고 GET /api/rankings/activity?size=51 경계 요청을 보낸다. Redis Sorted Set과 point ledger를 각각 비교한다.",
+    "scope": "포인트 적립 이벤트와 Redis Sorted Set 순위 데이터를 연결하고, 글·댓글 작성 뒤 점수 순서와 조회 제한을 확인하세요.",
+    "excluded": "원문에 적힌 요청과 완료 기준 밖의 기능은 이번 범위에 넣지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "댓글 포인트와 활동 순위 연결 화면",
+      "columns": [
+        "title (nonblank, max 100)",
+        "content (not null, 1-5000 chars)",
+        "tags (max 5; each nonblank, max 20)",
+        "응답 postId"
+      ],
+      "actions": "POST /api/posts 요청 후 명시된 응답을 확인합니다."
+    },
+    {
+      "name": "댓글 포인트와 활동 순위 연결 화면",
+      "columns": [
+        "cursor (opaque cursor)",
+        "size (1-50, default 20)",
+        "응답 items",
+        "응답 nextCursor"
+      ],
+      "actions": "GET /api/rankings/activity 요청 후 명시된 응답을 확인합니다."
+    },
+    {
+      "name": "댓글 포인트와 활동 순위 연결 화면",
+      "columns": [
+        "postId (positive)",
+        "content (nonblank, max 500)",
+        "응답 id",
+        "응답 authorId",
+        "응답 authorNickname",
+        "응답 content",
+        "응답 createdAt"
+      ],
+      "actions": "POST /api/posts/{postId}/comments 요청 후 명시된 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "점수 적립은 원본 활동 포인트 정책과 일치해야 합니다. 댓글 2점과 글 10점 수치를 바꾸거나 중복 적립을 허용하지 않습니다.",
+    "GET /api/rankings/activity 기본 요청은 200이며 size=51은 400입니다.",
+    "Redis 랭킹 갱신은 포인트 변경 커밋 뒤 발생하는 이벤트 흐름을 확인하고 실패 처리 경계를 설명합니다.",
+    "원문 완료 기준: 글·댓글 작성 뒤 `GET /api/rankings/activity` → 200, 점수 높은 순",
+    "원문 완료 기준: `GET /api/rankings/activity?size=51` → 400"
+  ],
+  "acceptance": [
+    "회원 A/B의 활동 원장과 Redis score를 전후 비교해 각각 20→30, 10→12인지 확인합니다. 조회할 원장 테이블·회원/적립유형/금액 열과 Redis key는 내 설계에서 확정하여 실행 기록에 적습니다(이름 원본 확인 필요).",
+    "size=51은 400이며 활동 ledger와 Redis score가 맞고 충전/지출은 순위에 미포함이다.",
+    "rollback된 활동의 score가 증가하지 않는지 확인하고 source seed fixture와 사용자 fixture를 구분했다.",
+    "글 작성 1건의 활동점수/ledger +10, 댓글 1건은 +2; GET /api/rankings/activity → 200에서 A 30점이 B 12점보다 앞선다.",
+    "`GET /api/rankings/activity?size=51` → 400 validation."
+  ],
+  "days": {
+    "board:rank": {
+      "title": "댓글 포인트와 활동 순위 연결하기",
+      "goal": "포인트 적립 이벤트와 Redis Sorted Set 순위 데이터를 연결하고, 글·댓글 작성 뒤 점수 순서와 조회 제한을 확인하세요.",
+      "concept": "활동 점수와 순위"
+    }
+  }
+}

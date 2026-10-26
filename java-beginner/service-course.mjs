@@ -94,7 +94,7 @@ function apisForModule(ids, days, apiById) {
   }).filter(Boolean);
 }
 
-export function convertServiceCourse({root=ROOT, features, contracts, sourceIndex}={}) {
+export function convertServiceCourse({root=ROOT, features, contracts, sourceIndex, courseViews={}}={}) {
   const files = features || fs.readdirSync(path.join(root,'service/features')).filter(file => file.endsWith('.json')).sort().map(file => JSON.parse(fs.readFileSync(path.join(root,'service/features',file),'utf8')));
   const apiContracts = contracts || JSON.parse(fs.readFileSync(path.join(root,'service/api-contracts.json'),'utf8'));
   const recipes = asArray(apiContracts.recipes);
@@ -103,19 +103,24 @@ export function convertServiceCourse({root=ROOT, features, contracts, sourceInde
   let dayNumber=0;
   const modules=files.map((feature,index) => {
     const variants=asArray(feature.variants);
-    const days=variants.flatMap(variant => asArray(variant.stages).map(stage => stageData(feature,variant,stage,recipeById,sourceIndex))).map(day=>({...day,day:++dayNumber}));
+    const overlay=courseViews[feature.id]||{};
+    const days=variants.flatMap(variant => asArray(variant.stages).map(stage => {
+      const day=stageData(feature,variant,stage,recipeById,sourceIndex);
+      const copy=overlay.days?.[`${variant.id}:${stage.id}`]||{};
+      return {...day,title:copy.title||day.title,goal:copy.goal||day.goal,concept:copy.concept||day.concept};
+    })).map(day=>({...day,day:++dayNumber}));
     const apiIds=unique(days.flatMap(day=>day.apiIds));
     const sqls=unique(apiIds.flatMap(id=>asArray(recipeById.get(id)?.manualDb).map(item=>item.sql)));
     const policies=unique(variants.flatMap(variant=>asArray(variant.stages).flatMap(stage=>asArray(stage.brief?.policies))));
     const acceptance=unique(variants.flatMap(variant=>asArray(variant.stages).flatMap(stage=>asArray(stage.brief?.done))));
     const mappedVariants=variants.map(variant=>({id:variant.id,project:variant.project,label:variant.label || PROJECT_LABELS[variant.project] || variant.project,stageIds:asArray(variant.stages).map(stage=>`${feature.id}:${variant.project}:${stage.id}`)}));
     return {
-      id:feature.id,mode:'service',number:String(index+1).padStart(2,'0'),title:feature.title,label:feature.group || '기능',
-      color:GROUP_COLORS[feature.group] || 'slate',level:feature.difficulty,result:feature.summary,
+      id:feature.id,mode:'service',number:String(index+1).padStart(2,'0'),title:overlay.title||feature.title,label:feature.group || '기능',
+      color:GROUP_COLORS[feature.group] || 'slate',level:feature.difficulty,result:overlay.result||feature.summary,
       group:feature.group, prerequisites:asArray(feature.prerequisites), variants:mappedVariants, days,
       projectOptions:Object.entries(PROJECT_LABELS).map(([project,label])=>({project,label})),
-      brief:{purpose:feature.summary,story:days.map(day=>day.brief.story).filter(Boolean).join('\n\n'),scope:days.map(day=>day.brief.scope).filter(Boolean).join('\n\n'),excluded:unique(days.map(day=>day.brief.excluded)).join('\n\n')},
-      policies,acceptance,screens:days.flatMap(day=>day.screens),tables:days.flatMap(day=>day.tables),apis:apisForModule(apiIds,days,apiById),
+      brief:{purpose:overlay.brief?.purpose||feature.summary,story:overlay.brief?.story||days.map(day=>day.brief.story).filter(Boolean).join('\n\n'),scope:overlay.brief?.scope||days.map(day=>day.brief.scope).filter(Boolean).join('\n\n'),excluded:overlay.brief?.excluded||unique(days.map(day=>day.brief.excluded)).join('\n\n')},
+      policies:overlay.policies||policies,acceptance:overlay.acceptance||acceptance,screens:overlay.screens||days.flatMap(day=>day.screens),tables:days.flatMap(day=>day.tables),apis:apisForModule(apiIds,days,apiById),
       manualDb:sqls, sourceRefs:asArray(sourceIndex?.units).filter(unit=>asArray(unit.sourceUnits).some(id=>days.some(day=>day.sourceUnits.includes(id)))),
     };
   });
@@ -131,4 +136,12 @@ export function convertServiceCourse({root=ROOT, features, contracts, sourceInde
   };
 }
 
-export function loadServiceCourse() { return convertServiceCourse({sourceIndex:readJson('service/generated-source-index.json')}); }
+export function loadServiceCourse() {
+  const directory=path.join(ROOT,'service/course-view');
+  const courseViews={};
+  if(fs.existsSync(directory)) for(const file of fs.readdirSync(directory).filter(name=>name.endsWith('.json'))) {
+    const item=JSON.parse(fs.readFileSync(path.join(directory,file),'utf8'));
+    if(item?.id&&file===`${item.id}.json`) courseViews[item.id]=item;
+  }
+  return convertServiceCourse({sourceIndex:readJson('service/generated-source-index.json'),courseViews});
+}

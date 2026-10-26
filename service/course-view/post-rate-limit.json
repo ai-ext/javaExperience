@@ -1,0 +1,49 @@
+{
+  "id": "post-rate-limit",
+  "title": "짧은 시간의 반복 글쓰기 제한하기",
+  "result": "정해진 시간 창의 허용량을 넘긴 글쓰기 요청은 429로 거절되고 저장되지 않는다.",
+  "brief": {
+    "purpose": "정해진 시간 창의 허용량을 넘긴 글쓰기 요청은 429로 거절되고 저장되지 않는다.",
+    "story": "한 회원의 쓰기 요청을 같은 시간 구간에 반복합니다. 다른 회원도 별도로 요청합니다. 원본에 정한 허용량 경계 직전·경계·초과 요청과 실패 입력을 보냅니다. 허용 요청만 저장되고 초과 요청은 429로 거절됩니다. 회원별 사용량을 서로 섞지 않습니다.",
+    "scope": "같은 회원이 유효한 글을 6번 보내 1~5회 성공과 6회 제한을 구분하고 저장된 글 수를 확인합니다.",
+    "excluded": "원본 기획서에 별도 제외 범위가 명시되어 있지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "회원 12가 연달아 6번 글쓰기",
+      "columns": [
+        "boardSlug",
+        "title",
+        "content"
+      ],
+      "actions": "POST /api/posts 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "막힌 동안 읽기",
+      "columns": [],
+      "actions": "GET /api/posts/2 요청을 보내고 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "새 글 등록과 복사 생성에 같은 회원별 60초 창을 적용합니다. 지우지 않은 최근 글 5개까지 허용하고 6번째부터 429입니다.",
+    "입력 검증과 금칙어 검사를 통과한 뒤 셉니다. 400 실패 요청은 생성 횟수에 포함하지 않습니다. 읽기·다른 회원·댓글은 영향받지 않습니다.",
+    "Retry-After는 창 안의 가장 오래된 글이 60초를 넘길 때까지 올림한 남은 초이며 1~60입니다. 본문 retryAfterSeconds와 맞추고 CORS exposedHeaders에 Retry-After를 노출합니다.",
+    "created_at과 판정 시각은 같은 초 단위의 지금을 사용합니다. 15-3의 Clock 적용 뒤에도 같은 Clock을 쓰며 practice 고정 Clock의 우회 예외를 보존합니다.",
+    "동일 회원의 1~5번째 유효 작성은 201, 6번째는 429이며 초과 요청은 글·태그를 저장하지 않습니다. Retry-After는 1~60초이고 응답 필드 retryAfterSeconds와 헤더 값이 같습니다. 만료 후 요청은 새 창으로 판정합니다.",
+    "원문 레시피 P에는 6회 반복 실행과 회차별 응답을 연결합니다. 현재 request recipe의 기대 상태 집합만으로 각 회차를 분리 판정할 수 없으면 실행 기록에 회차별 201/429를 남기고, 요청 도구의 repeat 설정 변경은 범위 밖입니다."
+  ],
+  "acceptance": [
+    "허용 요청만 저장되고 초과 요청은 429로 거절됩니다. 회원별 사용량을 서로 섞지 않습니다.",
+    "정확한 시간 구간·허용량·실패 요청 차감 규칙은 아래 업무 정책을 따르며 고정 Clock 실습의 예외를 실운영 정책으로 확대하지 않습니다.",
+    "POST /api/posts 입력이 원문 실패 check 조건에 해당 → HTTP 429 — 원문 check의 실패 응답 post/tag 데이터는 그대로 둔다; 시도 창 차감 여부는 원문 13-5 규칙대로 별도 기록한다.",
+    "POST /api/posts · [교육용 fixture · legacy:13-5:P] 회원 12가 연달아 6번 글쓰기 → HTTP 429 (P#6, P#6); $.status equals 429; $.retryAfterSeconds gte 1; $.retryAfterSeconds lte 60; header Retry-After {\"matches\": \"^(?:[1-9]|[1-5][0-9]|60)$\", \"equals\": \"{{P#6.body.retryAfterSeconds}}\"}; header Access-Control-Expose-Headers {\"matches\": \"Retry-After\"} 초과 POST는 post/tag를 추가하지 않고 기존 5개 미삭제 글을 보존한다.",
+    "member 12의 최근 60초 미삭제 글이 0~4개일 때 P#1~P#5는 각각 201, P#6는 429 및 Retry-After/retryAfterSeconds 1~60."
+  ],
+  "days": {
+    "community:limit": {
+      "title": "허용량 초과 쓰기는 저장 없이 거절하기",
+      "goal": "같은 회원이 유효한 글을 6번 보내 1~5회 성공과 6회 제한을 구분하고 저장된 글 수를 확인합니다.",
+      "concept": "member별 요청 시각과 POST 결과 · post 생성 행과 시도 카운터"
+    }
+  }
+}

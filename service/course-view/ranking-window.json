@@ -1,0 +1,68 @@
+{
+  "id": "ranking-window",
+  "title": "기간 안의 인기글 순위 계산하기",
+  "result": "8-2 최근 N일 인기 점수를 고정 Clock과 Asia/Seoul의 반열린 시간 구간으로 재현한다.",
+  "brief": {
+    "purpose": "8-2 최근 N일 인기 점수를 고정 Clock과 Asia/Seoul의 반열린 시간 구간으로 재현한다.",
+    "story": "days=7, to=2026-10-05 00:00 Asia/Seoul, from=2026-09-28 00:00를 계산한다. popular endpoint에 days=7,limit=5를 보내고 from 직전/from exact/to 직전/to exact event 포함 여부를 비교한다. 기간 [2026-09-28,2026-10-05), score=likes×3 + live comments, score 0 제외, score desc/publishedAt desc/id desc top5; post145 sample score61.",
+    "scope": "2026-10-05 기준 7일 동안의 좋아요×3+삭제 제외 댓글 점수를 계산하고 0점 제외 및 top5 tie order를 확인한다.",
+    "excluded": "원본 기획서에 별도 제외 범위가 명시되어 있지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "7일·5개",
+      "columns": [
+        "postId",
+        "score",
+        "likes",
+        "comments"
+      ],
+      "actions": "GET /api/posts/popular?days=7&limit=5 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "30일·3개",
+      "columns": [],
+      "actions": "GET /api/posts/popular?days=30&limit=3 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "7일·50개",
+      "columns": [],
+      "actions": "GET /api/posts/popular?days=7&limit=50 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "기간 31일",
+      "columns": [],
+      "actions": "GET /api/posts/popular?days=31 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "빈 기간",
+      "columns": [],
+      "actions": "GET /api/posts/popular?days= 요청을 보내고 응답을 확인합니다."
+    },
+    {
+      "name": "빈 건수",
+      "columns": [],
+      "actions": "GET /api/posts/popular?limit= 요청을 보내고 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "기간 [now-days,now), days 1..30 default7; invalid numeric/empty/bounds 400.",
+    "score=기간 좋아요×3+기간의 삭제되지 않은 댓글수,score0 제외,score내림차순→published_at내림차순→id내림차순입니다. limit은1~50,생략10입니다. 이번 사례는limit5이고 정책 전체를 top5로 고정하지 않습니다.",
+    "Clock bean, Asia/Seoul. Fixed app time은 SQL NOW()나 LocalDateTime.now()에 적용되지 않으므로 DB timestamps와 구분한다.",
+    "days outside 1..30, malformed or empty → 400. → events/posts unchanged."
+  ],
+  "acceptance": [
+    "time window boundaries and timezone confirmed.",
+    "score formula, zero exclusion and tie break confirmed.",
+    "days range success/failure recorded.",
+    "from exact and to-minus-one events count; before from and exact to do not.",
+    "post145 example scores 61 based on 20 likes and 1 comment."
+  ],
+  "days": {
+    "community:window": {
+      "title": "고정한 기준 시각으로 기간 순위 계산하기",
+      "goal": "2026-10-05 기준 7일 동안의 좋아요×3+삭제 제외 댓글 점수를 계산하고 0점 제외 및 top5 tie order를 확인한다.",
+      "concept": "fixed Clock now 2026-10-05T00:00 Asia/Seoul · event timestamps at 2026-09-28 and 2026-10-05"
+    }
+  }
+}

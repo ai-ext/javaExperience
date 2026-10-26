@@ -1,0 +1,73 @@
+{
+  "id": "audit-log",
+  "title": "관리자 변경 내역 남기고 조회하기",
+  "result": "관리자가 글을 숨기면 누가 어떤 글을 바꿨는지 감사 기록을 한 건 남기세요. 일반 회원은 기록을 볼 수 없고 대상 글이 바뀌어도 기록은 남아야 합니다.",
+  "brief": {
+    "purpose": "관리자가 글을 숨기면 누가 어떤 글을 바꿨는지 감사 기록을 한 건 남기세요. 일반 회원은 기록을 볼 수 없고 대상 글이 바뀌어도 기록은 남아야 합니다.",
+    "story": "P-101 ACTIVE이고 감사 로그에 해당 작업 기록이 없다. DB는 감사 대상 글이 나중에 상태 변경/삭제되어도 audit row를 보존하도록 준비한다. 운영 담당자 김민수는 이 요구를 맡습니다. 팀원 이지은과 함께 ADMIN으로 POST /api/admin/posts/101/hide를 한 번 실행한다. 이어 GET /api/admin/audit-logs를 재조회하고 USER token으로 같은 목록을 요청한다.",
+    "scope": "감사 로그 스키마와 보존 원칙을 정하고 숨김 작업에서 action 기록이 한 건 남는지 확인하세요. USER 조회는 권한 거부를 검증합니다.",
+    "excluded": "원문에 적힌 요청과 완료 기준 밖의 기능은 이번 범위에 넣지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "민감한 작업의 감사 이력 보관 화면",
+      "columns": [
+        "postId (positive)",
+        "reportId (positive; body itself may be omitted)",
+        "응답 postId",
+        "응답 status",
+        "응답 reportId"
+      ],
+      "actions": "POST /api/admin/posts/{postId}/hide 요청 후 명시된 응답을 확인합니다."
+    },
+    {
+      "name": "민감한 작업의 감사 이력 보관 화면",
+      "columns": [
+        "cursor (opaque cursor)",
+        "size (1-50, default 20)",
+        "Authorization",
+        "응답 items",
+        "응답 nextCursor"
+      ],
+      "actions": "GET /api/admin/audit-logs 요청 후 명시된 응답을 확인합니다."
+    },
+    {
+      "name": "민감한 작업의 감사 이력 보관 화면",
+      "columns": [
+        "postId (positive)",
+        "응답 id",
+        "응답 authorId",
+        "응답 authorNickname",
+        "응답 title",
+        "응답 content",
+        "응답 tags",
+        "응답 likeCount",
+        "응답 createdAt",
+        "응답 updatedAt"
+      ],
+      "actions": "GET /api/posts/{postId} 요청 후 명시된 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "감사 저장소는 저장과 커서 조회만 제공하고 감사 기록의 update/delete는 금지합니다. 대상 상태가 나중에 바뀌어도 기록은 남습니다.",
+    "숨김 성공 뒤 action=HIDE_POST 기록 한 건을 확인합니다. USER 토큰의 GET /api/admin/audit-logs는 403입니다.",
+    "감사 대상의 민감정보를 필요 이상으로 복사하지 않고 원문 비밀값을 저장하지 않습니다.",
+    "원문 완료 기준: `AuditLogRepositoryTest` 통과: 저장과 커서 조회만 있고 수정·삭제 메서드가 없다",
+    "원문 완료 기준: 설계 메모: 만든 테이블·키·제약·인덱스와 각각의 이유, 고려했다 버린 대안 1개를 기록한다.",
+    "원문 완료 기준: DB 불변식 확인: 감사 기록 수정·삭제를 저장소·권한 정책으로 막고 대상 변경 뒤에도 기록이 남음을 테스트한다. 실행 SQL·결과를 기록하고 DB와 트랜잭션·권한·앱이 맡는 책임을 구분한다."
+  ],
+  "acceptance": [
+    "AuditLogRepositoryTest에서 save와 cursor 조회만 있고 수정·삭제 메서드가 없음을 확인했다.",
+    "hide 200 뒤 HIDE_POST 1건, USER 403, 대상 상태 변경 뒤에도 기록 보존을 확인했다.",
+    "테이블 key/index와 DB·애플리케이션의 보존 책임 및 버린 대안을 기록했다.",
+    "hide 요청 → 200; 직후 GET /api/admin/audit-logs → 200에서 `action=HIDE_POST` 1건과 대상 post 101을 확인한다.",
+    "USER GET /api/admin/audit-logs → 403; 로그 저장소는 save 및 cursor read만 제공하고 update/delete 메서드가 없다."
+  ],
+  "days": {
+    "board:record": {
+      "title": "민감한 작업의 감사 이력 보관하기",
+      "goal": "감사 로그 스키마와 보존 원칙을 정하고 숨김 작업에서 action 기록이 한 건 남는지 확인하세요.",
+      "concept": "관리자 변경 기록"
+    }
+  }
+}
