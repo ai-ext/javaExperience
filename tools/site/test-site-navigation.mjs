@@ -30,6 +30,8 @@ for (const [source, section] of examples) {
   assert.deepEqual(links.map((link) => new URL(link.href).pathname.slice(1)), destinations, `${source}: 폴더 깊이별 이동 경로`);
   assert.equal(header.querySelector('.home-brand').href, 'https://learn.example/index.html');
   assert.match(header.querySelector('.home-brand').textContent, /javaExperience/);
+  assert.equal(header.querySelector('.site-brand-mark')?.textContent, 'Jw', `${source}: #14 규격의 브랜드 표식`);
+  assert.equal(header.querySelector('.site-header-context')?.textContent, 'JAVA 21 · SPRING', `${source}: 공통 헤더 오른쪽 정보`);
   assert.equal(siteSection(source), section);
   const current = [...nav.querySelectorAll('[aria-current="page"]')];
   assert.deepEqual(current.map((link) => link.textContent), section ? [section] : [], `${source}: 현재 공간만 선택`);

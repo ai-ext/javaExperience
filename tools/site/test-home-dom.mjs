@@ -21,10 +21,14 @@ function page(file = 'index.html', saved) {
 const home = page(); initLearning(home.doc, home.window);
 assert.equal(home.$('[data-home-title]').textContent, TASKS['0-1'].title);
 assert.ok(home.$('[data-home-prepare-note] [data-home-prepare]'), '시작 버튼 바로 아래 준비 안내');
-assert.equal(home.$('[data-service-board]').dataset.serviceReady, 'true');
+assert.equal(home.$('.home-course-path-beginner').getAttribute('href'), 'java-beginner.html', '#14 과정으로 바로 연결');
+assert.equal(home.$('.home-course-path-service').getAttribute('href'), 'scenario/README.html', '서비스 만들기로 바로 연결');
+assert.match(home.$('.home-course-path-beginner').textContent, /12개 기능.*60회차/);
+assert.match(home.$('.home-course-path-service').textContent, /94개 기능.*138단계/);
+assert.equal(home.$('[data-home-title]').textContent, TASKS['0-1'].title, '오늘 할 일과 이어 하기를 유지');
 home.$('[data-home-prepare]').click();
 assert.equal(home.$('#home-prepare-dialog').open, true);
-assert.match(home.$('#home-prepare-dialog').textContent, /3306/);
+assert.match(home.$('#home-prepare-dialog').textContent, /13308/);
 assert.match(home.$('#home-prepare-dialog').textContent, /13308/);
 home.$('[data-home-prepare-close]').click();
 assert.equal(home.doc.activeElement, home.$('[data-home-prepare]'));
@@ -196,6 +200,8 @@ assert.notEqual(script.getAttribute('type'), 'module', '직접 파일 열기에�
 assert.match(script.getAttribute('src'), /home-learning\.bundle\.js/);
 direct.window.eval(fs.readFileSync(new URL('tools/site/home-learning.bundle.js', root), 'utf8'));
 direct.$('[data-home-choose]').click(); assert.equal(direct.$('#home-start-dialog').open, true);
-assert.equal(direct.$('[data-service-board]').dataset.serviceReady, 'true');
+assert.equal(direct.$('.home-course-path-beginner').getAttribute('href'), 'java-beginner.html');
+assert.equal(direct.$('.home-course-path-service').getAttribute('href'), 'scenario/README.html');
+assert.equal(direct.$('[data-home-title]').textContent, TASKS['0-1'].title, '홈에서 오늘 할 일 진입 유지');
 direct.close();
 console.log('개선 연결: 환경 준비·선택 카드 즉시 반영·기존 과제 복귀·classic 번들 초기화 통과');

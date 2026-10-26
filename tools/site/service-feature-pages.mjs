@@ -68,6 +68,12 @@ function stageRecipesFor(variant, stage, recipes) {
   return [...selected, ...related];
 }
 
+function databaseChecksMarkup(recipes) {
+  const checks = recipes.flatMap((recipe) => list(recipe.manualDb).map((check) => ({ recipe, check })));
+  if (!checks.length) return '<section class="sf-db-checks"><h3>DB 확인 SQL</h3><p>이 단계에 연결된 조회 SQL이 없습니다. 데이터와 실제 결과를 별도로 확인하세요.</p></section>';
+  return `<section class="sf-db-checks" data-content-kind="reference"><h3>DB 확인 SQL</h3><p>SQL은 자동 실행하지 않습니다. 요청 응답의 ID를 넣고 별도 DB 클라이언트에서 확인하세요.</p><div class="sf-db-check-list">${checks.map(({ recipe, check }) => `<article><h4>${esc(recipe.label || recipe.title || recipe.id)} · ${esc(check.title || '데이터 확인')}</h4><pre><code>${esc(check.sql || '')}</code></pre><p><strong>확인할 열·비교 기준</strong> · ${esc(check.notes || 'SELECT 절의 열과 WHERE 조건을 요청에서 받은 ID에 맞춰 확인하세요.')}</p></article>`).join('')}</div></section>`;
+}
+
 function prerequisiteMarkup(prerequisites, featureId, features, rootPrefix) {
   const lookup = featureLookup(features);
   const items = list(prerequisites).filter((id) => id && id !== featureId);
@@ -158,7 +164,7 @@ function exampleMarkup(item) {
   return `<li><strong>${title}</strong>${description}${states ? `<dl class="sf-example-states">${states}</dl>` : ''}${value}</li>`;
 }
 
-function briefMarkup(brief = {}) {
+function briefMarkup(brief = {}, mode = 'all') {
   const scenario = list(brief.scenario);
   const scenarioMarkup = scenario.length ? `<section class="sf-brief-section sf-scenario-section" data-content-kind="guide"><h3>4 · 사용자 시나리오</h3><div class="sf-scenario">${scenario.map((step) => `<article><dl>${[['시작 상태', step.start], ['요청', step.action], ['응답', step.result], ['이후 상태', step.after]].filter(([, value]) => value != null && value !== '').map(([label, value]) => `<div><dt>${label}</dt><dd>${esc(human(value))}</dd></div>`).join('')}</dl></article>`).join('')}</div></section>` : '';
   const data = list(brief.data);
@@ -166,18 +172,20 @@ function briefMarkup(brief = {}) {
   const examples = list(brief.examples);
   const exampleBlock = examples.length ? `<section class="sf-brief-section" data-content-kind="example"><h4>입력 사례</h4><ul>${examples.map(exampleMarkup).join('')}</ul></section>` : '';
   const requirementRows = [
-    ['입력과 출력', list(brief.inputs)], ['성공 기준', list(brief.success)], ['개발 과제', list(brief.work)],
+    ['입력과 출력', list(brief.inputs)], ['성공 기준', list(brief.success)],
   ].filter(([, values]) => values.length).map(([label, values]) => `<tr><th scope="row">${label}</th><td><ul>${values.map((item) => `<li>${esc(human(item))}</li>`).join('')}</ul></td></tr>`).join('');
   const policy = policyMarkup(brief.policies, brief.failures);
-  const requirementsContent = [requirementRows ? `<div class="sf-requirements-table-wrap"><table class="sf-requirements-table"><tbody>${requirementRows}</tbody></table></div>` : '', dataMarkup, policy, exampleBlock].filter(Boolean).join('');
+  const requirementsContent = [requirementRows ? `<div class="sf-requirements-table-wrap"><table class="sf-requirements-table"><tbody>${requirementRows}</tbody></table></div>` : '', policy, exampleBlock].filter(Boolean).join('');
   const requirements = requirementsContent ? `<section class="sf-brief-section sf-requirements" data-content-kind="practice"><h3>3 · 세부 요구사항</h3>${requirementsContent}</section>` : '';
   const taskContent = brief.task || list(brief.preconditions).length;
   const taskSection = taskContent ? `<section class="sf-brief-section sf-task" data-content-kind="action"><h3>1 · 이번에 할 일</h3>${brief.task ? `<p>${esc(brief.task)}</p>` : ''}${list(brief.preconditions).length ? `<div class="sf-preconditions"><h4>2 · 시작 조건</h4><ul>${list(brief.preconditions).map((item) => `<li>${esc(human(item))}</li>`).join('')}</ul></div>` : ''}</section>` : '';
-  return `<div class="sf-brief">
-    ${brief.purpose ? `<p class="sf-purpose">${esc(brief.purpose)}</p>` : ''}
-    <div class="sf-brief-core">${taskSection}${requirements}</div>
-    ${scenarioMarkup}
-  </div>`;
+  const purpose = brief.purpose ? `<p class="sf-purpose">${esc(brief.purpose)}</p>` : '';
+  const work = list(brief.work);
+  const taskWork = work.length ? `<section class="sf-brief-section sf-task-work"><h4>직접 개발할 과제</h4><ol>${work.map((item) => `<li>${esc(human(item))}</li>`).join('')}</ol></section>` : '';
+  if (mode === 'task') return `<div class="sf-brief">${taskSection}${taskWork}</div>`;
+  if (mode === 'data') return `<div class="sf-brief">${dataMarkup || '<p>이 단계에 별도로 기록된 데이터 항목이 없습니다.</p>'}</div>`;
+  if (mode === 'brief') return `<div class="sf-brief">${purpose}<div class="sf-brief-core">${requirements}</div>${scenarioMarkup}</div>`;
+  return `<div class="sf-brief">${purpose}<div class="sf-brief-core">${taskSection}${taskWork}${requirements}</div>${scenarioMarkup}${dataMarkup}</div>`;
 }
 
 function policyMarkup(policies, failures) {
@@ -233,16 +241,18 @@ function hintMarkup(stage) {
 function stageMarkup(feature, variant, stage, stageIndex, variantIndex, apiRecipes, sourceIndex, rootPrefix) {
   const stageRecipes = stageRecipesFor(variant, stage, apiRecipes);
   const contract = serviceContractMarkup(stageRecipes);
-  const request = stageRecipes.length ? renderServiceRequestTool({ scopeKey: `feature-${feature.id}-${variant.id}-${stage.id}`, project: variant.project, recipes: stageRecipes, rootPrefix }) : '';
+  const request = stageRecipes.length ? renderServiceRequestTool({ scopeKey: `feature-${feature.id}-${variant.id}-${stage.id}`, project: variant.project, recipes: stageRecipes, rootPrefix, showVerification: false }) : '';
   const choices = list(stage.choices);
   const done = textList('완료 확인', stage.brief?.done, '', 'check');
+  const tabId = `${feature.id}-${variant.id}-${stage.id}`.replace(/[^a-zA-Z0-9_-]/g, '-');
   return `<article class="sf-stage-panel" id="sf-stage-${esc(variant.id)}-${esc(stage.id)}" data-sf-stage-panel data-sf-variant="${esc(variant.id)}" data-sf-stage="${esc(stage.id)}" data-sf-stage-index="${stageIndex}" data-sf-variant-index="${variantIndex}">
     <header class="sf-stage-title"><p>${esc(variant.label || variant.project || '실습 단계')} · ${stageIndex + 1}단계</p><h2 tabindex="-1">${esc(stage.title)}</h2></header>
+    <nav class="sf-stage-tabs" role="tablist" aria-label="${esc(stage.title)} 학습 내용">${[['task','오늘 할 일'],['brief','기획서'],['data','데이터'],['request','요청·응답']].map(([key,label], index) => `<button type="button" role="tab" id="sf-tab-${tabId}-${key}" aria-controls="sf-panel-${tabId}-${key}" aria-selected="${index === 0}" tabindex="${index === 0 ? '0' : '-1'}" data-sf-stage-tab="${key}">${label}</button>`).join('')}</nav>
     <div class="sf-stage-materials">
-      ${briefMarkup(stage.brief || '')}${choices.length ? `<section class="sf-choices"><h4>선택해서 확장하기</h4><ul>${choices.map((choice) => `<li>${esc(human(choice))}</li>`).join('')}</ul></section>` : ''}
-      <section class="sf-stage-flow-section sf-stage-hints" aria-label="필요할 때 보는 힌트"><h3>5 · 필요할 때 보는 힌트</h3><section class="sf-aside-stage" data-sf-aside-stage data-sf-variant="${esc(variant.id)}" data-sf-stage="${esc(stage.id)}"><p class="sf-aside-progress" data-sf-aside-progress>이 단계의 완료 기록 없음</p>${hintMarkup(stage) || '<p>현재 단계에 등록된 질문형 힌트가 없습니다.</p>'}</section></section>
-      <section class="sf-stage-flow-section sf-stage-api" aria-label="직접 호출하기"><h3>6 · 직접 호출하기</h3><div class="sf-api-workspace">${request ? `<div class="sf-request-entry">${request}<ul class="sf-request-checklist"><li>요청 전 준비 데이터를 확인합니다.</li><li>응답의 생성 id를 다음 요청에 이어 씁니다.</li><li>요청 뒤 조회와 DB 확인 SQL을 함께 대조합니다.</li></ul></div>` : '<p>이 단계에 연결된 API 요청 사례가 없습니다.</p>'}${contract ? `<div class="sf-expected-contract">${contract}</div>` : ''}</div></section>
-      <section class="sf-stage-flow-section sf-stage-done" aria-label="완료 확인"><h3>7 · 완료 확인</h3>${done}<label class="sf-stage-completion"><input type="checkbox" data-sf-stage-complete><span>완료 조건을 직접 확인했습니다</span></label>${executionChecksMarkup(stage, feature, variant)}${referencesMarkup(stage, feature, sourceIndex, rootPrefix)}</section>
+      <section class="sf-stage-tab-panel" role="tabpanel" id="sf-panel-${tabId}-task" aria-labelledby="sf-tab-${tabId}-task" data-sf-tab-panel="task">${briefMarkup(stage.brief || {}, 'task')}${choices.length ? `<section class="sf-choices"><h4>선택해서 확장하기</h4><ul>${choices.map((choice) => `<li>${esc(human(choice))}</li>`).join('')}</ul></section>` : ''}<section class="sf-stage-flow-section sf-stage-hints" aria-label="질문형 힌트"><h3>질문형 힌트</h3><section class="sf-aside-stage" data-sf-aside-stage data-sf-variant="${esc(variant.id)}" data-sf-stage="${esc(stage.id)}"><p class="sf-aside-progress" data-sf-aside-progress>이 단계의 완료 기록 없음</p>${hintMarkup(stage) || '<p>현재 단계에 등록된 질문형 힌트가 없습니다.</p>'}</section></section>${done}<label class="sf-stage-completion"><input type="checkbox" data-sf-stage-complete><span>완료 조건을 직접 확인했습니다</span></label>${executionChecksMarkup(stage, feature, variant)}</section>
+      <section class="sf-stage-tab-panel" role="tabpanel" id="sf-panel-${tabId}-brief" aria-labelledby="sf-tab-${tabId}-brief" data-sf-tab-panel="brief" hidden>${briefMarkup(stage.brief || {}, 'brief')}</section>
+      <section class="sf-stage-tab-panel" role="tabpanel" id="sf-panel-${tabId}-data" aria-labelledby="sf-tab-${tabId}-data" data-sf-tab-panel="data" hidden>${briefMarkup(stage.brief || {}, 'data')}${databaseChecksMarkup(stageRecipes)}${referencesMarkup(stage, feature, sourceIndex, rootPrefix)}</section>
+      <section class="sf-stage-tab-panel sf-stage-tab-request" role="tabpanel" id="sf-panel-${tabId}-request" aria-labelledby="sf-tab-${tabId}-request" data-sf-tab-panel="request" hidden><div class="sf-stage-flow-section sf-stage-api" aria-label="직접 호출하기"><div class="sf-api-workspace">${request ? `<div class="sf-request-entry">${request}<ul class="sf-request-checklist"><li>요청 전 준비 데이터를 확인합니다.</li><li>응답의 생성 id를 다음 요청에 이어 씁니다.</li><li>요청 뒤 조회와 DB 확인 SQL을 함께 대조합니다.</li></ul></div>` : '<p>이 단계에 연결된 API 요청 사례가 없습니다.</p>'}${contract ? `<div class="sf-expected-contract">${contract}</div>` : ''}</div></div></section>
     </div>
   </article>`;
 }
@@ -294,7 +304,7 @@ export function renderServiceCatalog({ features = [], sourceIndex = [], apiRecip
     const preview = featurePreview(feature).replace(/src="([^"]+)"/, (_, asset) => `src="${esc(linkHref(asset, rootPrefix))}"`);
     const group = feature.group || '서비스 기능';
     const markup = `<article class="sf-feature-card" data-sf-feature-card data-sf-id="${esc(feature.id)}" data-sf-difficulty="${esc(feature.difficulty || '')}" data-sf-projects="${esc(featureProjects.join('|'))}" data-sf-group="${esc(group)}" data-sf-search="${esc([feature.id, feature.title, feature.summary, group, ...featureProjects, ...list(feature.prerequisites), ...sourceTerms, ...apiPaths].join(' '))}">
-      <a class="sf-card-preview" href="${esc(href)}">${preview}</a><div class="sf-card-body"><div class="sf-card-meta"><span>${esc(group)}</span><span>${esc(feature.difficulty || '난이도 미정')}</span>${feature.status === 'authored' ? '<span class="sf-authored">기획서 작성</span>' : '<span class="sf-draft">기획 중</span>'}<span data-sf-progress-badge hidden>진행 기록 있음</span></div><h3><a href="${esc(href)}">${esc(feature.title)}</a></h3><p>${esc(feature.summary || '')}</p><dl><div><dt>먼저</dt><dd>${prerequisiteMarkup(feature.prerequisites, feature.id, authored, rootPrefix)}</dd></div><div><dt>프로젝트</dt><dd>${featureProjects.map(esc).join(' · ') || '프로젝트 미정'}</dd></div></dl><footer><span>${uniqueStages.size}개 단계 · API ${apiCount}개</span><a href="${esc(href)}">기획서 열기 →</a></footer></div></article>`;
+      <div class="sf-card-body"><div class="sf-card-meta"><span>${esc(group)}</span><span>${esc(feature.difficulty || '난이도 미정')}</span>${feature.status === 'authored' ? '<span class="sf-authored">기획서 작성</span>' : '<span class="sf-draft">기획 중</span>'}<span data-sf-progress-badge hidden>진행 기록 있음</span></div><h3><a href="${esc(href)}">${esc(feature.title)}</a></h3><p>${esc(feature.summary || '')}</p><dl><div><dt>핵심 범위</dt><dd>${esc(feature.coreScope || feature.scope || feature.outcome || feature.summary || '기능 요구사항과 완료 조건')}</dd></div><div><dt>선행 기능</dt><dd>${prerequisiteMarkup(feature.prerequisites, feature.id, authored, rootPrefix)}</dd></div></dl><footer><span>${uniqueStages.size}개 단계 · API ${apiCount}개</span><a href="${esc(href)}">요구사항 보기 →</a></footer></div><a class="sf-card-preview" href="${esc(href)}">${preview}</a></article>`;
     return { group, markup };
   });
   const cardGroups = new Map();
@@ -334,9 +344,9 @@ export function renderServiceCatalog({ features = [], sourceIndex = [], apiRecip
     return `<article class="sf-api-row" data-sf-api-row data-sf-method="${esc(route.method || '')}" data-sf-project="${esc(project)}" data-sf-search="${esc(routeSearch)}"><span class="sf-method sf-method-${esc(String(route.method || '').toLowerCase())}">${esc(route.method || '미정')}</span><code>${esc(route.path || '경로 미정')}</code><span>${esc(list(expected.statuses).join(' / ') || '응답 미정')} · ${esc(expected.description || '')}</span><a href="${esc(featureHref)}">${esc(label)} →</a>${apiRouteCasesMarkup(cases, sourceIndex, rootPrefix, route)}</article>`;
   }).join('')}</div></section>`).join('');
   return `<div class="sf-catalog" data-sf-catalog data-sf-view="features">
-    <header class="sf-catalog-header"><div><p class="sf-eyebrow">기능을 고르고, 직접 만들어 보세요</p><h1>서비스 만들기</h1><p>기능과 요구사항을 확인한 뒤 내 서버에서 하나씩 구현하세요.</p></div><a href="${esc(rootHref(rootPrefix, 'course/spring/README.html'))}">기존 일자별 자료 D00–D45 →</a></header>
+    <header class="sf-catalog-header"><div><p class="sf-eyebrow">SERVICE BUILD · 실무 기능 94개</p><h1>서비스 만들기</h1><p>기능의 결과와 범위를 먼저 확인하고, 필요한 순서로 단계별 구현을 이어갑니다.</p></div></header>
     <nav class="sf-view-tabs" aria-label="서비스 만들기 보기"><button type="button" data-sf-view-button="features" aria-pressed="true">기능 목록</button><button type="button" data-sf-view-button="preview" aria-pressed="false">단계별 시안</button><button type="button" data-sf-view-button="api" aria-pressed="false">API EXPLORER</button></nav>
-    <section class="sf-feature-list" id="visual-catalog" aria-labelledby="sf-feature-list-title"><div class="sf-section-heading"><div><h2 id="sf-feature-list-title">단계별 시안으로 고르기</h2><p>완성할 기능으로 묶었습니다. 예전 세부 단계도 안에서 볼 수 있어요.</p><p><span data-sf-visible-count>${authored.length}</span>개 기능</p></div><a href="#journey-all-apis">API 경로로 찾기 ↓</a></div>
+    <section class="sf-feature-list" id="visual-catalog" aria-labelledby="sf-feature-list-title"><div class="sf-section-heading"><div><h2 id="sf-feature-list-title">만들 기능 고르기</h2><p>사용자에게 생기는 결과, 핵심 범위, 먼저 필요한 기능을 살펴보세요.</p><p><span data-sf-visible-count>${authored.length}</span>개 기능 · <span>${featureStages({variants: authored.flatMap((feature) => list(feature.variants))}).length}</span>개 단계</p></div><a href="#journey-all-apis">API 경로로 찾기 ↓</a></div>
       <form class="sf-filters" data-sf-filter-form role="search"><label class="sf-search"><span aria-hidden="true">⌕</span><input type="search" data-sf-search placeholder="기능 · API 경로 검색" aria-label="기능 또는 API 검색"></label><label>난이도<select data-sf-difficulty><option value="">전체 난이도</option>${difficulties.map((value) => `<option value="${esc(value)}">${esc(value)}</option>`).join('')}</select></label><label>프로젝트<select data-sf-project><option value="">전체 프로젝트</option>${projects.map((value) => `<option value="${esc(value)}">${esc(value)}</option>`).join('')}</select></label><button type="reset" data-sf-reset>필터 해제</button></form>
       <p class="sf-empty" data-sf-empty hidden>검색 조건에 맞는 기능이 없습니다.</p><div data-sf-feature-groups>${cards}</div>
     </section>

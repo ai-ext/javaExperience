@@ -109,12 +109,12 @@ test('서비스 인라인 초기화는 DOMContentLoaded 전에 한 번만 실행
  dom.window.close();
 });
 
-test('서비스 상세 첫 페인트는 전체 단계 흐름을 선택하고 단계 안 콘텐츠 탭을 만들지 않는다',()=>{
- const source='<html><head></head><body><main><section data-sf-feature><article id="sf-stage-one-first" data-sf-stage-panel data-sf-variant="one" data-sf-stage="first"><h2>글 등록</h2><section data-sf-aside-stage data-sf-variant="one" data-sf-stage="first">힌트</section><section aria-label="직접 호출하기">요청 도구</section><section aria-label="완료 확인">완료 조건</section></article><article id="sf-stage-one-second" data-sf-stage-panel data-sf-variant="one" data-sf-stage="second"><h2>글 조회</h2></article></section></main></body></html>';
+test('서비스 상세 첫 페인트는 선택한 단계의 오늘 할 일 탭을 바로 표시한다',()=>{
+ const source='<html><head></head><body><main><section data-sf-feature><article id="sf-stage-one-first" data-sf-stage-panel data-sf-variant="one" data-sf-stage="first"><h2>글 등록</h2><nav role="tablist"><button role="tab" aria-selected="true" data-sf-stage-tab="task">오늘 할 일</button><button role="tab" aria-selected="false" data-sf-stage-tab="brief">기획서</button></nav><section role="tabpanel" data-sf-tab-panel="task">직접 개발할 일</section><section role="tabpanel" data-sf-tab-panel="brief" hidden>요구사항</section><section data-sf-aside-stage data-sf-variant="one" data-sf-stage="first">힌트</section><section aria-label="직접 호출하기">요청 도구</section><section aria-label="완료 확인">완료 조건</section></article><article id="sf-stage-one-second" data-sf-stage-panel data-sf-variant="one" data-sf-stage="second"><h2>글 조회</h2></article></section></main></body></html>';
  const html=renderInitialPage(source,'scenario/features/reload-fixture.md');
  assert.match(html,/sf-stage-one-first/,'처음 선택한 단계 정보가 초기 렌더 스크립트에 전달된다');
- assert.doesNotMatch(html,/data-sf-content-tab|data-sf-content-panel|sf-content-switch/,'단계 안에 내용을 전환하는 탭이 없다');
- assert.doesNotMatch(html,/\[data-sf-aside-stage\]\[data-sf-variant=/,'힌트를 별도 탭 패널처럼 첫 페인트에서 분리하지 않는다');
+ assert.match(html,/data-sf-tab-panel="task"/,'오늘 할 일은 서버 렌더 첫 화면에 포함된다');
+ assert.match(html,/data-sf-tab-panel="brief" hidden/,'나머지 탭은 선택 전까지 숨겨 깜빡임을 막는다');
 });
 
 // 대형 HTML은 body 끝 controller가 파싱되기 전에 먼저 페인트될 수 있다.

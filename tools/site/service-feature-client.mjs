@@ -255,6 +255,27 @@ function mountFeature(root, storage) {
   const variantSelect = root.querySelector('[data-sf-variant-select]');
   const progress = readProgress(storage);
   mountApiContracts(root);
+  for (const panel of panels) {
+    const tabs = [...panel.querySelectorAll('[data-sf-stage-tab]')];
+    const tabPanels = [...panel.querySelectorAll('[data-sf-tab-panel]')];
+    const selectTab = (tab, focus = false) => {
+      for (const candidate of tabs) {
+        const selected = candidate === tab;
+        candidate.setAttribute('aria-selected', String(selected));
+        candidate.tabIndex = selected ? 0 : -1;
+      }
+      for (const content of tabPanels) content.hidden = content.dataset.sfTabPanel !== tab.dataset.sfStageTab;
+      if (focus) tab.focus();
+    };
+    for (const [index, tab] of tabs.entries()) {
+      tab.addEventListener('click', () => selectTab(tab));
+      tab.addEventListener('keydown', (event) => {
+        const nextIndex = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index - 1 + tabs.length) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : -1;
+        if (nextIndex < 0) return;
+        event.preventDefault(); selectTab(tabs[nextIndex], true);
+      });
+    }
+  }
   const status = root.querySelector('[data-sf-progress-status]');
   const count = root.querySelector('[data-sf-progress-count]');
   const activeStages = () => panels.filter((panel) => panel.dataset.sfVariant === (variantSelect?.value || panels[0].dataset.sfVariant));

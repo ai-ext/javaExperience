@@ -15,7 +15,7 @@ function recipeLabel(recipe) {
   return recipe.label ?? recipe.title ?? recipe.id ?? '직접 등록 API';
 }
 
-export function renderServiceRequestTool({scopeKey = 'service', project = '', recipes = [], rootPrefix = ''} = {}) {
+export function renderServiceRequestTool({scopeKey = 'service', project = '', recipes = [], rootPrefix = '', showVerification = true} = {}) {
   const list = Array.isArray(recipes) ? recipes : [];
   const embeddedRecipes = list.map(recipe => {
     const headers = {...(recipe?.headers ?? {})};
@@ -65,7 +65,7 @@ export function renderServiceRequestTool({scopeKey = 'service', project = '', re
   </div>
   <div class="srq-actions"><label class="srq-inline"><input type="checkbox" data-srq-curl-token>curl 복사에 토큰 포함</label><button type="button" class="srq-secondary" data-srq-copy-curl>curl 복사</button><button type="button" class="srq-send" data-srq-send disabled>요청 보내기</button></div>
   <p class="srq-status" data-srq-status role="status" aria-live="polite">미실행</p>
-  <div class="srq-verification" data-srq-verification></div>
+  ${showVerification ? '<div class="srq-verification" data-srq-verification></div>' : ''}
   <div class="srq-comparison">
   <div class="srq-plan" data-srq-plan><div><span>기획상 기대</span><strong data-srq-expected>API를 직접 등록해 주세요.</strong></div><p data-srq-description></p></div>
   <div class="srq-result" data-srq-result><h3>실제 서버 응답</h3><div class="srq-result-metrics"><span>실제 HTTP 상태 <strong data-srq-actual-status>—</strong></span><span>실측 응답 시간 <strong data-srq-duration>—</strong></span></div><p data-srq-verdict></p><dl><dt>응답 headers</dt><dd><pre data-srq-response-headers></pre></dd><dt>응답 body 원문</dt><dd><pre data-srq-response-body></pre></dd></dl><p class="srq-snapshot" data-srq-snapshot></p></div>

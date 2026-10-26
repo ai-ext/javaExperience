@@ -1,5 +1,4 @@
 import { TASKS } from './home-state.mjs';
-import { renderHomeServicePreview } from './home-service-preview.mjs';
 import { renderHomeNewVisual } from './home-new-visual.mjs';
 import { renderHomePreparation } from './home-preparation.mjs';
 const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -13,7 +12,11 @@ export function renderHomeVisual(root, fromAbs, renderedHtml) {
     ['DB-01', 'SQL과 DB부터', '기존 데이터로 응답과 테이블을 연결합니다.'],
   ];
   return `<section class="home-visual" aria-labelledby="home-title">
-  <div class="home-intro"><p class="home-eyebrow">직접 만들며 배우는 백엔드</p><h1 id="home-title" data-home-intro-title>작은 API부터, <span>하나의 서비스까지.</span></h1><p data-home-intro-description>글 작성·조회·소통이 되는 게시판을 직접 만듭니다.<br>기능 하나씩 구현하고, 응답과 DB 결과로 확인하세요.</p><a class="home-concept-direct" href="docs/knowledge/README.html">개념부터 이해하기 →</a></div>
+  <header class="home-course-intro"><p class="home-eyebrow">JAVA WORKSHOP · 직접 만들며 배우는 백엔드</p><h1 id="home-title" data-home-intro-title>무엇을 만들게 되나요?</h1><p data-home-intro-description>만들고 싶은 과정으로 들어가 기능 하나씩 완성하세요.</p></header>
+  <section class="home-course-paths" aria-label="학습 과정 선택">
+    <a class="home-course-path home-course-path-beginner" href="java-beginner.html"><span class="home-course-path-mark" aria-hidden="true">01</span><span class="home-course-path-copy"><small>JAVA BEGINNER · PR #14</small><strong>입문 과정</strong><span>Java 기초부터 공지 게시판과 실무 기능까지 차근차근 만듭니다.</span></span><span class="home-course-path-count">12개 기능 <b>60회차</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
+    <a class="home-course-path home-course-path-service" href="scenario/README.html"><span class="home-course-path-mark" aria-hidden="true">02</span><span class="home-course-path-copy"><small>SERVICE BUILD · 실무</small><strong>서비스 만들기</strong><span>기능 요구사항을 설계하고 직접 구현해 요청과 데이터로 확인합니다.</span></span><span class="home-course-path-count">94개 기능 <b>138단계</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
+  </section>
   <div class="home-hero">
     <article class="home-task" aria-labelledby="home-task-title">
       <p class="home-task-tag" data-home-tag>첫 시작 · 0-1</p><h2 class="home-task-title" id="home-task-title" data-home-title>${task.title}</h2><p class="home-task-lead" data-home-description>${task.description}</p>
@@ -43,7 +46,6 @@ export function renderHomeVisual(root, fromAbs, renderedHtml) {
     </aside>
   </div>
   <nav class="home-roadmap" aria-label="앞으로 만들어 갈 흐름"><span><b>01</b> 작은 API</span><span aria-hidden="true">→</span><span><b>02</b> 게시글 저장</span><span aria-hidden="true">→</span><span><b>03</b> 조회·수정·확장</span><a href="scenario/README.html">전체 과정 보기 ↗</a></nav>
-  ${renderHomeServicePreview()}
   <section class="home-section" aria-labelledby="home-method-title"><div class="home-section-heading"><p class="home-eyebrow">읽기에서 끝나지 않도록</p><h2 id="home-method-title">이렇게 배우면 됩니다</h2><p>기능 하나를 이해하고, 만들고, 확인하는 흐름을 반복합니다.</p></div>
   <div class="home-method-grid">
     <article><span class="home-step-number">01</span><div class="home-step-visual"><span>글을 작성해 주세요</span><b aria-hidden="true">→</b><code>POST /api/posts</code></div><h3>만들 상황을 먼저 이해해요</h3><p>사용자의 요구와 요청·응답을 보고 이번에 만들 범위를 확인합니다.</p></article>

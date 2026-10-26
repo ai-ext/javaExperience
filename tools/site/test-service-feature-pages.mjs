@@ -42,6 +42,7 @@ test('catalog renders one feature card, grouping, filters, Explorer routes and c
   const prerequisite = { id: 'members-auth', title: '회원 가입과 로그인', group: '시작과 계정', projects: ['board'] };
   const html = renderServiceCatalog({ features: [feature, prerequisite], sourceIndex, apiRecipes: [recipe, relatedRecipe], rootPrefix: '../' });
   assert.equal((html.match(/data-sf-id="fixture-record"/g) || []).length, 1, '같은 기능 카드는 한 번만 표시해야 함');
+  assert.match(html, /data-sf-visible-count>2<\/span>개 기능 · <span>2<\/span>개 단계/, '서로 다른 프로젝트의 같은 단계 ID도 각각 센다');
   assert.match(html, /data-sf-feature-group/);
   assert.match(html, /게시글과 소통/);
   assert.match(html, /data-sf-difficulty/);
@@ -54,8 +55,8 @@ test('catalog renders one feature card, grouping, filters, Explorer routes and c
   assert.equal((html.match(/data-sf-api-row data-sf-method=/g) || []).length, 1, '동일 project+method+path를 한 행으로 묶어야 함');
   assert.match(html, /요청 사례·원문 자료 2개 보기/);
   assert.match(html, /#api-map-title/);
-  assert.match(html, /단계별 시안으로 고르기/);
-  assert.match(html, /완성할 기능으로 묶었습니다\. 예전 세부 단계도 안에서 볼 수 있어요\./);
+  assert.match(html, /만들 기능 고르기/);
+  assert.match(html, /사용자에게 생기는 결과, 핵심 범위, 먼저 필요한 기능/);
   assert.doesNotMatch(html, /기능 카드는 한 번씩만 표시합니다/);
   assert.match(html, /sf-preview-comparison/);
   assert.match(html, /data-sf-projects="board"/);
@@ -75,10 +76,10 @@ test('catalog search includes original day id, title, and aliases for linked cou
   for(const term of ['D30','API 변경 협의와 하위 호환','하위','호환'])assert.ok(searchText.includes(term),term);
 });
 
-test('feature renderer follows the requirement sequence without content tabs and preserves root-relative references', () => {
+test('feature renderer groups each stage into task, brief, data, and request tabs while preserving references', () => {
   const html = renderServiceFeature({ feature, features: [feature, { id: 'members-auth', title: '회원 가입과 로그인' }], sourceIndex, apiRecipes: [recipe, relatedRecipe], rootPrefix: '../../' });
   assert.equal((html.match(/data-sf-stage-panel/g) || []).length, 2);
-  for (const text of ['이번에 할 일', '시작 조건', '사용자 시나리오', '데이터와 이유', '업무 정책', '입력과 출력', '성공 기준', '입력 사례', '개발 과제', '완료 확인', '제목 누락']) assert.match(html, new RegExp(text));
+  for (const text of ['오늘 할 일', '기획서', '데이터', '요청·응답', '이번에 할 일', '시작 조건', '사용자 시나리오', '데이터와 이유', '업무 정책', '입력과 출력', '성공 기준', '입력 사례', '직접 개발할 과제', '완료 확인', '제목 누락']) assert.match(html, new RegExp(text));
   assert.match(html, /data-srq-root/);
   assert.match(html, /선택한 API 계약/);
   assert.match(html, /공백 불가/);
@@ -90,11 +91,12 @@ test('feature renderer follows the requirement sequence without content tabs and
   assert.match(html, /href="\.\.\/\.\.\/scenario\/ch1-create-post\/1-2-dto-response\.html#post"/);
   assert.match(html, /href="\.\.\/\.\.\/docs\/knowledge\/P16-json-jackson-practical\.html"/);
   assert.match(html, /data-sf-stage-complete/);
-  assert.doesNotMatch(html, /sf-content-tab|sf-content-panel|sf-content-switch/);
-  const order = ['1 · 이번에 할 일', '2 · 시작 조건', '3 · 세부 요구사항', '4 · 사용자 시나리오', '5 · 필요할 때 보는 힌트', '6 · 직접 호출하기', '7 · 완료 확인'];
-  const positions = order.map((label) => html.indexOf(label)).filter((position) => position >= 0);
-  assert.equal(positions.length, order.length, '요구사항서의 일곱 항목이 모두 있는 fixture');
-  assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+  // 2026-10-26 화면 결정에 따라 기능 단계는 네 탭으로 나누고 각 원문 항목은 해당 영역에 보존한다.
+  assert.equal((html.match(/role="tab"/g) || []).length, 8, '두 단계에 오늘 할 일·기획서·데이터·요청 응답 탭이 각각 있다');
+  assert.match(html, /data-sf-tab-panel="task"/);
+  assert.match(html, /data-sf-tab-panel="brief"[^>]* hidden/);
+  assert.match(html, /data-sf-tab-panel="data"[^>]* hidden/);
+  assert.match(html, /data-sf-tab-panel="request"[^>]* hidden/);
   assert.match(html, /class="sf-requirements-table"/);
   assert.match(html, /class="sf-request-checklist"/);
   assert.match(html, /<details class="sf-execution"><summary>직접 시도한 뒤 보기/);
@@ -103,6 +105,19 @@ test('feature renderer follows the requirement sequence without content tabs and
   assert.match(html, /<table><thead><tr><th>조건<\/th><th>결과<\/th><th>유지할 상태<\/th>/);
   assert.match(html, /원문 완료 기준·검증 메모/);
   assert.doesNotMatch(html, /<script[^>]+src=/);
+});
+
+test('단계 데이터 탭은 recipe DB 조회 SQL과 비교 기준을 보여 주고 요청 도구에서 중복하지 않는다', () => {
+  const recipeWithDb = { ...recipe, manualDb: [{ title: '생성 결과', sql: 'SELECT id, title FROM post WHERE id = :id;', notes: '응답 id의 id와 title을 비교합니다.' }] };
+  const html = renderServiceFeature({ feature, apiRecipes: [recipeWithDb], sourceIndex, rootPrefix: '../../' });
+  const dom = new JSDOM(`<main>${html}</main>`);
+  const dataPanel = dom.window.document.querySelector('[data-sf-tab-panel="data"]');
+  const requestTool = dom.window.document.querySelector('[data-sf-tab-panel="request"] .service-request-tool');
+  assert.match(dataPanel.textContent, /DB 확인 SQL/);
+  assert.match(dataPanel.textContent, /SELECT id, title FROM post WHERE id = :id;/);
+  assert.match(dataPanel.textContent, /응답 id의 id와 title을 비교합니다/);
+  assert.equal(requestTool.querySelector('[data-srq-verification]'), null, 'DB 확인은 데이터 탭에서 한 번만 표시');
+  dom.window.close();
 });
 
 test('feature body summary, string failure policies, and execution record guidance reach the page', () => {
@@ -141,6 +156,17 @@ test('manual progress is isolated by feature, project variant, and stage without
   const root = dom.window.document.querySelector('[data-sf-feature]');
   const panels = [...root.querySelectorAll('[data-sf-stage-panel]')];
   assert.equal(panels.filter((panel) => !panel.hidden).length, 1);
+  const taskTab = root.querySelector('[data-sf-stage-tab="task"]');
+  const dataTab = root.querySelector('[data-sf-stage-tab="data"]');
+  const taskPanel = root.querySelector('[data-sf-tab-panel="task"]');
+  const dataPanel = root.querySelector('[data-sf-tab-panel="data"]');
+  assert.equal(taskPanel.hidden, false, '새로고침 첫 화면에는 오늘 할 일이 먼저 보임');
+  dataTab.click();
+  assert.equal(taskPanel.hidden, true);
+  assert.equal(dataPanel.hidden, false, '데이터 탭이 해당 내용만 전환함');
+  assert.equal(dataTab.getAttribute('aria-selected'), 'true');
+  taskTab.click();
+  assert.equal(taskPanel.hidden, false, '오늘 할 일로 다시 돌아올 수 있음');
   const progressCheckbox = root.querySelector('[data-sf-stage-complete]');
   assert.equal(progressCheckbox.checked, false, '과거 기능 boolean은 새 단계 완료로 환산하지 않아야 함');
   assert.equal(root.querySelector('[data-sf-progress-count]').textContent, '0 / 1');
