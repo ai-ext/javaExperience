@@ -204,4 +204,8 @@ assert.equal(direct.$('.home-course-path-beginner').getAttribute('href'), 'java-
 assert.equal(direct.$('.home-course-path-service').getAttribute('href'), 'scenario/README.html');
 assert.equal(direct.$('[data-home-title]').textContent, TASKS['0-1'].title, '홈에서 오늘 할 일 진입 유지');
 direct.close();
+// 실제 홈은 course-pages의 renderCourseHome이 만든다. 생성된 index.html에서 두 과정 진입을 직접 확인한다.
+const builtHome = fs.readFileSync(new URL('index.html', root), 'utf8');
+assert.match(builtHome, /class="home-course-path home-course-path-beginner" href="java-beginner\.html"/, '실제 홈: 입문 과정 진입');
+assert.match(builtHome, /class="home-course-path home-course-path-service" href="scenario\/README\.html"/, '실제 홈: 서비스 만들기 진입');
 console.log('개선 연결: 환경 준비·선택 카드 즉시 반영·기존 과제 복귀·classic 번들 초기화 통과');
