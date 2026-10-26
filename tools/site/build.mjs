@@ -103,6 +103,7 @@ import { injectTicketFlow } from './course-flow.mjs';
 import { renderCourseOutline } from './course-outline.mjs';
 import { renderSemanticColors } from './course-semantic-colors.mjs';
 import { renderContentKinds, renderContentVisual } from './course-content.mjs';
+import { loadServiceCourse } from '../../java-beginner/service-course.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const ONLY_PATTERNS = [];
@@ -139,6 +140,15 @@ function loadServicePageData() {
   };
 }
 const SERVICE_PAGE_DATA = loadServicePageData();
+const SERVICE_COURSE = loadServiceCourse();
+function serviceCourseRedirect(featureId, rootPrefix) {
+  if (!featureId) return `<aside class="course-redirect"><p>서비스 만들기 과정은 통합 화면에서 이어집니다.</p><a href="${rootPrefix}java-service.html">실무 과정 열기 ↗</a><script>location.replace(${JSON.stringify(`${rootPrefix}java-service.html`)});</script></aside>`;
+  const module = SERVICE_COURSE.modules.find((item) => item.id === featureId);
+  if (!module) throw new Error(`실무 과정에 없는 feature: ${featureId}`);
+  const stages = module.days.map((day) => ({ project: day.project, variant: module.variants.find((item) => item.project === day.project)?.id, stage: day.sourceStageId, day: day.day }));
+  const fallback = stages[0];
+  return `<aside class="course-redirect"><p>이 기능은 실무 과정 화면으로 통합되었습니다.</p><a href="${rootPrefix}java-service.html#feature=${featureId}&project=${fallback.project}&stage=${fallback.stage}&d=${fallback.day}">기능 화면 열기 ↗</a><script>(()=>{const q=new URLSearchParams(location.search);const map=${JSON.stringify(stages)};const hash=decodeURIComponent(location.hash.slice(1));let variant=q.get('variant')||q.get('project');let stage=q.get('stage');if(!stage){const match=map.find(item=>hash.endsWith('-'+item.stage)&&(hash.includes('-'+item.variant+'-')||hash.includes('-'+item.project+'-')));if(match){variant=match.variant;stage=match.stage}}const item=map.find(entry=>(!variant||entry.variant===variant||entry.project===variant)&&(!stage||entry.stage===stage))||map[0];location.replace(${JSON.stringify(`${rootPrefix}java-service.html`)}+'#feature='+encodeURIComponent(${JSON.stringify(featureId)})+'&project='+encodeURIComponent(item.project)+'&stage='+encodeURIComponent(item.stage)+'&d='+item.day+(q.get('tab')?'&t='+encodeURIComponent(q.get('tab')):''));})();</script></aside>`;
+}
 function matchesOnlyPattern(file) {
   const relative = path.relative(ROOT, file).split(path.sep).join('/');
   return ONLY_PATTERNS.some((pattern) => {
@@ -705,6 +715,7 @@ function page({ abs, title, body, hasMermaid, hasDbIndexExperiment }) {
       + '<details class="service-original-reference" id="legacy-scenarios"><summary>기존 시나리오·실행 준비·DB 자료 보기</summary>'
       + originalTitle + originalBody + '</details>'
       + renderCatalog(API_ARCHITECTURE, levelHref);
+    body += serviceCourseRedirect(null, '../');
     const oldAnchors = JSON.parse(read(path.join(ROOT, 'docs/design/full-integration-2026-10-25/ORIGINAL-CATALOG-ANCHORS.json'))).ids;
     const presentIds = new Set([...body.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
     const missingAnchors = oldAnchors.filter(id => !presentIds.has(id));
@@ -859,7 +870,7 @@ function page({ abs, title, body, hasMermaid, hasDbIndexExperiment }) {
     const feature = serviceData.features.find((item) => item.id === serviceFeatureMatch[1]);
     if (!feature) throw new Error(`service catalog에 없는 기능 페이지: ${serviceFeatureMatch[1]}`);
     const rootPrefix = `${path.relative(path.dirname(abs), ROOT).split(path.sep).join('/')}/`;
-    body = servicePageRenderers.renderServiceFeature({ feature, features: serviceData.catalogFeatures, apiRecipes: serviceData.apiRecipes, sourceIndex: serviceData.sourceIndex, rootPrefix });
+    body = servicePageRenderers.renderServiceFeature({ feature, features: serviceData.catalogFeatures, apiRecipes: serviceData.apiRecipes, sourceIndex: serviceData.sourceIndex, rootPrefix }) + serviceCourseRedirect(feature.id, '../../');
   }
   body = renderCourseOutline(rel(abs), body);
   body = renderCatalogHeading(rel(abs), body);

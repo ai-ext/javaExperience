@@ -22,9 +22,14 @@ test('한글 query와 생성 번호를 사용하며 GET 본문을 보내지 않�
   assert.equal(new URL(request.url,'http://localhost').searchParams.get('keyword'),'배포');
   assert.equal(request.init.body, undefined);
   assert.deepEqual(captureResource('post-create', {id:42}), {postId:'42'});
+  assert.deepEqual(captureResource('board:post-create:normal', null, {key:'postId',locationPattern:'/api/posts/{postId}'}, '/api/posts/42'), {postId:'42'});
+  assert.deepEqual(captureResource('board:post-create:normal', null, {key:'postId',locationPattern:'/api/posts/{postId}'}, '/api/posts/../secret'), {});
   assert.deepEqual(captureResource('order-idempotent', {id:17}), {orderId:'17'});
   assert.deepEqual(captureResource('post-create', {id:'../../bad'}), {});
   assert.equal(inspectResponse(201, {id:42}, {expect:201, fields:['id']}).statusMatch,true);
   assert.equal(inspectResponse(201, {}, {expect:201, fields:['id']}).fieldsMatch,false);
   assert.equal(inspectResponse(500, {}, {expect:201, fields:['id']}).statusMatch,false);
+  assert.equal(inspectResponse(204, null, {expect:[201,204]}).statusMatch,true);
+  const targeted=buildRequest({method:'GET',path:'/api/health',target:'http://127.0.0.1:8081'});
+  assert.equal(new URL(targeted.url,'http://localhost').searchParams.get('__course_target'),'http://127.0.0.1:8081');
 });

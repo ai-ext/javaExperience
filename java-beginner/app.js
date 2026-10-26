@@ -5,13 +5,15 @@ const byId=new Map(apis.map(a=>[a.id,a]));
 const progressKey='java-beginner.standalone.progress.v2';
 const content=document.getElementById('content');
 let completed=[];
-try {
+if(course.mode==='service'){try{completed=readServiceProgress(localStorage,course);}catch{completed=[];}}
+else try {
   const currentSaved=localStorage.getItem(progressKey);
   const saved=currentSaved===null?migrateLegacyProgress(JSON.parse(localStorage.getItem('java-beginner.standalone.progress.v1')||'[]')):JSON.parse(currentSaved);
   if(Array.isArray(saved)) completed=[...new Set(saved.filter(x=>Number.isInteger(x)&&x>=1&&x<=60))];
   if(currentSaved===null) localStorage.setItem(progressKey,JSON.stringify(completed));
 } catch {}
 let current=null, selectedApi=null, selectedCase=null, target='http://127.0.0.1:8080';
+const projectTargets=(()=>{const defaults={board:'http://127.0.0.1:8080',community:'http://127.0.0.1:8080','project-v1':'http://127.0.0.1:8080',practice:'http://127.0.0.1:8080'};try{const saved=JSON.parse(localStorage.getItem('javaexperience.service.api-targets.v1')||'{}');for(const key of Object.keys(defaults))if(typeof saved?.[key]==='string')defaults[key]=saved[key];}catch{}return defaults;})();
 let vars={}, csrf='', bearer='', generation=0, pending=null, blobUrl=null;
 let runnerReady=false, toastTimer;
 const $=id=>document.getElementById(id);
@@ -20,9 +22,9 @@ function releaseBlob(){if(blobUrl){URL.revokeObjectURL(blobUrl);blobUrl=null;}}
 function navigationState(){
   if(location.hash==='#setup') return {view:'setup'};
   const params=new URLSearchParams(location.hash.slice(1));
-  const m=course.modules.find(m=>m.id===params.get('m'));
+  const m=course.modules.find(m=>m.id===(course.mode==='service'?params.get('feature'):params.get('m')));
   if(!m) return {view:'home'};
-  const d=m.days.find(d=>d.day===Number(params.get('d'))) || m.days[0];
+  const d=course.mode==='service'?(m.days.find(d=>d.project===params.get('project')&&d.sourceStageId===params.get('stage'))||m.days.find(d=>d.day===Number(params.get('d')))||m.days[0]):m.days.find(d=>d.day===Number(params.get('d'))) || m.days[0];
   const tab=['task','brief','data','api'].includes(params.get('t'))?params.get('t'):'task';
   return {view:'module',m,d,tab};
 }
@@ -42,21 +44,24 @@ function render(keepScroll=false){
     const label=link.querySelector('.nav-complete');label.textContent=count===m.days.length?'✓':'';
   }
   $('nav-overview').classList.toggle('active',current.view==='home');
-  $('progress-count').textContent=`${completed.length} / 60`;
-  $('progress-fill').style.width=`${completed.length/60*100}%`;
-  $('header-status').textContent=current.d?`Day ${pad(current.d.day)} / 60`:`${completed.length}회차 완료`;
-  document.title=current.d?`Day ${pad(current.d.day)} · ${current.d.title} — 처음 만드는 Java 실무`:'처음 만드는 Java 실무 · 60회차';
+  const total=course.modules.flatMap(m=>m.days).length;
+  $('progress-count').textContent=`${completed.length} / ${total}`;
+  $('progress-fill').style.width=`${completed.length/total*100}%`;
+  $('header-status').textContent=current.d?`Day ${pad(current.d.day)} / ${total}`:`${completed.length}회차 완료`;
+  document.title=current.d?`Day ${pad(current.d.day)} · ${current.d.title} — ${course.title}`:`${course.title} · ${total}회차`;
   if(current.view==='module'){
     $('complete-day').addEventListener('click',()=>{
       const n=current.d.day;
-      completed=completed.includes(n)?completed.filter(x=>x!==n):[...completed,n];
-      try{localStorage.setItem(progressKey,JSON.stringify(completed));}catch{toast('이 브라우저에서는 진도를 저장하지 못했습니다. 현재 창에서만 유지합니다.');}
+      if(course.mode==='service') completed=writeServiceProgress(localStorage,course,current.d,!completed.includes(n));
+      else {completed=completed.includes(n)?completed.filter(x=>x!==n):[...completed,n];try{localStorage.setItem(progressKey,JSON.stringify(completed));}catch{toast('이 브라우저에서는 진도를 저장하지 못했습니다. 현재 창에서만 유지합니다.');}}
       render(true);$('complete-day').focus({preventScroll:true});
     });
-    const all=course.modules.flatMap(m=>m.days.map(d=>({m,d})));
+    const all=course.mode==='service'?current.m.days.filter(d=>d.project===current.d.project).map(d=>({m:current.m,d})):course.modules.flatMap(m=>m.days.map(d=>({m,d})));
     const index=all.findIndex(x=>x.d.day===current.d.day);
     const prev=all[index-1],next=all[index+1];
     $('day-pagination').innerHTML=`${prev?`<a href="${route(prev.m,prev.d)}">← Day ${pad(prev.d.day)}</a>`:''}${next?`<a href="${route(next.m,next.d)}">Day ${pad(next.d.day)} →</a>`:'<a href="#overview">전체 과정으로 →</a>'}`;
+    const projectSelect=$('project-select');
+    if(projectSelect){projectSelect.value=current.d.project;projectSelect.addEventListener('change',()=>{const first=current.m.days.find(day=>day.project===projectSelect.value);if(first)location.hash=route(current.m,first).slice(1);});}
     if(current.tab==='api') mountApi();
   }
   for(const button of document.querySelectorAll('[data-copy]')) button.addEventListener('click',async()=>{
@@ -93,7 +98,12 @@ async function mountApi(){
     const data=await config.json();
     if(!data.target) throw new Error('Missing API target');
     if(pageGeneration!==generation) return;
-    target=data.target;runnerReady=true;$('api-target').textContent=target;
+    target=data.target;
+    if(course.mode==='service'){
+      const selector=$('project-target'),input=$('project-target-url');
+      if(selector&&input){selector.value=current.d.project;input.value=projectTargets[current.d.project]||'http://127.0.0.1:8080';target=input.value;selector.addEventListener('change',()=>{input.value=projectTargets[selector.value]||'http://127.0.0.1:8080';target=input.value;$('api-target').textContent=target;clearResponse('프로젝트 서버 주소를 바꿨습니다.');});input.addEventListener('input',()=>{target=input.value.trim();projectTargets[selector.value]=target;$('api-target').textContent=target;try{localStorage.setItem('javaexperience.service.api-targets.v1',JSON.stringify(projectTargets));}catch{}clearResponse('프로젝트 서버 주소를 바꿨습니다.');});}
+    }
+    runnerReady=true;$('api-target').textContent=target;
     $('connection-label').textContent='전용 실행기 연결됨';$('send-request').disabled=false;
   }catch{
     if(pageGeneration!==generation) return;
@@ -102,7 +112,12 @@ async function mountApi(){
 }
 function selectApi(){
   selectedApi=byId.get($('api-select').value);
-  $('case-select').innerHTML=selectedApi.cases.map((c,i)=>`<option value="${i}">${esc(c.label)} · ${c.expect}</option>`).join('');
+  if(course.mode==='service'&&$('project-target')){
+    const selector=$('project-target'),input=$('project-target-url');
+    if([...selector.options].some(option=>option.value===selectedApi.project))selector.value=selectedApi.project;
+    if(projectTargets[selectedApi.project]){input.value=projectTargets[selectedApi.project];target=input.value;$('api-target').textContent=target;}
+  }
+  $('case-select').innerHTML=selectedApi.cases.map((c,i)=>`<option value="${i}">${esc(c.label)} · ${(c.expectedStatuses||[c.expect]).filter(Boolean).join(' / ')||'상태 미등록'}</option>`).join('');
   fillCase();
 }
 function fillCase(){
@@ -123,7 +138,8 @@ function fillCase(){
   updateBodyVisibility();
   $('api-prepare').textContent=`${a.prepare}${c.withoutAuth?' 이 사례는 먼저 로그아웃하고 새 CSRF 토큰을 준비한 뒤 실행하세요. 쿠키를 자동으로 제거하지 않습니다.':''}`;
   $('api-note').textContent=a.note || '';
-  $('expected-status').textContent=`선택한 사례의 예상 HTTP 상태: ${c.expect}${c.expect>=400?' · 의도한 실패 응답':' · 정상 처리/호환 사례'}`;
+  const expectedStatuses=c.expectedStatuses?.length?c.expectedStatuses:[c.expect].filter(Number.isInteger);
+  $('expected-status').textContent=`선택한 사례의 예상 HTTP 상태: ${expectedStatuses.join(' / ')||'원문 미등록'}${!expectedStatuses.length?' · 실제 상태를 기록하세요.':expectedStatuses.some(status=>status>=400)?' · 의도한 실패 응답':' · 정상 처리/호환 사례'}`;
   const expectedResponse=Object.hasOwn(c,'response')?c.response:c.expect>=400?{code:'서버가 정한 오류 코드',message:'실패 원인 안내'}:a.response;
   $('expected-body-label').textContent=c.expect>=400?'선택한 실패 응답의 구조 예시':'정상 응답 구조 예시';
   $('expected-body').textContent=expectedResponse===null?(a.id==='file-download'?'파일 바이트 · JSON 응답 아님':'본문 없음'):JSON.stringify(expectedResponse,null,2);
@@ -155,10 +171,10 @@ async function sendRequest(){
   const pathVars=Object.fromEntries([...document.querySelectorAll('[data-path-var]')].map(input=>[input.dataset.pathVar,input.value]));
   let request;
   try {
-    request=buildRequest({method:$('http-method').value,path:$('api-path').value,vars:pathVars,query:$('api-query').value,headers:$('api-headers').value,body:$('api-body').value,csrf,token:bearer,multipart:selectedApi.multipart,file:$('api-file').files[0]});
+    request=buildRequest({method:$('http-method').value,path:$('api-path').value,vars:pathVars,query:$('api-query').value,headers:$('api-headers').value,body:$('api-body').value,csrf,token:bearer,multipart:selectedApi.multipart,file:$('api-file').files[0],target:course.mode==='service'?target:''});
   }catch(error){$('send-message').textContent=error.message;$('send-message').className='send-message error';return;}
   clearResponse('요청을 보내는 중입니다.');
-  const snapshot={generation,api:selectedApi,case:selectedCase,expected:Number(selectedCase.expect),method:request.init.method};
+  const snapshot={generation,api:selectedApi,case:selectedCase,expected:selectedCase.expectedStatuses?.length?selectedCase.expectedStatuses:Number.isInteger(selectedCase.expect)?Number(selectedCase.expect):[],method:request.init.method};
   const controller=new AbortController();pending=controller;
   const controls=[...content.querySelectorAll('input,select,textarea,button')];for(const control of controls) control.disabled=true;
   const start=performance.now();const timeout=setTimeout(()=>controller.abort(),35000);
@@ -171,10 +187,13 @@ async function sendRequest(){
     const elapsed=Math.round(performance.now()-start);
     let body=null;if(isText && raw){try{body=JSON.parse(raw);}catch{body=raw;}}
     const fromUpstream=response.headers.get('x-java-beginner-upstream')==='true';
-    const fields=snapshot.case.expectedFields ?? (snapshot.expected>=400?['code','message']:snapshot.api.responseFields.map(f=>f.name));
+    const expectedStatuses=Array.isArray(snapshot.expected)?snapshot.expected:[snapshot.expected].filter(Number.isInteger);
+    const hasExpectedStatus=expectedStatuses.length>0;
+    const expectedFailure=expectedStatuses.some(status=>status>=400);
+    const fields=snapshot.case.expectedFields ?? (expectedFailure?['code','message']:snapshot.api.responseFields.map(f=>f.name));
     const inspection=inspectResponse(response.status,body,{expect:snapshot.expected,fields});
     $('response-empty').hidden=true;$('response-badge').textContent=`HTTP ${response.status}`;
-    $('response-badge').className=`response-badge ${fromUpstream&&inspection.statusMatch?'success':'error'}`;
+    $('response-badge').className=`response-badge ${fromUpstream&&(inspection.statusMatch||!hasExpectedStatus)?'success':'error'}`;
     $('response-meta').textContent=`${fromUpstream?'실제 API 서버 응답':'전달 실행기 응답 · API 도달 실패'} · ${elapsed} ms · ${snapshot.method} ${request.path}`;
     if(isText){$('response-body').hidden=false;$('response-body').textContent=raw?(typeof body==='string'?body:JSON.stringify(body,null,2)):'(응답 본문 없음)';}
     else {
@@ -188,9 +207,9 @@ async function sendRequest(){
     }
     $('response-headers').hidden=false;$('response-header-body').textContent=[...response.headers.entries()].map(([k,v])=>`${k}: ${v}`).join('\n');
     if(!fromUpstream) $('response-check').textContent='API 실행 결과가 아닙니다. 전달 실행기의 오류 안내를 확인하세요.';
-    else $('response-check').textContent=`${inspection.statusMatch?'예상 HTTP 상태와 일치합니다.':'예상 HTTP '+snapshot.expected+'와 다릅니다.'} ${fields.length?(inspection.fieldsMatch?'필수 최상위 필드가 있습니다.':'필수 최상위 필드가 없거나 JSON 형식이 다릅니다.'):'본문 형식은 해당 API 정책으로 확인하세요.'} 값과 DB 결과·권한·동시성은 별도 확인이 필요합니다.`;
-    if(fromUpstream&&response.ok&&body&&typeof body==='object'){
-      const captured=captureResource(snapshot.api.id,body);vars={...vars,...pathVars,...captured};
+    else $('response-check').textContent=`${!hasExpectedStatus?'원문에 기대 HTTP 상태가 등록되지 않았습니다. 실제 상태를 기록하세요.':inspection.statusMatch?'예상 HTTP 상태와 일치합니다.':'예상 HTTP '+expectedStatuses.join(' / ')+'와 다릅니다.'} ${fields.length?(inspection.fieldsMatch?'필수 최상위 필드가 있습니다.':'필수 최상위 필드가 없거나 JSON 형식이 다릅니다.'):'본문 형식은 해당 API 정책으로 확인하세요.'} 값과 DB 결과·권한·동시성은 별도 확인이 필요합니다.`;
+    if(fromUpstream&&response.ok){
+      const captured=captureResource(snapshot.api.id,body,snapshot.api.capture,response.headers.get('location'));vars={...vars,...pathVars,...captured};
       $('send-message').textContent=Object.keys(captured).length?`${Object.entries(captured).map(([k,v])=>k+'='+v).join(', ')}를 현재 창의 다음 요청에 이어 씁니다. 자동 완료는 하지 않습니다.`:'요청을 마쳤습니다. 실제 응답과 DB 상태를 직접 확인하세요.';
     }else $('send-message').textContent='요청을 마쳤습니다. 예상 상태와 실제 응답의 차이를 확인하세요.';
   }catch(error){
@@ -211,6 +230,13 @@ $('course-search').addEventListener('input',event=>{
   node.hidden=false;node.innerHTML=found.length?found.map(({m,d})=>`<a href="${route(m,d)}"><span>DAY ${pad(d.day)} · ${esc(m.title)}</span><strong>${esc(d.title)}</strong></a>`).join(''):'<p>검색 결과가 없습니다. 게시판·로그인·재고 같은 기능 이름으로 찾아보세요.</p>';
 });
 $('search-results').addEventListener('click',event=>{if(event.target.closest('a')){$('course-search').value='';$('search-results').hidden=true;}});
+content.addEventListener('click',event=>{
+  const button=event.target.closest('[data-hint-open],[data-hint-prev],[data-hint-next]');if(!button)return;
+  const box=button.closest('.hint-box'),data=JSON.parse(box.querySelector('[data-hint-data]').textContent),index=Number(box.dataset.hintIndex);
+  const next=button.hasAttribute('data-hint-open')?0:button.hasAttribute('data-hint-prev')?Math.max(0,index-1):Math.min(data.length-1,index+1);
+  box.dataset.hintIndex=String(next);box.querySelector('[data-hint-text]').textContent=data[next];box.querySelector('[data-hint-open]').hidden=true;
+  box.querySelector('[data-hint-prev]').disabled=next===0;box.querySelector('[data-hint-next]').hidden=next===data.length-1;
+});
 document.addEventListener('keydown',event=>{
   if(event.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){event.preventDefault();$('course-search').focus();}
   if(event.key==='Escape'){$('course-search').value='';$('search-results').hidden=true;}

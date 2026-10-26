@@ -47,6 +47,6 @@ export function renderHomeServicePreview() {
     <li><span>4</span><div><strong>댓글·좋아요</strong><p>글에 반응하는 기능을 더해요.</p></div></li>
   </ol>
   <p class="home-service-scope">각 기능은 과정을 따라 순서대로 추가합니다.</p>
-  <a class="home-service-course-link" href="scenario/README.html">서비스 만들기 전체 과정 보기 <span aria-hidden="true">→</span></a>
+  <a class="home-service-course-link" href="java-service.html">서비스 만들기 전체 과정 보기 <span aria-hidden="true">→</span></a>
 </section>`;
 }

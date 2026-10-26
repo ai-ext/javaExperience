@@ -797,7 +797,7 @@ export function renderCourseHome(course) {
   <div class="ch-intro"><h1 id="course-home-title">무엇을 만들게 되나요?</h1><p>만들고 싶은 과정으로 들어가 기능 하나씩 완성하세요.</p></div>
   <section class="home-course-paths" aria-label="학습 과정 선택">
     <a class="home-course-path home-course-path-beginner" href="${esc(href('java-beginner.html'))}"><span class="home-course-path-mark" aria-hidden="true">01</span><span class="home-course-path-copy"><small>JAVA BEGINNER</small><strong>입문 과정</strong><span>Java 기초부터 공지 게시판과 실무 기능까지 차근차근 만듭니다.</span></span><span class="home-course-path-count">12개 기능 <b>60회차</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
-    <a class="home-course-path home-course-path-service" href="${esc(href('scenario/README.html'))}"><span class="home-course-path-mark" aria-hidden="true">02</span><span class="home-course-path-copy"><small>SERVICE BUILD · 실무</small><strong>서비스 만들기</strong><span>기능 요구사항을 설계하고 직접 구현해 요청과 데이터로 확인합니다.</span></span><span class="home-course-path-count">94개 기능 <b>138단계</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
+    <a class="home-course-path home-course-path-service" href="${esc(href('java-service.html'))}"><span class="home-course-path-mark" aria-hidden="true">02</span><span class="home-course-path-copy"><small>SERVICE BUILD · 실무</small><strong>서비스 만들기</strong><span>기능 요구사항을 설계하고 직접 구현해 요청과 데이터로 확인합니다.</span></span><span class="home-course-path-count">94개 기능 <b>138단계</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
   </section>
   <div class="ch-hero">
     <article class="ch-today" aria-labelledby="ch-today-title">

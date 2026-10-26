@@ -15,7 +15,7 @@ export function renderHomeVisual(root, fromAbs, renderedHtml) {
   <header class="home-course-intro"><p class="home-eyebrow">JAVA WORKSHOP · 직접 만들며 배우는 백엔드</p><h1 id="home-title" data-home-intro-title>무엇을 만들게 되나요?</h1><p data-home-intro-description>만들고 싶은 과정으로 들어가 기능 하나씩 완성하세요.</p></header>
   <section class="home-course-paths" aria-label="학습 과정 선택">
     <a class="home-course-path home-course-path-beginner" href="java-beginner.html"><span class="home-course-path-mark" aria-hidden="true">01</span><span class="home-course-path-copy"><small>JAVA BEGINNER · PR #14</small><strong>입문 과정</strong><span>Java 기초부터 공지 게시판과 실무 기능까지 차근차근 만듭니다.</span></span><span class="home-course-path-count">12개 기능 <b>60회차</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
-    <a class="home-course-path home-course-path-service" href="scenario/README.html"><span class="home-course-path-mark" aria-hidden="true">02</span><span class="home-course-path-copy"><small>SERVICE BUILD · 실무</small><strong>서비스 만들기</strong><span>기능 요구사항을 설계하고 직접 구현해 요청과 데이터로 확인합니다.</span></span><span class="home-course-path-count">94개 기능 <b>138단계</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
+    <a class="home-course-path home-course-path-service" href="java-service.html"><span class="home-course-path-mark" aria-hidden="true">02</span><span class="home-course-path-copy"><small>SERVICE BUILD · 실무</small><strong>서비스 만들기</strong><span>기능 요구사항을 설계하고 직접 구현해 요청과 데이터로 확인합니다.</span></span><span class="home-course-path-count">94개 기능 <b>138단계</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
   </section>
   <div class="home-hero">
     <article class="home-task" aria-labelledby="home-task-title">
@@ -45,7 +45,7 @@ export function renderHomeVisual(root, fromAbs, renderedHtml) {
       </div></div>
     </aside>
   </div>
-  <nav class="home-roadmap" aria-label="앞으로 만들어 갈 흐름"><span><b>01</b> 작은 API</span><span aria-hidden="true">→</span><span><b>02</b> 게시글 저장</span><span aria-hidden="true">→</span><span><b>03</b> 조회·수정·확장</span><a href="scenario/README.html">전체 과정 보기 ↗</a></nav>
+  <nav class="home-roadmap" aria-label="앞으로 만들어 갈 흐름"><span><b>01</b> 작은 API</span><span aria-hidden="true">→</span><span><b>02</b> 게시글 저장</span><span aria-hidden="true">→</span><span><b>03</b> 조회·수정·확장</span><a href="java-service.html">전체 과정 보기 ↗</a></nav>
   <section class="home-section" aria-labelledby="home-method-title"><div class="home-section-heading"><p class="home-eyebrow">읽기에서 끝나지 않도록</p><h2 id="home-method-title">이렇게 배우면 됩니다</h2><p>기능 하나를 이해하고, 만들고, 확인하는 흐름을 반복합니다.</p></div>
   <div class="home-method-grid">
     <article><span class="home-step-number">01</span><div class="home-step-visual"><span>글을 작성해 주세요</span><b aria-hidden="true">→</b><code>POST /api/posts</code></div><h3>만들 상황을 먼저 이해해요</h3><p>사용자의 요구와 요청·응답을 보고 이번에 만들 범위를 확인합니다.</p></article>

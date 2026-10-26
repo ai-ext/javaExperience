@@ -42,3 +42,20 @@ test('로컬 실행기는 실제 HTTP 메서드·본문·오류·쿠키를 전�
   const offline=await fetch(`${base}/__api/offline`);
   assert.equal(offline.status,502);assert.equal((await offline.json()).code,'API_CONNECTION_FAILED');
 });
+
+test('서비스 과정은 선택한 로컬 프로젝트 서버로 전달하고 대상 URL 파라미터를 upstream에 넘기지 않는다',async(t)=>{
+  const {createCourseServer}=await import('./server.mjs');
+  let received='';
+  const backend=createServer((req,res)=>{received=req.url;res.writeHead(200,{'Content-Type':'application/json'});res.end('{"ok":true}');});
+  backend.listen(0,'127.0.0.1');await once(backend,'listening');
+  const app=createCourseServer();app.listen(0,'127.0.0.1');await once(app,'listening');
+  t.after(()=>{app.closeAllConnections();app.close();backend.closeAllConnections();backend.close();});
+  const base=`http://127.0.0.1:${app.address().port}`;
+  const target=`http://127.0.0.1:${backend.address().port}`;
+  const response=await fetch(`${base}/__api/api/posts?keyword=한글&__course_target=${encodeURIComponent(target)}`);
+  assert.equal(response.status,200);
+  assert.equal(received,'/api/posts?keyword=%ED%95%9C%EA%B8%80');
+  const rejected=await fetch(`${base}/__api/api/posts?__course_target=${encodeURIComponent('http://example.com')}`);
+  assert.equal(rejected.status,400);
+  assert.equal((await rejected.json()).code,'INVALID_TARGET');
+});

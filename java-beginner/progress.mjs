@@ -4,3 +4,22 @@ export function migrateLegacyProgress(saved) {
   if(!Array.isArray(saved)) return [];
   return [...new Set(saved.filter(n=>Number.isInteger(n)&&n>=5&&n<=60).map(n=>n<=57?n-4:n))];
 }
+
+export function readServiceProgress(storage, course) {
+  let saved={version:1,completed:{},stages:{}};
+  try {const parsed=JSON.parse(storage?.getItem('javaexperience.service.progress.v1')||'null');if(parsed?.version===1&&parsed.completed&&typeof parsed.completed==='object')saved={...parsed,stages:parsed.stages&&typeof parsed.stages==='object'?parsed.stages:{}};} catch {}
+  return course.modules.flatMap(module=>module.days.filter(day=>Boolean(saved.stages?.[module.id]?.[day.project]?.[day.sourceStageId || day.id.split(':').at(-1)])).map(day=>day.day));
+}
+
+export function writeServiceProgress(storage, course, day, done) {
+  const key='javaexperience.service.progress.v1';
+  let saved={version:1,completed:{},stages:{}};
+  try {const parsed=JSON.parse(storage?.getItem(key)||'null');if(parsed?.version===1&&parsed.completed&&typeof parsed.completed==='object')saved={...parsed,stages:parsed.stages&&typeof parsed.stages==='object'?parsed.stages:{}};} catch {}
+  saved.stages[day.featureId] ||= {};
+  saved.stages[day.featureId][day.project] ||= {};
+  saved.stages[day.featureId][day.project][day.sourceStageId] = Boolean(done);
+  const feature=course.modules.find(module=>module.id===day.featureId);
+  saved.completed[day.featureId]=Boolean(feature?.variants.some(variant=>variant.stageIds.length>0&&variant.stageIds.every(id=>{const item=feature.days.find(candidate=>candidate.id===id);return item&&Boolean(saved.stages?.[day.featureId]?.[item.project]?.[item.sourceStageId]);})));
+  try {storage?.setItem(key,JSON.stringify(saved));} catch {}
+  return readServiceProgress(storage,course);
+}

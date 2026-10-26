@@ -46,8 +46,9 @@ async function open(file, { saved, brokenStorage = false, script = courseScript,
 // 홈 배치는 디자인 브랜치를 유지한다. 통합 기능과 기존 일자는 새 메뉴 및 같은 저장값으로 연결한다.
 await test('홈은 통합 기능 진입과 기존 일자 기록을 분리해 연결한다', () => {
   const home = new JSDOM(renderCourseHome(course), { url: 'https://learn.example/README.html' }).window.document;
-  assert.equal(home.querySelector('h1').textContent.trim(), '오늘 만들고, 결과로 확인하세요.');
+  assert.equal(home.querySelector('h1').textContent.trim(), '무엇을 만들게 되나요?');
   assert.ok(home.querySelector('.ch-menu-guide a[href="scenario/README.html"]'), '기능 목록 대표 진입');
+  assert.equal(home.querySelector('.home-course-path-service')?.getAttribute('href'), 'java-service.html', '실무 과정 카드는 통합된 #14 화면을 연다');
   assert.ok(home.querySelector('.ch-menu-guide a[href="course/map.html"]'), '독립 과정 지도 진입');
   assert.ok(home.querySelector('[data-today-open][href="course/spring/D01.html"]'), '기존 일자 주소 보존');
   assert.equal(home.querySelector('.ch-progress'), null, '홈에 일자 진도를 중복 나열하지 않는다');

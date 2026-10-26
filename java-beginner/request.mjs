@@ -1,7 +1,7 @@
 const methods = new Set(['GET','POST','PUT','PATCH','DELETE','HEAD','OPTIONS']);
 const blockedHeaders = /^(?:cookie|cookie2|host|origin|referer|connection|content-length|transfer-encoding|upgrade|expect|set-cookie|sec-.*|proxy-.*)$/i;
 
-export function buildRequest({method, path, vars = {}, query = '', headers = '{}', body = '', token = '', csrf = '', file = null, multipart = false}) {
+export function buildRequest({method, path, vars = {}, query = '', headers = '{}', body = '', token = '', csrf = '', file = null, multipart = false, target = ''}) {
   method = String(method).toUpperCase();
   if (!methods.has(method)) throw new Error('지원하지 않는 HTTP 메서드입니다.');
   path = String(path).trim();
@@ -40,22 +40,32 @@ export function buildRequest({method, path, vars = {}, query = '', headers = '{}
     }
   }
   const params=new URLSearchParams(String(query).replace(/^\?/,''));
+  if(target) params.set('__course_target',String(target));
   return {url:`/__api${path}${params.size?'?'+params.toString():''}`,init,path};
 }
 
 export function inspectResponse(status, body, {expect, fields = []}) {
-  const statusMatch=status===Number(expect);
+  const statuses=Array.isArray(expect)?expect.map(Number):[Number(expect)];
+  const statusMatch=statuses.includes(Number(status));
   const fieldsMatch=fields.every(key=>body!==null && typeof body==='object' && Object.hasOwn(body,key));
   return {statusMatch,fieldsMatch};
 }
 
-export function captureResource(id, body) {
+export function captureResource(id, body, capture = null, location = '') {
   const map={
     'post-create':'postId','owned-post':'postId','urgent-create':'postId',
     'comment-create':'commentId','file-upload':'attachmentId','product-create':'productId',
     'order-create':'orderId','order-idempotent':'orderId'
   };
-  const key=map[id];
-  if(!key || !body || !/^\d+$/.test(String(body.id ?? ''))) return {};
-  return {[key]:String(body.id)};
+  const key=capture?.key || map[id];
+  if(!key || !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(key)) return {};
+  let value=body?.[key] ?? (body?.id!=null&&map[id]===key?body.id:undefined);
+  if(value==null&&location&&capture?.locationPattern){
+    let path=String(location);try{if(/^https?:\/\//i.test(path))path=new URL(path).pathname;}catch{return {};}
+    const marker=`{${key}}`,pattern=String(capture.locationPattern),index=pattern.indexOf(marker);
+    if(index>=0){const prefix=pattern.slice(0,index),suffix=pattern.slice(index+marker.length);if(path.startsWith(prefix)&&path.endsWith(suffix))value=path.slice(prefix.length,path.length-suffix.length||undefined);}
+  }
+  const normalized=String(value??'');
+  if(!/^(?:[1-9]\d*|[A-Za-z0-9_-]{1,128})$/.test(normalized)) return {};
+  return {[key]:normalized};
 }

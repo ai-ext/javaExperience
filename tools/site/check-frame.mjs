@@ -12,6 +12,9 @@ Object.assign(routes, {홈:'index.html','일자 목록':'course/spring/README.ht
 Object.assign(routes, {'일반 개념 리더':'docs/knowledge/J01-types-string.html','장면 개념 리더':'docs/knowledge/P09-java-syntax-basics.html','레슨 상세':'lessons/A1-client-server-http.html','학습 순서':'docs/knowledge/README.html#kc-sequence','Spring 분야':'docs/knowledge/README.html#kc-category-spring', ...Object.fromEntries(CORE_UNITS.map(unit=>[unit.id, `lessons/concept-core.html?unit=${unit.id}`]))});
 Object.assign(routes, {'API EXPLORER':'scenario/README.html#journey-all-apis'});
 const pairs=[['출발 자료','개념 학습'],['일자 목록','Java'],['티켓','서비스 만들기'],['홈','과정 지도'],['서비스 만들기','일자 목록'],['서비스 만들기','기능 상세'],['실전 미션','개념 학습']];
+// 2026-10-26 결정(2): 서비스 만들기 목록·기능 상세 주소는 실무 과정(java-service.html, 입문 과정 화면 체계)으로 이동한다. 공통 틀 검사 대상에서 빼고, 이동 자체는 test-service-generated에서 확인한다.
+for (const [key, value] of Object.entries(routes)) if (/^scenario\/(README\.html|features\/)/.test(value)) delete routes[key];
+for (let k = pairs.length - 1; k >= 0; k--) if (!routes[pairs[k][0]] || !routes[pairs[k][1]]) pairs.splice(k, 1);
 const server = await startCheckServer();
 const base = server.base;
 let browser;
