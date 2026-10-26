@@ -3,4 +3,4 @@
 
 > 기획 원본 · 상세 기획 원본은 service/features/flush-observation.json입니다.
 
-10-12 JPA write와 MyBatis read가 같은 transaction/connection에서 flush 전후에 언제 보이는지 실제 SQL과 응답으로 확인한다.
+같은 트랜잭션에서 JPA로 바꾼 값이 MyBatis 조회에 언제 보이는지 확인하세요. flush 전·후·commit/rollback 후를 별도 관찰하고 HTTP 응답과 구분합니다.

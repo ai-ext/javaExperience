@@ -2,7 +2,7 @@
   "version": 1,
   "id": "likes",
   "title": "좋아요를 누르고 취소하기",
-  "summary": "과정 D05 likes 관계의 PUT/DELETE 멱등 동작을 spec-board의 204 빈 body 계약으로 확인한다.",
+  "summary": "좋아요를 누르거나 취소하고 반복 요청에도 상태와 집계가 한 번만 바뀌는지 확인합니다.",
   "difficulty": "기초",
   "prerequisites": [
     "posts-create-read"
@@ -28,7 +28,7 @@
           ],
           "brief": {
             "purpose": "과정 D05 likes 관계의 PUT/DELETE 멱등 동작을 spec-board의 204 빈 body 계약으로 확인한다.",
-            "task": "같은 member/post를 PUT 두 번, DELETE 두 번 보내고 post_like 행 수와 like_count 변화가 한번만 생기는지 확인한다.",
+            "task": "좋아요를 누르고 취소한 뒤 같은 요청을 반복해도 좋아요 상태와 집계가 두 번 바뀌지 않는지 확인합니다.",
             "preconditions": [
               "spec-board board:like-put/like-delete recipe가 사용하는 PUT/DELETE route를 선택한다.",
               "테스트 post와 Kim member id를 준비하고 좋아요 전 post_like row 수·like_count를 읽는다."
@@ -58,7 +58,9 @@
             "policies": [
               "board D05 likes API recipe의 URI와 성공 status 204/empty body를 그대로 쓴다. 200 JSON 응답이 아니다.",
               "PUT은 liked=true 상태를 만든다. DELETE는 liked=false 상태를 만든다. 같은 verb 반복은 상태를 다시 toggle하지 않는다.",
-              "본문에서 member id나 likeCount를 받지 않고 token member를 쓴다. 자기 글 좋아요 및 visibility/접근 조건은 source rule에 따른다."
+              "본문에서 member id나 likeCount를 받지 않고 token member를 쓴다. 자기 글 좋아요 및 visibility/접근 조건은 source rule에 따른다.",
+              "응답은 각 원문 계약을 따릅니다. board 레시피는 204·빈 본문이며 community 응답은 200 `{postId,liked,likeCount}`입니다. 서로 다른 계약의 응답 형태를 섞지 않습니다.",
+              "board D05의 원문에서 자기 글 좋아요 금지 여부를 확인할 수 없으면 이를 정책으로 추가하지 않습니다. community와 project-v1 실패 상태는 각각 연결된 원문 check의 실제 status를 따르며 다른 변형의 상태를 복사하지 않습니다."
             ],
             "inputs": [
               "PUT /api/posts/3/like, 동일 PUT 재요청.",
@@ -156,7 +158,7 @@
           ],
           "brief": {
             "purpose": "community 4-0~4-2의 좋아요 생성·취소·동시성 경합을 실제 relation 수와 like_count로 검증한다.",
-            "task": "김자바가 박디비 글 3을 먼저 취소하고 PUT/DELETE idempotency를 반복한다. 동시성 fixture에서는 20명·동일 회원 경합도 테스트한다.",
+            "task": "좋아요를 누르고 취소한 뒤 같은 요청을 반복해도 좋아요 상태와 집계가 두 번 바뀌지 않는지 확인합니다.",
             "preconditions": [
               "tok-kimjava와 public post 3 또는 자신의 테스트 글, post_like 및 like_count 시작값을 기록한다.",
               "4-2 동시성 테스트는 글16 실제 seed 초기값 0, 회원 7~26 및 tok-c01~tok-c20을 쓴다. 설명 timeline의 5는 별도 예시값이다."
@@ -191,7 +193,9 @@
               "community 4-1 PUT은 like 상태, DELETE는 unlike 상태를 멱등하게 만든다. 각 응답은 200 JSON {postId,liked,likeCount}. toggle로 구현하지 않는다.",
               "post_like row 수와 post.like_count는 항상 같아야 한다. 원자 DB update는 INSERT/DELETE 실제 영향 행이 1일 때만 count를 바꾼다.",
               "자기 글·없는 글·권한/인증 실패 status는 source recipe를 사용한다. 경합의 unique violation을 transaction에서 삼켜 500으로 끝내지 않는다.",
-              "20명 동시 요청과 같은 회원 5회 요청은 서로 다른 동시성 케이스로 실행한다."
+              "20명 동시 요청과 같은 회원 5회 요청은 서로 다른 동시성 케이스로 실행한다.",
+              "응답은 각 원문 계약을 따릅니다. board 레시피는 204·빈 본문이며 community 응답은 200 `{postId,liked,likeCount}`입니다. 서로 다른 계약의 응답 형태를 섞지 않습니다.",
+              "board D05의 원문에서 자기 글 좋아요 금지 여부를 확인할 수 없으면 이를 정책으로 추가하지 않습니다. community와 project-v1 실패 상태는 각각 연결된 원문 check의 실제 status를 따르며 다른 변형의 상태를 복사하지 않습니다."
             ],
             "inputs": [
               "일반: Kim token, post 3; 먼저 DELETE baseline reset, then PUT×2, DELETE×2.",
@@ -371,7 +375,7 @@
           ],
           "brief": {
             "purpose": "spec-board 10-10 토글 v1과 10-11 멱등 v2를 분리해 상태 변화·버전 호환을 검증한다.",
-            "task": "post 29 v1 POST를 두 번 보내 toggle 변화와 10-11 v2 PUT/DELETE 재요청의 멱등 차이를 비교한다.",
+            "task": "좋아요를 누르고 취소한 뒤 같은 요청을 반복해도 좋아요 상태와 집계가 두 번 바뀌지 않는지 확인합니다.",
             "preconditions": [
               "project-v1 posts schema post_likes와 count를 확인하고 본인 소유가 아닌 visible post 29/40을 사용한다.",
               "10-10 v1 POST /api/v1/posts/{postId}/like, 10-11 v2 PUT/DELETE /api/v2/posts/{postId}/like는 별개 contract다."
@@ -401,7 +405,9 @@
             "policies": [
               "10-10 v1은 POST /api/v1/posts/{id}/like toggle 그대로 둔다. 두 번 호출하면 liked true→false로 전환된다.",
               "10-11 v2는 PUT으로 liked=true, DELETE로 false를 idempotently 설정한다. 같은 회원 동시 PUT 10회 모두 200, count 한 번 증가.",
-              "count delta는 DB에서 원자 update, 관계 변경과 같은 transaction에서 처리한다. 해당 viewer가 글을 볼 수 없으면 404, token 없음 401."
+              "count delta는 DB에서 원자 update, 관계 변경과 같은 transaction에서 처리한다. 해당 viewer가 글을 볼 수 없으면 404, token 없음 401.",
+              "응답은 각 원문 계약을 따릅니다. board 레시피는 204·빈 본문이며 community 응답은 200 `{postId,liked,likeCount}`입니다. 서로 다른 계약의 응답 형태를 섞지 않습니다.",
+              "board D05의 원문에서 자기 글 좋아요 금지 여부를 확인할 수 없으면 이를 정책으로 추가하지 않습니다. community와 project-v1 실패 상태는 각각 연결된 원문 check의 실제 status를 따르며 다른 변형의 상태를 복사하지 않습니다."
             ],
             "inputs": [
               "v1 post29: POST twice, token Kim; inspect data.liked/likeCount.",

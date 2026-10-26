@@ -2,7 +2,7 @@
   "version": 1,
   "id": "contract-tests",
   "title": "내 API의 정상·실패 동작을 테스트로 남기기",
-  "summary": "7장 Controller slice, service unit, real MySQL integration test가 보장하는 경계를 각각 확인한다.",
+  "summary": "글 작성·좋아요·삭제의 정상/실패 규칙이 깨지면 테스트가 잡도록 하세요. HTTP 검사, 서비스 정책 검사, 실제 MySQL 흐름 검사가 무엇을 증명하는지 나눠 확인합니다.",
   "difficulty": "중급",
   "prerequisites": [
     "posts-create-read"
@@ -28,8 +28,8 @@
             "legacy:7-3"
           ],
           "brief": {
-            "purpose": "7장 Controller slice, service unit, real MySQL integration test가 보장하는 경계를 각각 확인한다.",
-            "task": "PostControllerTest, LikeServiceTest, PostFlowIntegrationTest 전용 명령을 실행하고 각 테스트의 mock/real dependency와 assertion을 기록한다.",
+            "purpose": "글 작성·좋아요·삭제의 정상/실패 규칙이 깨지면 테스트가 잡도록 하세요. HTTP 검사, 서비스 정책 검사, 실제 MySQL 흐름 검사가 무엇을 증명하는지 나눠 확인합니다.",
+            "task": "글쓰기와 좋아요의 정상·실패 규칙을 테스트로 확인하세요. HTTP, 서비스 정책, 실제 MySQL 흐름별 실행을 나눠 각 테스트가 증명하는 범위를 기록합니다.",
             "preconditions": [
               "community-board test configuration과 Testcontainers의 MySQL 사용 여부를 확인한다.",
               "테스트 class 이름과 package를 원문에서 그대로 사용한다."
@@ -72,7 +72,7 @@
             ],
             "success": [
               "Controller has 4+ contract tests: 201+Location+author, 400 title error, 401+WWW-Authenticate, 404.",
-              "Like unit has 5+ cases: self-like no save; new save once and count+1; existing unlike no-op; absent unlike no-op; actual access policy 404.",
+              "좋아요 단위 검사는 다섯 경우를 확인합니다: 내 글은 INSERT 시도 없음, 새 좋아요는 insertIgnore 1행과 증가 1회, 이미 누른 좋아요는 0행과 증가 없음, 안 누른 취소는 DELETE 0행과 감소 없음, 접근 불가 글은 실제 정책 spy로 404를 확인합니다.",
               "Integration runs real MySQL and verifies create201/detail200/like/comment201/delete204 plus free seed order."
             ],
             "failures": [
@@ -103,7 +103,7 @@
                 "title": "Like policy unit",
                 "start": "Spring/MySQL stopped; repository mocked",
                 "action": "./gradlew test --tests org.example.like.LikeServiceTest",
-                "result": "5+ unit cases, only expected save invocation, no real SQL claim"
+                "result": "5+ unit cases: self-like 시 INSERT IGNORE 미호출, 새 좋아요는 insertIgnore 1행과 count +1, 이미 좋아요·미등록 취소는 각 변경 없음, 접근 불가 글은 404; 실제 SQL 실행으로 오인하지 않음"
               },
               {
                 "title": "Real flow",
@@ -124,13 +124,13 @@
             ],
             "hints": [
               "201 응답을 MockMvc로 확인하는 것만으로 SQL INSERT가 있었다고 할 수 없는 이유는 무엇인가요?",
-              "LikeServiceTest에서 repository.save 호출이 없는 경우가 보장하는 정책은 어떤 상태인가요?",
+              "이미 누른 좋아요에서 insertIgnore가 0행일 때 숫자 증가도 없음을 어떤 두 관찰로 확인할까요?",
               "PostFlowIntegrationTest에서 요청별 commit 뒤의 DB 관찰이 필요한 이유를 같은 테스트 transaction과 비교해 볼까요?"
             ]
           },
           "hints": [
             "201 응답을 MockMvc로 확인하는 것만으로 SQL INSERT가 있었다고 할 수 없는 이유는 무엇인가요?",
-            "LikeServiceTest에서 repository.save 호출이 없는 경우가 보장하는 정책은 어떤 상태인가요?",
+            "이미 누른 좋아요에서 insertIgnore가 0행일 때 숫자 증가도 없음을 어떤 두 관찰로 확인할까요?",
             "PostFlowIntegrationTest에서 요청별 commit 뒤의 DB 관찰이 필요한 이유를 같은 테스트 transaction과 비교해 볼까요?"
           ],
           "recipeIds": [],
@@ -144,8 +144,8 @@
             {
               "title": "Like service policy unit",
               "command": "./gradlew test --tests org.example.like.LikeServiceTest",
-              "expected": "5+ unit cases: self-like no save, new like save once/count+1, already liked/unlike absent no-op, access 404.",
-              "record": "save invocation, counter delta, policy spy 사용 case를 적는다."
+              "expected": "5+ unit cases: self-like은 insertIgnore 미호출, 새 좋아요는 insertIgnore 1행/count +1, already liked/unlike absent는 변경 없음, access 404.",
+              "record": "insertIgnore invocation·영향 행 수·counter delta와 policy spy 사용 case를 적는다. `save()` 호출을 기대하지 않는다."
             },
             {
               "title": "Real MySQL flow",

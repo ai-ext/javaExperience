@@ -398,6 +398,8 @@ test('디자인 E: 티켓 작업 순서·원문 코드·닫힌 정답과 Java �
     assert.ok(doc.querySelector('.exercise-java .exercise-meta'));
     assert.equal(doc.querySelectorAll('.exercise-return').length,2);
     assert.ok(doc.querySelector('.exercise-route a'));
+    assert.equal(doc.querySelector('.exercise-return-primary').getAttribute('href'), `../spring/D${id.slice(1)}.html#오늘-순서`);
+    assert.match(doc.querySelector('.exercise-return-primary').textContent, new RegExp(`D${id.slice(1)}로 돌아가기`));
     assert.match(doc.querySelector('.exercise-return:last-child').textContent,/완료 조건/);
   }
 });

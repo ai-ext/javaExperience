@@ -3,4 +3,4 @@
 
 > 기획 원본 · 상세 기획 원본은 service/features/follow-recommendations.json입니다.
 
-8-3 follow table self-join으로 mutuals·follow-back·친구의 친구 후보를 계산하고 아직 연결되지 않은 활성 회원을 찾는다.
+맞팔·나만 아직 팔로우하지 않은 회원·친구의 친구 추천을 보여 주세요. 이미 연결된 회원·자기 자신·비활성·차단 대상은 추천에서 빼고 동률 순서를 지킵니다.

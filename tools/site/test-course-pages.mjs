@@ -371,7 +371,9 @@ for (const day of course.days) {
     assert.ok(li.querySelector('input.step-check').getAttribute('aria-label'), `${day.id}: 체크박스 이름`);
   }
   assert.equal($$('section.day-step').length, day.steps.length);
-  assert.equal($$('section.day-step .step-done input.step-check').length, day.steps.length, `${day.id}: 칸 끝 체크`);
+  assert.equal($$('.day-crumbs .course-crumbs-jump').length, 0, `${day.id}: 이전·다음 날짜는 하단 페이지 이동에서 한 번만 제공`);
+  assert.equal($$('section.day-step .step-done input.step-check').length, 0, `${day.id}: 본문 완료 체크를 중복 렌더링하지 않음`);
+  assert.equal($$('.day-chips input.step-check').length, day.steps.length, `${day.id}: 완료 기록은 순서 목록의 체크 하나로 조작`);
   assert.equal($$('details.step-answer[open]').length, 0, `${day.id}: 정답은 닫힘`);
   assert.equal($$('details.step-answer code[class^="language-"]').length, 0, `${day.id}: 정답 하이라이트는 펼칠 때`);
   if (day.phase === 'build') {
@@ -394,13 +396,14 @@ for (const day of course.days) {
   }
 }
 
-// 진도 체크: 같은 순서의 체크박스끼리 맞추고, 저장하고, 다시 열면 복원한다.
+// 진도 체크: 순서 목록의 단일 체크박스를 저장하고, 다시 열면 복원한다.
 {
   const page = await open('course/spring/D04.html');
-  const [top, bottom] = page.$$('input.step-check[data-step="D04-2"]');
-  assert.ok(top && bottom, '칩과 칸 끝 체크');
+  const inputs = page.$$('input.step-check[data-step="D04-2"]');
+  assert.equal(inputs.length, 1, '같은 순서의 완료 조작은 한 곳만 렌더링');
+  const [top] = inputs;
   top.checked = true; top.dispatchEvent(new page.window.Event('change', { bubbles: true }));
-  assert.equal(bottom.checked, true, '같은 순서 체크 동기화');
+  assert.equal(top.checked, true, '순서 목록 체크 상태 반영');
   assert.ok(page.$('.day-chip[data-step="D04-2"]').classList.contains('is-done'));
   assert.equal(page.$('[data-day-progress]').textContent, '구현 완료 1/5');
   const saved = page.window.localStorage.getItem(KEY);

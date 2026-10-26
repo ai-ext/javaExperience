@@ -2,7 +2,7 @@
   "version": 1,
   "id": "diagnose-slow-requests",
   "title": "느린 요청의 대기 지점 찾아 고치기",
-  "summary": "느린 PG 충전이 같은 DB 연결 풀을 쓰는 글 목록 요청을 막는 지점을 측정 증거로 찾습니다.",
+  "summary": "결제가 느릴 때도 글 목록은 1.5초 안에 응답하게 하세요. 같은 시점의 메트릭·스레드 덤프로 원인을 설명하고, 목록과 충전의 정상 결과를 함께 확인합니다.",
   "difficulty": "고급",
   "group": "조회와 성능",
   "prerequisites": [
@@ -34,7 +34,7 @@
             "support:course/java/J12.md"
           ],
           "brief": {
-            "purpose": "느린 PG 충전이 같은 DB 연결 풀을 쓰는 글 목록 요청을 막는 지점을 측정 증거로 찾습니다.",
+            "purpose": "결제가 느릴 때도 글 목록은 1.5초 안에 응답하게 하세요. 같은 시점의 메트릭·스레드 덤프로 원인을 설명하고, 목록과 충전의 정상 결과를 함께 확인합니다.",
             "task": "Toxiproxy로 PG 응답을 늦추고 충전 요청 중 actuator 메트릭·스레드 덤프를 수집하세요. PG 대기 중에도 목록이 정해진 응답시간 안에 끝나도록 경계를 고칩니다.",
             "preconditions": [
               "B01은 D12 필수 ticket이다. Hikari pool max=10, connection timeout=2초인 현재 설정값을 먼저 기록한다.",
@@ -68,7 +68,7 @@
             ],
             "policies": [
               "B01 재현에서 충전이 PG 응답을 기다리는 중에도 GET /api/posts는 200, 1.5초 이내여야 합니다.",
-              "PG 호출은 DB 트랜잭션/커넥션을 점유하지 않아야 합니다. pool을 늘리는 것으로 근본 원인을 가리지 않습니다.",
+              "PG가 지연되는 동안에도 목록 200·1.5초 이내와 충전 정상 완료를 함께 보장합니다. 연결 점유 경계 변경 또는 원문이 허용한 PG 동시 호출 제한 등의 대안을 비교하고 실측으로 선택합니다. 풀 크기만 늘려 원인을 감추지 않습니다.",
               "메트릭과 스레드 덤프를 같은 재현 시점에 수집해 대기 원인으로 연결합니다. B01 티켓 제출물을 원문대로 유지합니다. B01은 D12 필수 티켓입니다.",
               "원문 완료 기준: 재현 중 `/actuator/metrics`와 스레드 덤프를 떠서 근거로 남긴다",
               "원문 완료 기준: `PostListDuringSlowPgTest` 통과: Toxiproxy로 PG 응답을 늦춘 채 충전을 몰아, 충전들이 PG 응답을 기다리는 동안에도 `GET /api/posts` → 200, 1.5초 이내",
@@ -120,7 +120,7 @@
             "done": [
               "B01 필수 재현에서 Hikari max10/active/pending, PG wait thread와 목록 요청 지연을 연결했다.",
               "수정 후 slow PG 중 GET list 200/≤1.5초를 test로 고정했다.",
-              "해결 근거가 PG call을 DB transaction 밖으로 분리한 점이며 pool 크기 변경으로 대체하지 않았음을 기록했다."
+              "지연 주입이 실제로 PG에 도달했음을 확인하고, 그 동안 목록의 200·1.5초 이내와 충전이 500 없이 완료되는 증거를 함께 남깁니다. B01 필수 티켓의 원인·수정·재현 테스트를 제출합니다."
             ]
           },
           "hints": [
@@ -133,7 +133,14 @@
             "board:post-list:normal",
             "board:points-charge:normal"
           ],
-          "executionChecks": [],
+          "executionChecks": [
+            {
+              "title": "결제가 느려도 글 목록은 계속 응답하기 · 결과 대조",
+              "command": "원문과 내 프로젝트에서 확정한 실제 실행 명령을 기록합니다. 미확정 명령은 실행 완료로 표시하지 않습니다.",
+              "expected": "이 단계의 정상·실패·보존 기준과 실제 결과를 구분합니다.",
+              "record": "PostListDuringSlowPgTest의 실제 패키지 명령을 실행합니다. PG 도달·대기, 목록 요청 시각/상태/시간, 충전 완료 건수, 같은 시각 Hikari active/pending·thread dump를 연결합니다. 패키지는 원본 확인 필요."
+            }
+          ],
           "choices": [],
           "concepts": [],
           "references": [
@@ -251,7 +258,7 @@
             "done": [
               "B02 필수 ticket에서 slow log 목록 SQL을 찾았다.",
               "EXPLAIN ANALYZE 실제 rows read/returned와 key/rows/Extra를 전후 비교하고 test 통과를 남겼다.",
-              "설정 변경과 복원, 측정하지 않은 개선값 미기재를 확인했다."
+              "동일 SQL의 EXPLAIN에서는 key·rows·Extra를, EXPLAIN ANALYZE에서는 실제 rows·loops·time을 구분해 기록합니다. 반환 행 수와 읽은 행 수를 비교하고 로컬 관찰 설정을 복원."
             ]
           },
           "hints": [

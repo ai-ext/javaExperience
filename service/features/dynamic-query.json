@@ -2,7 +2,7 @@
   "version": 1,
   "id": "dynamic-query",
   "title": "검색 조건을 조합해 글 찾기",
-  "summary": "8-4 검색 조건 조합을 SELECT와 COUNT에 똑같이 적용해 page metadata 및 날짜·게시판 오류를 확인한다.",
+  "summary": "게시판·태그·작성자·날짜·검색어를 함께 적용해 목록과 전체 개수를 보여 주세요. 없는 게시판은 빈 200, 잘못된 날짜는 게시판 존재와 무관하게 400이어야 합니다.",
   "difficulty": "중급",
   "prerequisites": [
     "posts-find"
@@ -26,8 +26,8 @@
             "legacy:8-4"
           ],
           "brief": {
-            "purpose": "8-4 검색 조건 조합을 SELECT와 COUNT에 똑같이 적용해 page metadata 및 날짜·게시판 오류를 확인한다.",
-            "task": "board/tag/author/date/q를 단독·조합 검색하고 없는 slug/tag는 빈 결과, from>to와 invalid values는 400인지 확인한다.",
+            "purpose": "게시판·태그·작성자·날짜·검색어를 함께 적용해 목록과 전체 개수를 보여 주세요. 없는 게시판은 빈 200, 잘못된 날짜는 게시판 존재와 무관하게 400이어야 합니다.",
+            "task": "필터를 하나씩 적용해 원하는 글을 찾으세요. board·tag·author·date·q 조건을 조합하고 없는 값과 잘못된 범위의 응답을 확인합니다.",
             "preconditions": [
               "dev board, tag jpa, author 3 이스프링, publishedAt 경계에 걸리는 글을 확인한다.",
               "기본 page=0,size=10 및 응답 total 필드 계약을 확인한다."
@@ -61,7 +61,7 @@
             "policies": [
               "GET /api/posts/search filters board/tag/author/from/to/q; page default0,size default10.",
               "없는 board/tag는 200 zero results. board listing missing slug 404와 다르다.",
-              "from/to YYYY-MM-DD inclusive, DATETIME range 1000-01-01..9999-12-31; from>to 400; date validation precedes missing-board short-circuit.",
+              "GET /api/posts/search filters board/tag/author/from/to/q; page default 0, 음수는 400. size 기본 10, 1~50만 허용하고 범위 밖은 400입니다. 날짜는 양 끝을 포함하며 from>to는 없는 board보다 먼저 400으로 검증합니다. 최대 page의 범위 밖 결과는 기존 totalElements를 유지한 items=[]·hasNext=false.",
               "검색·visibility predicate와 parameter binding을 SELECT 및 COUNT 모두에서 공유한다."
             ],
             "inputs": [
@@ -122,15 +122,15 @@
               "SELECT/count, visibility, page metadata align."
             ],
             "hints": [
-              "Why should search for a missing board return empty 200 while a board-specific listing returns 404?",
-              "Which total changes first if the count query omits the tag predicate?",
-              "When both a missing slug and from>to are sent, what does the source say to validate first?"
+              "없는 게시판을 찾는 검색의 빈 200과 특정 게시판 목록의 404는 어떤 사용 결과가 다른가요?",
+              "COUNT에서 태그 조건이 빠지면 items와 totalElements 중 무엇이 먼저 어긋날까요?",
+              "없는 slug와 from>to를 함께 보내면 어떤 검증이 먼저여야 할까요?"
             ]
           },
           "hints": [
-            "Why should search for a missing board return empty 200 while a board-specific listing returns 404?",
-            "Which total changes first if the count query omits the tag predicate?",
-            "When both a missing slug and from>to are sent, what does the source say to validate first?"
+            "없는 게시판을 찾는 검색의 빈 200과 특정 게시판 목록의 404는 어떤 사용 결과가 다른가요?",
+            "COUNT에서 태그 조건이 빠지면 items와 totalElements 중 무엇이 먼저 어긋날까요?",
+            "없는 slug와 from>to를 함께 보내면 어떤 검증이 먼저여야 할까요?"
           ],
           "recipeIds": [
             "legacy:8-4:Z1",
@@ -155,7 +155,7 @@
               "title": "선택한 원문 recipe 실행",
               "command": "API Explorer에서 연결된 recipe를 선택해 명시적으로 전송",
               "expected": "recipe의 project·method·path·상태·응답 형태와 실제 응답이 구분되어 표시된다.",
-              "record": "recipe id, 요청 조건, 기대/실측 status·headers·body를 적는다."
+              "record": "같은 board/tag/author/from/to/q와 권한 조건의 SELECT·COUNT SQL을 연결합니다. 원문 Z1~Z16의 기대 결과와 totalElements를 대조하고 post2의 포함/정렬, 빈 items=[], 오류 후 DB 불변을 기록."
             }
           ],
           "concepts": [
