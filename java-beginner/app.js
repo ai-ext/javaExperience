@@ -4,14 +4,7 @@ const apis=course.modules.flatMap(m=>m.apis.map(a=>({...a,module:m})));
 const byId=new Map(apis.map(a=>[a.id,a]));
 const progressKey='java-beginner.standalone.progress.v2';
 const content=document.getElementById('content');
-let completed=[];
-if(course.mode==='service'){try{completed=readServiceProgress(localStorage,course);}catch{completed=[];}}
-else try {
-  const currentSaved=localStorage.getItem(progressKey);
-  const saved=currentSaved===null?migrateLegacyProgress(JSON.parse(localStorage.getItem('java-beginner.standalone.progress.v1')||'[]')):JSON.parse(currentSaved);
-  if(Array.isArray(saved)) completed=[...new Set(saved.filter(x=>Number.isInteger(x)&&x>=1&&x<=60))];
-  if(currentSaved===null) localStorage.setItem(progressKey,JSON.stringify(completed));
-} catch {}
+let completed=readCourseProgress(localStorage,course);
 let current=null, selectedApi=null, selectedCase=null, target='http://127.0.0.1:8080';
 const projectTargets=(()=>{const defaults={board:'http://127.0.0.1:8080',community:'http://127.0.0.1:8080','project-v1':'http://127.0.0.1:8080',practice:'http://127.0.0.1:8080'};try{const saved=JSON.parse(localStorage.getItem('javaexperience.service.api-targets.v1')||'{}');for(const key of Object.keys(defaults))if(typeof saved?.[key]==='string')defaults[key]=saved[key];}catch{}return defaults;})();
 let vars={}, csrf='', bearer='', generation=0, pending=null, blobUrl=null;
@@ -22,9 +15,10 @@ function releaseBlob(){if(blobUrl){URL.revokeObjectURL(blobUrl);blobUrl=null;}}
 function navigationState(){
   if(location.hash==='#setup') return {view:'setup'};
   const params=new URLSearchParams(location.hash.slice(1));
-  const m=course.modules.find(m=>m.id===(course.mode==='service'?params.get('feature'):params.get('m')));
+  if(['beginner','service'].includes(params.get('group'))) return {view:'home',group:params.get('group')};
+  const m=course.modules.find(m=>m.id===(params.has('feature')?params.get('feature'):params.get('m')));
   if(!m) return {view:'home'};
-  const d=course.mode==='service'?(m.days.find(d=>d.project===params.get('project')&&d.sourceStageId===params.get('stage'))||m.days.find(d=>d.day===Number(params.get('d')))||m.days[0]):m.days.find(d=>d.day===Number(params.get('d'))) || m.days[0];
+  const d=m.source==='service'?(m.days.find(d=>d.project===params.get('project')&&d.sourceStageId===params.get('stage'))||m.days.find(d=>d.day===Number(params.get('d')))||m.days[0]):m.days.find(d=>d.day===Number(params.get('d'))) || m.days[0];
   const tab=['task','brief','data','api'].includes(params.get('t'))?params.get('t'):'task';
   return {view:'module',m,d,tab};
 }
@@ -44,22 +38,24 @@ function render(keepScroll=false){
     const label=link.querySelector('.nav-complete');label.textContent=count===m.days.length?'✓':'';
   }
   $('nav-overview').classList.toggle('active',current.view==='home');
+  const courseSwitch=$('course-switch');
+  if(courseSwitch){const targetGroup=current.m?.source==='service'?'beginner':'service';courseSwitch.href=`#group=${targetGroup}`;courseSwitch.textContent=targetGroup==='service'?'실무 묶음으로 이동':'입문 묶음으로 이동';}
   const total=course.modules.flatMap(m=>m.days).length;
   $('progress-count').textContent=`${completed.length} / ${total}`;
   $('progress-fill').style.width=`${completed.length/total*100}%`;
-  $('header-status').textContent=current.d?`Day ${pad(current.d.day)} / ${total}`:`${completed.length}회차 완료`;
-  document.title=current.d?`Day ${pad(current.d.day)} · ${current.d.title} — ${course.title}`:`${course.title} · ${total}회차`;
+  $('header-status').textContent=current.d?`Day ${dayLabel(current.d)} / ${total}`:`${completed.length}회차 완료`;
+  document.title=current.d?`Day ${dayLabel(current.d)} · ${current.d.title} — ${course.title}`:`${course.title} · ${total}회차`;
   if(current.view==='module'){
     $('complete-day').addEventListener('click',()=>{
       const n=current.d.day;
-      if(course.mode==='service') completed=writeServiceProgress(localStorage,course,current.d,!completed.includes(n));
-      else {completed=completed.includes(n)?completed.filter(x=>x!==n):[...completed,n];try{localStorage.setItem(progressKey,JSON.stringify(completed));}catch{toast('이 브라우저에서는 진도를 저장하지 못했습니다. 현재 창에서만 유지합니다.');}}
+      if(current.m.source==='service') completed=writeServiceProgress(localStorage,course,current.d,!completed.includes(current.d.progressId));
+      else {completed=completed.includes(current.d.progressId)?completed.filter(x=>x!==current.d.progressId):[...completed,current.d.progressId];try{localStorage.setItem(progressKey,JSON.stringify(completed.filter(Number.isInteger)));}catch{toast('이 브라우저에서는 진도를 저장하지 못했습니다. 현재 창에서만 유지합니다.');}}
       render(true);$('complete-day').focus({preventScroll:true});
     });
-    const all=course.mode==='service'?current.m.days.filter(d=>d.project===current.d.project).map(d=>({m:current.m,d})):course.modules.flatMap(m=>m.days.map(d=>({m,d})));
+    const all=current.m.source==='service'?current.m.days.filter(d=>d.project===current.d.project).map(d=>({m:current.m,d})):current.m.days.map(d=>({m:current.m,d}));
     const index=all.findIndex(x=>x.d.day===current.d.day);
     const prev=all[index-1],next=all[index+1];
-    $('day-pagination').innerHTML=`${prev?`<a href="${route(prev.m,prev.d)}">← Day ${pad(prev.d.day)}</a>`:''}${next?`<a href="${route(next.m,next.d)}">Day ${pad(next.d.day)} →</a>`:'<a href="#overview">전체 과정으로 →</a>'}`;
+    $('day-pagination').innerHTML=`${prev?`<a href="${route(prev.m,prev.d)}">← ${dayLabel(prev.d)}</a>`:''}${next?`<a href="${route(next.m,next.d)}">${dayLabel(next.d)} →</a>`:'<a href="#overview">전체 과정으로 →</a>'}`;
     const projectSelect=$('project-select');
     if(projectSelect){projectSelect.value=current.d.project;projectSelect.addEventListener('change',()=>{const first=current.m.days.find(day=>day.project===projectSelect.value);if(first)location.hash=route(current.m,first).slice(1);});}
     if(current.tab==='api') mountApi();
@@ -67,14 +63,18 @@ function render(keepScroll=false){
   for(const button of document.querySelectorAll('[data-copy]')) button.addEventListener('click',async()=>{
     try{await navigator.clipboard.writeText(button.dataset.copy);toast('실행 명령을 복사했습니다.');}catch{toast('복사가 지원되지 않습니다. 옆의 실행 명령을 선택해 복사하세요.');}
   });
-  if(!keepScroll) window.scrollTo({top:0,behavior:'instant'});
+  if(!keepScroll){
+    const group=current.view==='home'&&current.group?document.getElementById(`group-${current.group}`):null;
+    if(group) group.scrollIntoView({block:'start'});else window.scrollTo({top:0,behavior:'instant'});
+  }
 }
 
 async function mountApi(){
   const pageGeneration=generation;
   const preferred=[...new Set(current.d.apiIds.length?current.d.apiIds:current.m.apis.map(a=>a.id))];
   const options=ids=>ids.map(id=>byId.get(id)).filter(Boolean).map(a=>`<option value="${esc(a.id)}">${esc(a.method)} · ${esc(a.title)}</option>`).join('');
-  $('api-select').innerHTML=`<optgroup label="오늘 확인할 API">${options(preferred)}</optgroup>${course.modules.map(m=>`<optgroup label="${m.number} ${esc(m.title)}">${options(m.apis.map(a=>a.id).filter(id=>!preferred.includes(id)))}</optgroup>`).join('')}`;
+  const sourceModules=course.modules.filter(module=>module.source===current.m.source);
+  $('api-select').innerHTML=`<optgroup label="오늘 확인할 API">${options(preferred)}</optgroup>${sourceModules.map(m=>`<optgroup label="${m.number} ${esc(m.title)}">${options(m.apis.map(a=>a.id).filter(id=>!preferred.includes(id)))}</optgroup>`).join('')}`;
   $('api-select').value=preferred[0] || current.m.apis[0].id;
   $('csrf-token').value=csrf;$('bearer-token').value=bearer;
   $('csrf-token').addEventListener('input',e=>{csrf=e.target.value;clearResponse('토큰을 변경했습니다. 다시 요청하면 새 입력이 반영됩니다.');});
@@ -99,7 +99,7 @@ async function mountApi(){
     if(!data.target) throw new Error('Missing API target');
     if(pageGeneration!==generation) return;
     target=data.target;
-    if(course.mode==='service'){
+    if(current.m.source==='service'){
       const selector=$('project-target'),input=$('project-target-url');
       if(selector&&input){selector.value=current.d.project;input.value=projectTargets[current.d.project]||'http://127.0.0.1:8080';target=input.value;selector.addEventListener('change',()=>{input.value=projectTargets[selector.value]||'http://127.0.0.1:8080';target=input.value;$('api-target').textContent=target;clearResponse('프로젝트 서버 주소를 바꿨습니다.');});input.addEventListener('input',()=>{target=input.value.trim();projectTargets[selector.value]=target;$('api-target').textContent=target;try{localStorage.setItem('javaexperience.service.api-targets.v1',JSON.stringify(projectTargets));}catch{}clearResponse('프로젝트 서버 주소를 바꿨습니다.');});}
     }
@@ -112,7 +112,7 @@ async function mountApi(){
 }
 function selectApi(){
   selectedApi=byId.get($('api-select').value);
-  if(course.mode==='service'&&$('project-target')){
+  if(selectedApi.module.source==='service'&&$('project-target')){
     const selector=$('project-target'),input=$('project-target-url');
     if([...selector.options].some(option=>option.value===selectedApi.project))selector.value=selectedApi.project;
     if(projectTargets[selectedApi.project]){input.value=projectTargets[selectedApi.project];target=input.value;$('api-target').textContent=target;}
@@ -171,7 +171,7 @@ async function sendRequest(){
   const pathVars=Object.fromEntries([...document.querySelectorAll('[data-path-var]')].map(input=>[input.dataset.pathVar,input.value]));
   let request;
   try {
-    request=buildRequest({method:$('http-method').value,path:$('api-path').value,vars:pathVars,query:$('api-query').value,headers:$('api-headers').value,body:$('api-body').value,csrf,token:bearer,multipart:selectedApi.multipart,file:$('api-file').files[0],target:course.mode==='service'?target:''});
+    request=buildRequest({method:$('http-method').value,path:$('api-path').value,vars:pathVars,query:$('api-query').value,headers:$('api-headers').value,body:$('api-body').value,csrf,token:bearer,multipart:selectedApi.multipart,file:$('api-file').files[0],target:selectedApi.module.source==='service'?target:''});
   }catch(error){$('send-message').textContent=error.message;$('send-message').className='send-message error';return;}
   clearResponse('요청을 보내는 중입니다.');
   const snapshot={generation,api:selectedApi,case:selectedCase,expected:selectedCase.expectedStatuses?.length?selectedCase.expectedStatuses:Number.isInteger(selectedCase.expect)?Number(selectedCase.expect):[],method:request.init.method};

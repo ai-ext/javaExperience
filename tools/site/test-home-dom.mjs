@@ -21,8 +21,8 @@ function page(file = 'index.html', saved) {
 const home = page(); initLearning(home.doc, home.window);
 assert.equal(home.$('[data-home-title]').textContent, TASKS['0-1'].title);
 assert.ok(home.$('[data-home-prepare-note] [data-home-prepare]'), '시작 버튼 바로 아래 준비 안내');
-assert.equal(home.$('.home-course-path-beginner').getAttribute('href'), 'java-beginner.html', '#14 과정으로 바로 연결');
-assert.equal(home.$('.home-course-path-service').getAttribute('href'), 'java-service.html', '서비스 만들기로 바로 연결');
+assert.equal(home.$('.home-course-path-beginner').getAttribute('href'), 'java-beginner.html#group=beginner', '입문 과정 묶음으로 바로 연결');
+assert.equal(home.$('.home-course-path-service').getAttribute('href'), 'java-beginner.html#group=service', '실무 과정 묶음으로 바로 연결');
 assert.match(home.$('.home-course-path-beginner').textContent, /12개 기능.*60회차/);
 assert.match(home.$('.home-course-path-service').textContent, /94개 기능.*138단계/);
 assert.equal(home.$('[data-home-title]').textContent, TASKS['0-1'].title, '오늘 할 일과 이어 하기를 유지');
@@ -200,12 +200,12 @@ assert.notEqual(script.getAttribute('type'), 'module', '직접 파일 열기에�
 assert.match(script.getAttribute('src'), /home-learning\.bundle\.js/);
 direct.window.eval(fs.readFileSync(new URL('tools/site/home-learning.bundle.js', root), 'utf8'));
 direct.$('[data-home-choose]').click(); assert.equal(direct.$('#home-start-dialog').open, true);
-assert.equal(direct.$('.home-course-path-beginner').getAttribute('href'), 'java-beginner.html');
-assert.equal(direct.$('.home-course-path-service').getAttribute('href'), 'java-service.html');
+assert.equal(direct.$('.home-course-path-beginner').getAttribute('href'), 'java-beginner.html#group=beginner');
+assert.equal(direct.$('.home-course-path-service').getAttribute('href'), 'java-beginner.html#group=service');
 assert.equal(direct.$('[data-home-title]').textContent, TASKS['0-1'].title, '홈에서 오늘 할 일 진입 유지');
 direct.close();
 // 실제 홈은 course-pages의 renderCourseHome이 만든다. 생성된 index.html에서 두 과정 진입을 직접 확인한다.
 const builtHome = fs.readFileSync(new URL('index.html', root), 'utf8');
-assert.match(builtHome, /class="home-course-path home-course-path-beginner" href="java-beginner\.html"/, '실제 홈: 입문 과정 진입');
-assert.match(builtHome, /class="home-course-path home-course-path-service" href="java-service\.html"/, '실제 홈: 서비스 과정 통합 화면 진입');
+assert.match(builtHome, /class="home-course-path home-course-path-beginner" href="java-beginner\.html#group=beginner"/, '실제 홈: 입문 과정 묶음 진입');
+assert.match(builtHome, /class="home-course-path home-course-path-service" href="java-beginner\.html#group=service"/, '실제 홈: 서비스 과정 묶음 진입');
 console.log('개선 연결: 환경 준비·선택 카드 즉시 반영·기존 과제 복귀·classic 번들 초기화 통과');

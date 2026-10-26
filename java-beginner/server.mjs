@@ -61,7 +61,7 @@ export function createCourseServer({target='http://127.0.0.1:8080'}={}) {
       return;
     }
     if(req.method==='GET' && ['/', '/java-beginner.html', '/java-service.html'].includes(rawPath)) {
-      try {const html=await readFile(rawPath==='/java-service.html'?serviceHtmlPath:htmlPath);res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(html);} catch {json(res,500,{code:'HTML_NOT_BUILT',message:'저장소 루트에서 node java-beginner/build.mjs [--service]를 실행하세요.'});}
+      try {const html=await readFile(rawPath==='/java-service.html'?serviceHtmlPath:htmlPath);res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(html);} catch {json(res,500,{code:'HTML_NOT_BUILT',message:'저장소 루트에서 node java-beginner/build.mjs를 실행하세요.'});}
       return;
     }
     if(rawPath==='/favicon.ico'){res.writeHead(204);res.end();return;}
