@@ -92,6 +92,19 @@
 | **#14 형식에 맞추기** | 기능 공통 기획서는 단계 기획서를 묶어 만든다. 단계 기획서·질문형 힌트·프로젝트 선택·실행 확인·원본 링크는 #14 화면 스타일의 칸으로 추가한다. 화면 설계 칸은 원본에 없으면 1차에서 비워 두고 목록으로 남긴다. |
 | **API 테스트·주소·진도** | #14의 중계 실행기를 같이 쓴다. `scenario/README.html`·기능 상세 주소는 계속 열리고 새 화면으로 연결된다. 진도 저장 값은 유지한다. |
 
+### 2026-10-28 결정(3): 팀원 입문 과정 원본은 그대로 두고, 통합본은 별도 페이지로
+
+사용자: "#14에서 팀원이 만든 것도 둔 상태에서 우리 통합본도 둬 보자." 결정(2)에서 `java-beginner.html`을 통합본으로 덮어썼던 것을 되돌린다.
+
+| 페이지 | 원본 폴더 | 내용 |
+|---|---|---|
+| `java-beginner.html` | `java-beginner/` | 팀원 #14 원본 그대로(main과 차이 0, 12기능·60회차) |
+| `java-service.html` | `java-service/` | 통합본(입문 12기능 + 실무 94기능, 198회차). 입문 데이터는 `../java-beginner/course.mjs`를 읽기만 한다 |
+
+- 통합에 필요한 수정본(app·view·progress·request·server·style·build)과 배치표·변환기는 `java-service/`에 둔다. 팀원 폴더는 고치지 않는다.
+- 홈의 입문 과정 카드는 `java-beginner.html`, 서비스 만들기 카드와 기존 서비스 주소(`scenario/README.html`, `scenario/features/*.html`)는 `java-service.html`로 연결한다.
+- 진도는 두 페이지가 같은 저장 키를 함께 쓴다(입문 `java-beginner.standalone.progress.v2`, 실무 `javaexperience.service.progress.v1`). 한쪽에서 표시한 입문 회차가 다른 쪽에도 보인다.
+
 ### 서비스 만들기 통합 요청의 공통 조건
 
 모든 작업(D00~D45, 기존 시나리오 101단계, 기능 화면)에 같은 수준으로 적용한다. 포인트·쿠폰 상점과 D30은 작성 방식을 보여 주는 예시일 뿐이다.
