@@ -48,7 +48,7 @@ await test('홈은 통합 기능 진입과 기존 일자 기록을 분리해 연
   const home = new JSDOM(renderCourseHome(course), { url: 'https://learn.example/README.html' }).window.document;
   assert.equal(home.querySelector('h1').textContent.trim(), '무엇을 만들게 되나요?');
   assert.ok(home.querySelector('.ch-menu-guide a[href="scenario/README.html"]'), '기능 목록 대표 진입');
-  assert.equal(home.querySelector('.home-course-path-service')?.getAttribute('href'), 'java-beginner.html#group=service', '실무 과정 카드는 통합 페이지의 실무 묶음을 연다');
+  assert.equal(home.querySelector('.home-course-path-service')?.getAttribute('href'), 'java-service.html#group=service', '실무 과정 카드는 통합 페이지의 실무 묶음을 연다');
   assert.ok(home.querySelector('.ch-menu-guide a[href="course/map.html"]'), '독립 과정 지도 진입');
   assert.ok(home.querySelector('[data-today-open][href="course/spring/D01.html"]'), '기존 일자 주소 보존');
   assert.equal(home.querySelector('.ch-progress'), null, '홈에 일자 진도를 중복 나열하지 않는다');

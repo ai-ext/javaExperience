@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {course} from './course.mjs';
+import {course} from '../java-beginner/course.mjs';
 import {loadServiceCourse} from './service-course.mjs';
 import {combineCourses,validateMergePlan} from './combined-course.mjs';
 import {moduleMarkup,route} from './view.mjs';
@@ -44,9 +44,10 @@ test('서비스 단계와 입문 회차는 기존 진도 저장 키를 독립적
 });
 
 test('통합 뒤에도 입문 과정 60회차 화면이 기존 렌더링과 같다',()=>{
+  // 팀원 원본 페이지는 java-beginner/에 그대로 있다. 이 검사는 통합본 안의 입문 회차 화면이 바뀌지 않았는지 본다(폴더 이동으로 바뀐 실행기 경로만 맞춘다).
   const rows=[];
   for(const module of course.modules) for(const day of module.days) for(const tab of ['task','brief','data','api']) {
-    rows.push([module.id,day.day,tab,moduleMarkup(module,day,tab,[]).replaceAll('java-service.html#feature=','#feature=')]);
+    rows.push([module.id,day.day,tab,moduleMarkup(module,day,tab,[]).replaceAll('java-service.html#feature=','#feature=').replaceAll('node java-service/server.mjs','node java-beginner/server.mjs')]);
   }
   const digest=createHash('sha256').update(rows.map(row=>row.join('\0')).join('\n')).digest('hex');
   assert.equal(rows.length,240);

@@ -4,19 +4,13 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 
 const htmlPath=new URL('../java-beginner.html',import.meta.url);
-const serviceHtmlPath=new URL('../java-service.html',import.meta.url);
 const localHosts=new Set(['localhost','127.0.0.1','[::1]']);
 const noForward=new Set(['host','connection','content-length','transfer-encoding','upgrade','keep-alive','te','trailer','proxy-authorization','proxy-authenticate','origin','referer','accept-encoding']);
 function json(res,status,value){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));}
-function localTarget(raw,fallback){
-  let url;
-  try{url=new URL(raw||fallback);}catch{throw new Error('API 대상은 로컬 HTTP 주소여야 합니다.');}
-  if(!localHosts.has(url.hostname)||!['http:','https:'].includes(url.protocol)||url.username||url.password||url.pathname!=='/'||url.search||url.hash) throw new Error('API 대상은 http://localhost 또는 127.0.0.1의 origin이어야 합니다.');
-  return url.origin;
-}
 
 export function createCourseServer({target='http://127.0.0.1:8080'}={}) {
-  const upstream=localTarget(target,'http://127.0.0.1:8080');
+  const upstream=new URL(target);
+  if(!localHosts.has(upstream.hostname) || !['http:','https:'].includes(upstream.protocol) || upstream.username || upstream.password || upstream.pathname!=='/' || upstream.search || upstream.hash) throw new Error('JAVA_BEGINNER_API에는 로컬 API 서버의 origin만 입력하세요. 예: http://127.0.0.1:8080');
   return createServer(async(req,res)=>{
     const host=req.headers.host || '';
     let own;
@@ -27,11 +21,7 @@ export function createCourseServer({target='http://127.0.0.1:8080'}={}) {
     if(rawPath==='/__config' && req.method==='GET') return json(res,200,{target:upstream.origin});
     if(rawPath.startsWith('/__api/')) {
       if((origin && origin!==own.origin) || req.headers['sec-fetch-site']==='cross-site') return json(res,403,{code:'ORIGIN_REJECTED',message:'실행기가 제공한 로컬 페이지에서 요청하세요.'});
-      const requestUrl=new URL(req.url,'http://runner.invalid');
-      let requestTarget=upstream;
-      try{requestTarget=localTarget(requestUrl.searchParams.get('__course_target'),upstream);}catch(error){return json(res,400,{code:'INVALID_TARGET',message:error.message});}
-      requestUrl.searchParams.delete('__course_target');
-      const targetPath=requestUrl.pathname.slice('/__api'.length)+requestUrl.search;
+      const targetPath=req.url.slice('/__api'.length);
       let decoded;
       try {decoded=targetPath.split('?')[0];for(let i=0;i<3;i++) decoded=decodeURIComponent(decoded);} catch {return json(res,400,{code:'INVALID_PATH',message:'경로를 확인하세요.'});}
       if(decoded.startsWith('//') || /[\\\u0000-\u0020]/.test(decoded) || decoded.split('/').some(s=>s==='.' || s==='..')) return json(res,400,{code:'INVALID_PATH',message:'같은 서버의 API 경로를 입력하세요.'});
@@ -42,10 +32,10 @@ export function createCourseServer({target='http://127.0.0.1:8080'}={}) {
         const headers={};
         for(const [key,value] of Object.entries(req.headers)) if(!noForward.has(key) && !key.startsWith('sec-') && value!==undefined) headers[key]=value;
         const body=Buffer.concat(parts);
-        const response=await fetch(new URL(targetPath,requestTarget+'/'),{method:req.method,headers,body:['GET','HEAD'].includes(req.method)||!body.length?undefined:body,redirect:'manual',signal:AbortSignal.timeout(30000)});
+        const response=await fetch(new URL(targetPath,upstream),{method:req.method,headers,body:['GET','HEAD'].includes(req.method)||!body.length?undefined:body,redirect:'manual',signal:AbortSignal.timeout(30000)});
         if(response.status>=300 && response.status<400) return json(res,502,{code:'API_REDIRECT',message:'API가 리다이렉트했습니다. 로그인 HTML 대신 JSON 오류를 반환하도록 서버의 API 설정을 확인하세요.'});
         const responseHeaders={};
-        for(const key of ['content-type','content-disposition','location','x-request-id','x-csrf-token','www-authenticate']) {const value=response.headers.get(key);if(value) responseHeaders[key]=value;}
+        for(const key of ['content-type','content-disposition','x-request-id','x-csrf-token','www-authenticate']) {const value=response.headers.get(key);if(value) responseHeaders[key]=value;}
         responseHeaders['Cache-Control']='no-store';
         responseHeaders['X-Content-Type-Options']='nosniff';
         const cookies=response.headers.getSetCookie();
@@ -60,8 +50,8 @@ export function createCourseServer({target='http://127.0.0.1:8080'}={}) {
       }
       return;
     }
-    if(req.method==='GET' && ['/', '/java-beginner.html', '/java-service.html'].includes(rawPath)) {
-      try {const html=await readFile(rawPath==='/java-service.html'?serviceHtmlPath:htmlPath);res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(html);} catch {json(res,500,{code:'HTML_NOT_BUILT',message:'저장소 루트에서 node java-beginner/build.mjs를 실행하세요.'});}
+    if(req.method==='GET' && ['/', '/java-beginner.html'].includes(rawPath)) {
+      try {const html=await readFile(htmlPath);res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(html);} catch {json(res,500,{code:'HTML_NOT_BUILT',message:'저장소 루트에서 node java-beginner/build.mjs를 실행하세요.'});}
       return;
     }
     if(rawPath==='/favicon.ico'){res.writeHead(204);res.end();return;}

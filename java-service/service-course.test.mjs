@@ -6,7 +6,7 @@ import {moduleMarkup,route} from './view.mjs';
 import {readServiceProgress,writeServiceProgress} from './progress.mjs';
 
 test('서비스 원본 94개 feature의 138단계와 참조 recipe 계약을 모두 변환한다', async () => {
-  const {course} = await import('./course.mjs');
+  const {course} = await import('../java-beginner/course.mjs');
   const {loadServiceCourse} = await import('./service-course.mjs');
   const service=loadServiceCourse();
   const contracts=JSON.parse(readFileSync(new URL('../service/api-contracts.json',import.meta.url),'utf8'));
