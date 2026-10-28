@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync,readFileSync,readdirSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {course} from '../java-beginner/course.mjs';
 import {loadServiceCourse} from './service-course.mjs';
@@ -39,7 +39,30 @@ test('21개 재배치 기능은 지정 회차 또는 append 묶음에 존재한�
   assert.equal(service.modules.reduce((n,module)=>n+module.days.length,0),138);
 });
 
-test('23개 화면과 단계별 업무 요청서는 근거와 화면 형식을 갖춘다',()=>{
+test('94개 기능의 화면 이름과 표시 열은 읽기 쉬운 범위다',()=>{
+  const viewFiles=readdirSync(new URL('../service/course-view/',import.meta.url)).filter(file=>file.endsWith('.json'));
+  assert.equal(viewFiles.length,94,'94개 기능의 화면을 모두 검사해야 함');
+  for(const file of viewFiles){
+    const view=JSON.parse(readFileSync(new URL(`../service/course-view/${file}`,import.meta.url),'utf8'));
+    const names=new Set();
+    for(const screen of view.screens||[]){
+      assert.ok(typeof screen.name==='string'&&screen.name.trim(),`${view.id} 화면 이름 누락`);
+      assert.ok(!/^[a-z][a-z0-9-]*$/.test(screen.name),`${view.id} 화면 이름이 영문 ID 형식임: ${screen.name}`);
+      assert.ok(!/요청 결과 확인|요청 처리 결과|화면 확인|결과 확인/.test(screen.name),`${view.id} 화면 이름이 범용적임: ${screen.name}`);
+      assert.ok(!screen.name.includes('{{'),`${view.id} 화면 이름에 템플릿 변수가 남음`);
+      assert.ok(!/(?:김자바|이스프링|박디비|\d+번|\b[PVHLWIE]\d+\b)/.test(screen.name),`${view.id} 화면 이름에 사람 이름 또는 테스트 번호가 있음: ${screen.name}`);
+      assert.ok(Array.isArray(screen.columns),`${view.id} 화면 열 형식 오류`);
+      assert.ok(screen.columns.length<=8,`${view.id} 화면 열이 8개를 초과함: ${screen.name}`);
+      assert.ok(!JSON.stringify(screen).includes('{{'),`${view.id} 화면에 템플릿 변수가 남음`);
+      assert.ok(typeof screen.actions==='string'&&screen.actions.trim(),`${view.id} 화면 동작 설명 누락`);
+      assert.ok(!names.has(screen.name),`${view.id} 화면 이름 중복: ${screen.name}`);
+      names.add(screen.name);
+      if(screen.basis) assert.ok(existsSync(resolve(screen.basis)),`${view.id} 근거 파일 없음: ${screen.basis}`);
+    }
+  }
+});
+
+test('23개 단계별 업무 요청서는 근거와 화면 형식을 갖춘다',()=>{
   for(const id of screenIds){
     const view=JSON.parse(readFileSync(new URL(`../service/course-view/${id}.json`,import.meta.url),'utf8'));
     assert.ok(view.screens.length>0,`${id} 화면 누락`);
