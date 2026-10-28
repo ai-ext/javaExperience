@@ -1003,6 +1003,1821 @@
           "pointer": "/post"
         }
       ]
+    },
+    {
+      "id": "board:comment-create:normal",
+      "manualDb": [
+        {
+          "title": "댓글 생성 행",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :createdId;",
+          "notes": "201 Location 또는 응답의 댓글 id로 행을 찾고 post_id·member_id·content를 응답/요청과 비교합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/resources/schema.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "board:comment-delete:normal",
+      "manualDb": [
+        {
+          "title": "댓글 삭제 상태",
+          "sql": "SELECT id, post_id, deleted_at FROM comment WHERE id = :commentId;",
+          "notes": "삭제 성공 뒤 행이 유지되고 deleted_at이 채워졌는지 확인합니다. 요청 경로의 commentId를 바인딩합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/resources/schema.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "board:points-charge:normal",
+      "manualDb": [
+        {
+          "title": "포인트 충전 원장",
+          "sql": "SELECT id, member_id, type, amount, balance_after, ref_type, ref_id FROM point_ledger WHERE member_id = :memberId AND created_at >= :from ORDER BY id DESC;",
+          "notes": "충전 전후 같은 시간 범위를 바인딩하고 응답의 실제 회원·충전 금액·잔액과 새 원장 행을 대조합니다. 원장에 없는 PG 승인 상태를 추정하지 않습니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/resources/schema.sql",
+          "pointer": "/point_ledger"
+        }
+      ]
+    },
+    {
+      "id": "board:pg-callback:normal",
+      "manualDb": [
+        {
+          "title": "PG callback 저장 결과",
+          "sql": "SELECT id, order_id, amount, payment_key, status, created_at, updated_at FROM pg_payment WHERE order_id = :orderId;",
+          "notes": "callback 요청의 orderId로 조회해 callback 전후 실제 결제 상태와 금액을 비교합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/resources/schema.sql",
+          "pointer": "/pg_payment"
+        }
+      ]
+    },
+    {
+      "id": "board:coupon-issue:normal",
+      "manualDb": [
+        {
+          "title": "회원 쿠폰 발급 행",
+          "sql": "SELECT id, coupon_id, member_id, status, used_at FROM member_coupon WHERE coupon_id = :couponId AND member_id = :memberId;",
+          "notes": "발급 성공 후 대상 회원의 쿠폰 행 한 건과 발급 응답 id를 대조합니다. 중복 발급 실패는 새 행이 없어야 합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/resources/schema.sql",
+          "pointer": "/member_coupon"
+        }
+      ]
+    },
+    {
+      "id": "board:shop-order:normal",
+      "manualDb": [
+        {
+          "title": "주문 생성 행",
+          "sql": "SELECT id, member_id, item_id, quantity, paid_amount, member_coupon_id, idempotency_key FROM shop_order WHERE id = :createdId;",
+          "notes": "성공 응답의 orderId로 행을 조회하고 주문 요청·응답의 실제 수량과 금액을 비교합니다. 중복 멱등 키 재요청은 새 주문 행을 만들지 않아야 합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/resources/schema.sql",
+          "pointer": "/shop_order"
+        }
+      ]
+    },
+    {
+      "id": "board:admin-bulk-coupon:normal",
+      "manualDb": [
+        {
+          "title": "대량 쿠폰 발급 행",
+          "sql": "SELECT id, coupon_id, member_id, status, used_at FROM member_coupon WHERE coupon_id = :couponId AND created_at >= :from ORDER BY id;",
+          "notes": "요청 전후 시각과 업로드한 실제 회원 id를 기준으로 새 발급 행만 대조합니다. 실패한 회원은 행이 없어야 합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/resources/schema.sql",
+          "pointer": "/member_coupon"
+        }
+      ]
+    },
+    {
+      "id": "legacy:9-3:A2",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "응답에서 캡처한 실제 생성 id를 바인딩해 원문 fixture의 제목·본문·초기 상태와 비교합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:9-3:B1",
+      "manualDb": [
+        {
+          "title": "글 수정 결과",
+          "sql": "SELECT id, title, content, status, deleted_at FROM post WHERE id = :postId;",
+          "notes": "A2에서 캡처한 같은 글 id를 바인딩해 수정 전후 제목·본문과 삭제 상태를 비교합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:9-5:V1",
+      "manualDb": [
+        {
+          "title": "북마크 연결 결과",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "요청 회원과 글의 실제 id를 바인딩해 기존 스키마 변경 단계의 북마크 연결과 folder_id를 확인합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:16-2:P",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:13-4:P0",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-0:A",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-0:B",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-1:B0",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-1:B1",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-1:B2",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-1:V6",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-1:B5",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-1:B6",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-2:F3",
+      "manualDb": [
+        {
+          "title": "북마크 폴더 생성",
+          "sql": "SELECT id, member_id, name FROM bookmark_folder WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark_folder 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark_folder"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-2:F7",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-2:F8",
+      "manualDb": [
+        {
+          "title": "북마크 폴더 변경",
+          "sql": "SELECT id, member_id, name FROM bookmark_folder WHERE id = :folderId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark_folder 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark_folder"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-2:B1",
+      "manualDb": [
+        {
+          "title": "북마크 폴더 생성",
+          "sql": "SELECT id, member_id, name FROM bookmark_folder WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark_folder 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark_folder"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-2:B2",
+      "manualDb": [
+        {
+          "title": "북마크 폴더 변경",
+          "sql": "SELECT id, member_id, name FROM bookmark_folder WHERE id = :folderId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark_folder 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark_folder"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-4:A",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-4:B",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-4:C",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-4:D",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-4:P",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-4:H",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-4:I",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-4:J",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:5-1:W1",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:5-1:B1",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:5-1:B2",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:5-2:Q1",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:5-2:B1",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:5-3:N4",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:5-3:N6",
+      "manualDb": [
+        {
+          "title": "댓글 변경 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :commentId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-1:K",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-1:S",
+      "manualDb": [
+        {
+          "title": "댓글 변경 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :commentId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-1:VM",
+      "manualDb": [
+        {
+          "title": "댓글 변경 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :commentId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-1:E",
+      "manualDb": [
+        {
+          "title": "댓글 변경 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :commentId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-1:D",
+      "manualDb": [
+        {
+          "title": "댓글 변경 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :commentId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-9:C",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, author_id, parent_id, content, deleted_at FROM comments WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comments 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/comments"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-9:R",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, author_id, parent_id, content, deleted_at FROM comments WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comments 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/comments"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-9:D",
+      "manualDb": [
+        {
+          "title": "댓글 삭제 상태",
+          "sql": "SELECT id, post_id, author_id, deleted_at FROM comments WHERE id = :commentId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comments 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/comments"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-9:B1",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, author_id, parent_id, content, deleted_at FROM comments WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comments 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/comments"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-9:B2",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, author_id, parent_id, content, deleted_at FROM comments WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comments 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/comments"
+        }
+      ]
+    },
+    {
+      "id": "legacy:16-3:B1",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, title, status, visibility, deleted_at FROM post WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:8-5:X1",
+      "manualDb": [
+        {
+          "title": "집계 카운터 재계산",
+          "sql": "SELECT id, like_count, comment_count FROM post WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:8-5:X2",
+      "manualDb": [
+        {
+          "title": "집계 카운터 재계산",
+          "sql": "SELECT id, like_count, comment_count FROM post WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-12:P",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-12:U",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-4:F0",
+      "manualDb": [
+        {
+          "title": "팔로우 변경",
+          "sql": "SELECT id, follower_id, followee_id, created_at FROM follow WHERE follower_id = :followerId AND followee_id = :followeeId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 follow 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/follow"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-4:F1",
+      "manualDb": [
+        {
+          "title": "팔로우 변경",
+          "sql": "SELECT id, follower_id, followee_id, created_at FROM follow WHERE follower_id = :followerId AND followee_id = :followeeId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 follow 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/follow"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-4:F2",
+      "manualDb": [
+        {
+          "title": "팔로우 변경",
+          "sql": "SELECT id, follower_id, followee_id, created_at FROM follow WHERE follower_id = :followerId AND followee_id = :followeeId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 follow 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/follow"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-3:A",
+      "manualDb": [
+        {
+          "title": "회원 생성 결과",
+          "sql": "SELECT id, email, nickname FROM users WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 users 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/users"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-3:B1",
+      "manualDb": [
+        {
+          "title": "회원 생성 결과",
+          "sql": "SELECT id, email, nickname FROM users WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 users 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/users"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-3:B2",
+      "manualDb": [
+        {
+          "title": "회원 생성 결과",
+          "sql": "SELECT id, email, nickname FROM users WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 users 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/users"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-10:T1",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT post_id, user_id, created_at FROM post_likes WHERE post_id = :postId AND user_id = :userId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_likes 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/post_likes"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-10:T2",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT post_id, user_id, created_at FROM post_likes WHERE post_id = :postId AND user_id = :userId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_likes 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/post_likes"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-11:R",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT post_id, user_id, created_at FROM post_likes WHERE post_id = :postId AND user_id = :userId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_likes 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/post_likes"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-11:V1",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT post_id, user_id, created_at FROM post_likes WHERE post_id = :postId AND user_id = :userId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_likes 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/post_likes"
+        }
+      ]
+    },
+    {
+      "id": "legacy:16-4:F",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:16-4:S",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:13-3:W4",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-5:P1",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-5:P2",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-5:L1",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT id, post_id, member_id, created_at FROM post_like WHERE post_id = :postId AND member_id = :memberId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_like 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post_like"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-5:L2",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT id, post_id, member_id, created_at FROM post_like WHERE post_id = :postId AND member_id = :memberId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_like 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post_like"
+        }
+      ]
+    },
+    {
+      "id": "legacy:6-5:B1",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-2:K",
+      "manualDb": [
+        {
+          "title": "댓글 생성 결과",
+          "sql": "SELECT id, post_id, member_id, parent_id, content, deleted_at FROM comment WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 comment 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/comment"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-3:L5",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT id, post_id, member_id, created_at FROM post_like WHERE post_id = :postId AND member_id = :memberId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_like 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post_like"
+        }
+      ]
+    },
+    {
+      "id": "legacy:12-3:L7",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT id, post_id, member_id, created_at FROM post_like WHERE post_id = :postId AND member_id = :memberId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_like 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post_like"
+        }
+      ]
+    },
+    {
+      "id": "legacy:16-1:P",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:15-5:M2",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT id, post_id, member_id, created_at FROM post_like WHERE post_id = :postId AND member_id = :memberId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_like 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post_like"
+        }
+      ]
+    },
+    {
+      "id": "legacy:15-5:M4",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT id, post_id, member_id, created_at FROM post_like WHERE post_id = :postId AND member_id = :memberId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_like 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post_like"
+        }
+      ]
+    },
+    {
+      "id": "legacy:15-5:M5",
+      "manualDb": [
+        {
+          "title": "좋아요 변경",
+          "sql": "SELECT id, post_id, member_id, created_at FROM post_like WHERE post_id = :postId AND member_id = :memberId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post_like 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post_like"
+        }
+      ]
+    },
+    {
+      "id": "legacy:1-8:A",
+      "manualDb": [
+        {
+          "title": "복사된 글",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:1-8:B",
+      "manualDb": [
+        {
+          "title": "복사된 글",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-1:P0",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-1:P5",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, title, status, visibility, deleted_at FROM post WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-6:H1",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, title, status, visibility, deleted_at FROM post WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-6:H2",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, title, status, visibility, deleted_at FROM post WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-6:H3",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, title, status, visibility, deleted_at FROM post WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-2:I5",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-3:W0",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-5:P",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-5:R",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-5:B1",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-5:B2",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-8:U",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-8:B1",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-8:B2",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:10-8:D",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, author_id, title, content, visibility, deleted_at FROM posts WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 posts 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch10-project/10-1-new-project.md",
+          "pointer": "/posts"
+        }
+      ]
+    },
+    {
+      "id": "legacy:15-3:P1",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:14-8:F1",
+      "manualDb": [
+        {
+          "title": "북마크 폴더 생성",
+          "sql": "SELECT id, member_id, name FROM bookmark_folder WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark_folder 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark_folder"
+        }
+      ]
+    },
+    {
+      "id": "legacy:14-8:B1",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:14-8:B2",
+      "manualDb": [
+        {
+          "title": "북마크 변경",
+          "sql": "SELECT id, member_id, post_id, folder_id, memo FROM bookmark WHERE member_id = :memberId AND post_id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 bookmark 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/bookmark"
+        }
+      ]
+    },
+    {
+      "id": "legacy:14-6:K1",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:14-6:K2",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:14-6:K3",
+      "manualDb": [
+        {
+          "title": "글 생성 결과",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-5:R4",
+      "manualDb": [
+        {
+          "title": "글 변경 결과",
+          "sql": "SELECT id, title, status, visibility, deleted_at FROM post WHERE id = :postId;",
+          "notes": "원문 실행의 실제 성공 id 또는 요청 경로·인증 주체 id를 바인딩해 post 행의 존재와 입력/응답 상태를 비교합니다. 삭제/수정 요청은 원문에 기록된 성공 조건에서만 판정합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "board:signup:normal",
+      "manualDb": [
+        {
+          "title": "가입 회원 행",
+          "sql": "SELECT id, email, nickname, role, member_status, deleted_at FROM member WHERE email = :email;",
+          "notes": "201 응답과 같은 email로 조회해 nickname 정규화 결과를 비교합니다. password_hash는 조회하거나 기록하지 않습니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "board-server/src/main/resources/schema.sql",
+          "pointer": "/member"
+        }
+      ]
+    },
+    {
+      "id": "legacy:15-4:T1",
+      "manualDb": [
+        {
+          "title": "휴지통 영구 삭제 결과",
+          "sql": "SELECT id, deleted_at FROM post WHERE deleted_at IS NOT NULL AND deleted_at < :cutoff ORDER BY id LIMIT 1000;",
+          "notes": "원문 cutoff를 바인딩합니다. 성공 응답 뒤 해당 청크의 대상 id가 없어졌는지 응답 deletedPosts/chunks와 대조합니다. 이 SQL은 다음 미처리 청크가 남았는지도 보여 주므로 단일 실행 뒤 전체 0건을 기대하지 않습니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch15-scheduling-batch/15-4-trash-purge.md",
+          "pointer": "## 화면 시나리오"
+        }
+      ]
+    },
+    {
+      "id": "community:create:normal",
+      "sourceRefs": [
+        {
+          "path": "scenario/ch7-tests/7-1-controller-slice.md",
+          "pointer": "POST /api/posts"
+        }
+      ]
+    },
+    {
+      "id": "community:detail:normal",
+      "sourceRefs": [
+        {
+          "path": "scenario/ch7-tests/7-1-controller-slice.md",
+          "pointer": "GET /api/posts/{id}"
+        }
+      ]
+    },
+    {
+      "id": "community:list:normal",
+      "sourceRefs": [
+        {
+          "path": "scenario/ch7-tests/7-3-integration.md",
+          "pointer": "GET /api/boards/free/posts?size=20"
+        }
+      ]
+    },
+    {
+      "id": "legacy:9-2:A",
+      "manualDb": [
+        {
+          "title": "좋아요 회원별 인덱스 확인",
+          "sql": "SHOW INDEX FROM post_like;",
+          "notes": "원문 9-2의 전후 SHOW INDEX 결과를 비교합니다. `(member_id)`만 있는 기준선, 추가한 `(member_id, created_at, id)` 인덱스, 복구 후 인덱스를 구분해 기록합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch9-schema-change/9-2-index-explain.md",
+          "pointer": "SHOW INDEX / ix_post_like_member_created"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-4:S0",
+      "manualDb": [
+        {
+          "title": "검색 fixture 글 생성 확인",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "각 POST 요청의 응답 body.id로 행을 조회하고 검색어 fixture가 들어간 실제 글인지 원문 요청과 비교합니다. Q1/Q2/Q3는 이 행 id를 검색 결과와 대조합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch11-post-advanced/11-4-search.md",
+          "pointer": "S0 fixture request"
+        },
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-4:SA",
+      "manualDb": [
+        {
+          "title": "검색 fixture 글 생성 확인",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "각 POST 요청의 응답 body.id로 행을 조회하고 검색어 fixture가 들어간 실제 글인지 원문 요청과 비교합니다. Q1/Q2/Q3는 이 행 id를 검색 결과와 대조합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch11-post-advanced/11-4-search.md",
+          "pointer": "SA fixture request"
+        },
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
+    },
+    {
+      "id": "legacy:11-4:SB",
+      "manualDb": [
+        {
+          "title": "검색 fixture 글 생성 확인",
+          "sql": "SELECT id, title, content, status, visibility, deleted_at FROM post WHERE id = :createdId;",
+          "notes": "각 POST 요청의 응답 body.id로 행을 조회하고 검색어 fixture가 들어간 실제 글인지 원문 요청과 비교합니다. Q1/Q2/Q3는 이 행 id를 검색 결과와 대조합니다."
+        }
+      ],
+      "sourceRefs": [
+        {
+          "path": "scenario/ch11-post-advanced/11-4-search.md",
+          "pointer": "SB fixture request"
+        },
+        {
+          "path": "docker/mysql/init/01-community.sql",
+          "pointer": "/post"
+        }
+      ]
     }
   ]
 }
