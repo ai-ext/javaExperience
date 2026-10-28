@@ -57,22 +57,35 @@ test('23개 화면과 단계별 업무 요청서는 근거와 화면 형식을 �
   const service=loadServiceCourse();
   const stages=service.modules.flatMap(module=>module.days);
   const tickets=stages.map(day=>day.ticket).filter(Boolean);
-  assert.ok(tickets.length>0);
+  assert.equal(tickets.length,70,'단계별 업무 요청서 70개를 검사해야 함');
+  const ids=new Set();
+  const beginnerIds=new Set(course.modules.flatMap(module=>module.days.map(day=>day.ticket?.id).filter(Boolean)));
   for(const ticket of tickets){
     assert.ok(ticket.id&&ticket.from&&ticket.request&&ticket.situation,`${ticket.id} 업무 요청 본문 누락`);
-    assert.ok(ticket.from.includes(' · '),`${ticket.id} 요청자와 요청 종류 구분 누락`);
-    assert.match(ticket.id,/^[a-z][a-z0-9-]*(?::[a-z0-9-]+){2}$/i,`${ticket.id} 식별자 형식 불일치`);
-    assert.ok(ticket.constraints.length&&ticket.acceptance.length,`${ticket.id} 업무 조건 또는 확인 결과 누락`);
+    assert.match(ticket.from,/^[^·]+ · [^·]+$/,`${ticket.id} 요청자와 요청 종류 형식 불일치`);
+    assert.ok(ticket.from.length<=24,`${ticket.id} 요청자 문구가 24자를 초과함`);
+    assert.match(ticket.id,/^[A-Z][A-Z0-9]*-\d{3}$/,`${ticket.id} 식별자 형식 불일치`);
+    assert.ok(!ids.has(ticket.id),`${ticket.id} 업무 요청 ID 중복`);
+    assert.ok(!beginnerIds.has(ticket.id),`${ticket.id} 입문 업무 요청 ID와 중복`);
+    ids.add(ticket.id);
+    assert.ok(Array.isArray(ticket.constraints)&&Array.isArray(ticket.acceptance),`${ticket.id} 업무 조건 또는 확인 결과 누락`);
     assert.ok(ticket.basis&&existsSync(resolve(ticket.basis)),`${ticket.id} 업무 요청 근거 없음`);
-    assert.ok(ticket.situation.length<=100,`${ticket.id} 상황이 100자를 초과함`);
-    assert.ok(ticket.request.length<=140,`${ticket.id} 요청이 140자를 초과함`);
-    assert.ok(!/[→{}]/.test(ticket.request),`${ticket.id} 요청에 금지 표기가 있음`);
-    assert.ok(!/\/(?:api|v[0-9]|admin|posts|members)\b|https?:\/\//i.test(ticket.request),`${ticket.id} 요청에 경로가 있음`);
+    assert.ok(ticket.situation.length<=80,`${ticket.id} 상황이 80자를 초과함`);
+    assert.ok(ticket.request.length<=120,`${ticket.id} 요청이 120자를 초과함`);
+    assert.match(ticket.request,/주세요\.$/,`${ticket.id} 요청이 '주세요.'로 끝나지 않음`);
+    assert.ok((ticket.request.match(/[.!?](?:\s|$)/g)||[]).length<=2,`${ticket.id} 요청이 세 문장 이상임`);
     assert.ok(ticket.constraints.length>=2&&ticket.constraints.length<=3,`${ticket.id} 조건 수가 범위를 벗어남`);
     assert.ok(ticket.acceptance.length>=2&&ticket.acceptance.length<=3,`${ticket.id} 확인 항목 수가 범위를 벗어남`);
     for(const item of [...ticket.constraints,...ticket.acceptance]){
-      assert.ok(item.length<=80,`${ticket.id} 항목이 80자를 초과함: ${item}`);
-      assert.ok(/[.!?。]$/.test(item),`${ticket.id} 항목이 완결된 한 문장이 아님: ${item}`);
+      assert.ok(item.length<=60,`${ticket.id} 항목이 60자를 초과함: ${item}`);
+      assert.match(item,/\.$/,`${ticket.id} 항목이 한 문장으로 끝나지 않음: ${item}`);
+    }
+    const prose=[ticket.from,ticket.situation,ticket.request,...ticket.constraints,...ticket.acceptance].join('\n');
+    assert.ok(!/[→{}]|https?:\/\/|\/[A-Za-z][A-Za-z0-9._/-]*|fixture/i.test(prose),`${ticket.id} 설명에 금지 표기가 있음`);
+    assert.ok(!/[가-힣][a-z]+/.test(prose),`${ticket.id} 한글과 영문 사이 공백 누락`);
+    assert.ok(!/\b[a-z]+[A-Z][A-Za-z]*\b|\b[a-z]+_[a-z0-9_]+\b/.test(prose),`${ticket.id} 설명에 변수명이 있음`);
+    for(const item of ticket.acceptance){
+      assert.match(item,/[가-힣]+다\.$/,`${ticket.id} 확인 결과를 관찰 가능한 평서문으로 작성해야 함: ${item}`);
     }
   }
 });
