@@ -62,6 +62,21 @@ test('94개 기능의 화면 이름과 표시 열은 읽기 쉬운 범위다',()
   }
 });
 
+test('94개 기능 화면에는 기계적 열·동작 설명과 동사형 단계 이름이 없다',()=>{
+  const viewFiles=readdirSync(new URL('../service/course-view/',import.meta.url)).filter(file=>file.endsWith('.json'));
+  assert.equal(viewFiles.length,94,'94개 기능의 화면을 모두 검사해야 함');
+  for(const file of viewFiles){
+    const view=JSON.parse(readFileSync(new URL(`../service/course-view/${file}`,import.meta.url),'utf8'));
+    for(const screen of view.screens||[]){
+      for(const column of screen.columns){
+        assert.ok(!/^(입력|결과) [A-Za-z]/.test(column),`${view.id} 기계적 표시 열: ${column}`);
+      }
+      assert.ok(!/^요청 입력 \/ 결과 확인|요청을 보내고 응답을 확인합니다\.?$/.test(screen.actions),`${view.id} 빈약한 동작 설명: ${screen.actions}`);
+      assert.ok(!/(?:하기|시키기)$/.test(screen.name),`${view.id} 단계형 화면 이름: ${screen.name}`);
+    }
+  }
+});
+
 test('23개 단계별 업무 요청서는 근거와 화면 형식을 갖춘다',()=>{
   for(const id of screenIds){
     const view=JSON.parse(readFileSync(new URL(`../service/course-view/${id}.json`,import.meta.url),'utf8'));
