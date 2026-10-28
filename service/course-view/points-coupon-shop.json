@@ -91,12 +91,46 @@
     "board:points": {
       "title": "활동 포인트 적립·잔액·이력 확인하기",
       "goal": "글·댓글 활동 포인트를 적립하고 잔액과 원장 합계가 맞는지 확인합니다. 쿠폰 발급과 구매는 뒤 단계에서 별도로 완료합니다.",
-      "concept": "member.point_balance · point_ledger의 signed amount·reason·reference"
+      "concept": "member.point_balance · point_ledger의 signed amount·reason·reference",
+      "ticket": {
+        "id": "points-coupon-shop:board:points",
+        "from": "서비스 회원 · 활동 포인트 적립·잔액·이력 요청",
+        "request": "글·댓글 활동 포인트를 적립하고 잔액과 원장 합계가 맞는지 확인합니다. 쿠폰 발급과 구매는 뒤 단계에서 별도로 완료합니다.",
+        "situation": "글과 댓글 활동으로 쌓인 점수와 잔액을 일치시키고, 보유 점수와 적립 내역을 확인합니다.",
+        "constraints": [
+          "잔액은 원자적 UPDATE로 바꾸고 같은 트랜잭션에서 원장에 기록해 잔액과 이력 합을 맞춥니다.",
+          "잔액 조회 후 저장 방식의 동시 갱신 손실을 먼저 재현하고, 50건 후 잔액과 원장 합의 불일치 여부를 확인합니다.",
+          "글 저장·포인트 잔액·이력의 트랜잭션 경계를 기록하고 실패 시 함께 취소되는 범위를 실행으로 설명합니다."
+        ],
+        "acceptance": [
+          "balance 200 계약, 빈 회원의 ·, 미인증 401을 확인했다.",
+          "50개 동시 글 요청의 성공 수·잔액·원장 합이 일치하고 글 활동당 10점으로 반영됐다.",
+          "clear 관찰과 실패 rollback, 추가 전용 ledger 근거를 기록했다."
+        ],
+        "basis": "course/days/D07.json"
+      }
     },
     "board:coupons": {
       "title": "한 사람에게 쿠폰 한 장 발급하기",
       "goal": "DB 제약과 발급 서비스 경계를 설계해 같은 회원의 중복과 총량 초과를 막고, 내 쿠폰 목록으로 저장 결과를 확인하세요.",
-      "concept": "coupon.total_quantity·issued_quantity · coupon.expires_at"
+      "concept": "coupon.total_quantity·issued_quantity · coupon.expires_at",
+      "ticket": {
+        "id": "points-coupon-shop:board:coupons",
+        "from": "서비스 회원 · 한 사람에게 쿠폰 한 장 발급 요청",
+        "request": "DB 제약과 발급 서비스 경계를 설계해 같은 회원의 중복과 총량 초과를 막고, 내 쿠폰 목록으로 저장 결과를 확인하세요.",
+        "situation": "글과 댓글 활동으로 쌓인 점수와 잔액을 일치시키고, 보유 점수와 적립 내역을 확인합니다.",
+        "constraints": [
+          "한 회원은 같은 쿠폰을 한 장만 보유합니다.",
+          "총 발급량은 0 이상 총량 이하이며 중복·초과 발급을 DB에서도 막습니다.",
+          "중복 확인·발급량 증가·보유 저장은 원자적인 업무 흐름으로 처리하고 경합 시 UNIQUE 변경 결과를 정해진 오류로 변환합니다."
+        ],
+        "acceptance": [
+          "새 회원 201, 동일 회원 409 duplicate, 소진 409 exhaustion, 내 쿠폰 200의 API·DB 값을 대조했다.",
+          "CouponRepositoryTest에서 남은 수량 조건부 증가와 영향 행 수를 확인했다.",
+          "local seed 10매·30일은 data-local.sql의 샘플임을 표기하고 고정 schema policy로 승격하지 않았다."
+        ],
+        "basis": "course/days/D07.json"
+      }
     },
     "board:purchase": {
       "title": "상품을 조회하고 포인트·쿠폰으로 구매하기",

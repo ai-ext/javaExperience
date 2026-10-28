@@ -2,6 +2,9 @@ import {readFileSync} from 'node:fs';
 
 const beginnerConceptLinks=JSON.parse(readFileSync(new URL('./concept-links.json',import.meta.url),'utf8'));
 const mergePlan=JSON.parse(readFileSync(new URL('./merge-plan.json',import.meta.url),'utf8'));
+const beginnerModuleTitles={board:'사내 공지 게시판', 'search-comments':'공지 찾기와 댓글 대화', members:'회원 로그인과 내 글 보호', files:'공지에 첨부파일 달기', catalog:'사내 물품 상품 관리', orders:'물품 주문과 취소', concurrency:'마지막 재고와 중복 주문 지키기', performance:'느려진 목록을 근거로 개선', quality:'변경해도 기존 기능 지키기', operations:'실행 환경과 운영 관찰', recovery:'삭제 공지 복구와 운영 변경', handover:'재입고 업무를 맡아 마무리하기'};
+const serviceFeatureTitles={'purge-trash':'오래된 휴지통 글을 작은 묶음으로 정리하기','integrated-search':'제목·본문·작성자로 글 검색하기',comments:'글에 댓글과 답글 남기기',sessions:'쿠키로 로그인 상태 이어 가기','points-coupon-shop':'포인트와 쿠폰으로 상품 구매하기','coupon-limits':'동시에 받아도 쿠폰 수량 지키기','db-list-queries':'목록 응답에서 SQL 조건과 조회 방식 찾기','diagnose-slow-requests':'느린 요청의 대기 지점 찾아 고치기','api-compatibility':'기존 앱도 계속 쓰게 예약 API 바꾸기','independent-repair':'서로 다른 두 문제를 증거로 고치기','bounded-workers':'작업이 몰려도 수용량과 종료 시간 지키기','release-containers':'실행 중인 요청을 지키며 앱 교체하기','change-delivery':'새 취소 요구를 합의하고 기존 예약에 반영하기','posts-edit-remove':'내 글을 수정하고 삭제하기','posts-find':'조건에 맞는 글 목록 이어 보기','members-auth':'회원 가입과 로그인 만들기','post-images':'글에 이미지를 첨부하기','transaction-consistency':'실패해도 주문과 포인트 상태 맞추기','contract-tests':'내 API의 정상·실패 동작을 테스트로 남기기','runtime-ready':'서버를 실행하고 안전하게 설정하기','trash-restore':'삭제한 글을 휴지통에서 복구하기','posts-create-read':'글을 등록하고 다시 읽기'};
+const serviceTitle=id=>serviceFeatureTitles[id]||id;
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const pad = n => String(n).padStart(2,'0');
 export const dayLabel = d => `${typeof d.progressId==='string'&&d.progressId.startsWith('service:')?'S':''}${pad(d.day)}`;
@@ -46,11 +49,11 @@ function coursePairLinks(m){
     const entry=m.merge||mergePlan.entries.find(item=>item.feature===m.id);
     const pair=entry?.coursePairs?.[0];
     if(!pair)return '';
-    return `<nav class="course-cross-links"><span>입문 과정에서 먼저</span><a href="#m=${esc(pair.module)}">${esc(pair.module)} ↗</a><span>실무 과정에서 이어서</span></nav>`;
+    return `<nav class="course-cross-links"><span>입문 과정에서 먼저</span><a href="#m=${esc(pair.module)}">${esc(beginnerModuleTitles[pair.module]||pair.module)} ↗</a><span>실무 과정에서 이어서</span></nav>`;
   }
   const pairs=mergePlan.entries.flatMap(entry=>(entry.coursePairs||[]).filter(pair=>pair.module===m.id).map(pair=>({...pair,feature:entry.feature}))).sort((a,b)=>a.order-b.order);
   const ids=pairs.map(pair=>pair.feature);
-  return ids.length?`<nav class="course-cross-links"><span>입문 과정에서 먼저</span><span>${esc(m.title)}</span><span>실무 과정에서 이어서</span>${ids.map(id=>`<a href="#feature=${esc(id)}">${esc(id)} ↗</a>`).join('')}</nav>`:'';
+  return ids.length?`<nav class="course-cross-links"><span>입문 과정에서 먼저</span><span>${esc(m.title)}</span><span>실무 과정에서 이어서</span>${ids.map(id=>`<a href="#feature=${esc(id)}">${esc(serviceTitle(id))} ↗</a>`).join('')}</nav>`:'';
 }
 
 function overlapMarkup(d){
@@ -88,7 +91,7 @@ function briefMarkup(m,d) {
 }
 
 function dataMarkup(m,d) {
-  return `${m.mode==='service'&&!m.screens.length?panel('ON SCREEN','화면 설계',`<p class="body-copy">원문에 화면 설계 근거가 등록되지 않았습니다. 추정 화면을 만들지 않았습니다.</p>`):panel('ON SCREEN','사용자에게 보여줄 정보',`<div class="screen-grid">${m.screens.map(s=>`<article class="screen-card"><h3>${esc(s.name)}</h3><div class="field-tags">${s.columns.map(c=>`<span>${esc(c)}</span>`).join('')}</div><p>${esc(s.actions)}</p></article>`).join('')}</div>`)}${dModeTablesMarkup(m,d)}`;
+  return `${m.mode==='service'&&!m.screens.length?panel('ON SCREEN','화면 설계',`<p class="body-copy">원문에 화면 설계 근거가 등록되지 않았습니다. 추정 화면을 만들지 않았습니다.</p>`):panel('ON SCREEN','사용자에게 보여줄 정보',`<div class="screen-grid">${m.screens.map(s=>`<article class="screen-card"><h3>${esc(s.name)}</h3><div class="field-tags">${s.columns.map(c=>`<span>${esc(c)}</span>`).join('')}</div><p>${esc(s.actions)}</p>${s.basis?`<small class="screen-basis">근거: <a href="${esc(s.basis)}">${esc(s.basis)}</a></small>`:''}</article>`).join('')}</div>`)}${dModeTablesMarkup(m,d)}`;
 }
 
 function dModeTablesMarkup(m,d){const tables=m.mode==='service'?d.tables:m.tables;return `<div class="section-heading data-heading"><div><span class="section-label">BEHIND THE SCREEN</span><h2>어떤 데이터가 쌓이나요?</h2></div><span class="subtle">이름·자료형·제약·확인 쿼리</span></div>${tables.length?tables.map(t=>`<section class="panel table-panel"><h3><span class="table-symbol" aria-hidden="true">▦</span> ${esc(t.name)}</h3>${t.note?`<p class="table-note">${esc(t.note)}</p>`:''}<div class="table-wrap"><table><thead><tr><th>항목</th><th>타입·제약</th><th>필수</th><th>저장하는 이유</th></tr></thead><tbody>${t.fields.map(f=>`<tr><td><code>${esc(f.name)}</code></td><td>${esc(f.type)}</td><td>${f.required?'필수':'선택'}</td><td>${esc(f.note)}</td></tr>`).join('')}</tbody></table></div><div class="table-example"><div><span class="section-label">데이터 예시 · 실측 아님</span><pre>${esc(JSON.stringify(t.sample,null,2))}</pre></div><div><span class="section-label">별도 DB 클라이언트에서 확인</span><pre>${esc(t.check)}</pre><p class="fine-print">실제 생성된 id와 자신의 테이블 이름에 맞추세요. 이 페이지는 DB에 직접 연결하지 않습니다.</p></div></div></section>`).join(''):panel('DB SOURCE','단계의 DB 확인 SQL',`<p class="body-copy">원문 recipe에 DB 확인 SQL이 없습니다. 실제 스키마와 실행 결과를 확인한 뒤 기록하세요.</p>`)}`;}

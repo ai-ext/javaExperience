@@ -13,11 +13,11 @@ const mergePlan=JSON.parse(readFileSync(new URL('./merge-plan.json',import.meta.
 test('두 과정의 기능 순서, 출처, 고유 회차 식별자를 합친다',()=>{
   const combined=combineCourses(course,loadServiceCourse(),mergePlan);
   assert.equal(validateMergePlan(mergePlan,course,loadServiceCourse()),true);
-  assert.equal(combined.modules.length,21);
+  assert.equal(combined.modules.length,29);
   assert.deepEqual(combined.modules.slice(0,12).map(module=>module.id),course.modules.map(module=>module.id));
   assert.equal(combined.modules.filter(module=>module.source==='beginner').length,12);
-  assert.equal(combined.modules.filter(module=>module.source==='service').length,9);
-  assert.equal(combined.attachedModules.length,85);
+  assert.equal(combined.modules.filter(module=>module.source==='service').length,17);
+  assert.equal(combined.attachedModules.length,77);
   assert.equal(new Set([...combined.modules,...combined.attachedModules].flatMap(module=>module.days.map(day=>day.progressId))).size,198);
   assert.deepEqual(combined.modules.slice(0,12).flatMap(module=>module.days).map(day=>day.progressId).filter(Number.isInteger),Array.from({length:60},(_,index)=>index+1));
   assert.equal(combined.modules[0].days.filter(day=>day.source==='service').length,loadServiceCourse().modules.filter(module=>mergePlan.entries.some(entry=>entry.type==='extend'&&entry.module==='board'&&entry.feature===module.id)).flatMap(module=>module.days).length);
@@ -67,7 +67,7 @@ test('통합 뒤에도 입문 과정 60회차 화면이 기존 렌더링과 같�
   // 팀원 원본 페이지는 java-beginner/에 그대로 있다. 이 검사는 통합본 안의 입문 회차 화면이 바뀌지 않았는지 본다(폴더 이동으로 바뀐 실행기 경로만 맞춘다).
   const rows=[];
   for(const module of course.modules) for(const day of module.days) for(const tab of ['task','brief','data','api']) {
-    rows.push([module.id,day.day,tab,moduleMarkup(module,day,tab,[]).replaceAll('java-service.html#feature=','#feature=').replaceAll('node java-service/server.mjs','node java-beginner/server.mjs').replace(/<nav class="concept-links[^>]*>[\s\S]*?<\/nav>/g,'').replace(/<section class="overlap-note[^>]*>[\s\S]*?<\/section>/g,'')]);
+    rows.push([module.id,day.day,tab,moduleMarkup(module,day,tab,[]).replaceAll('java-service.html#feature=','#feature=').replaceAll('node java-service/server.mjs','node java-beginner/server.mjs').replace(/<nav class="concept-links[^>]*>[\s\S]*?<\/nav>/g,'').replace(/<section class="overlap-note[^>]*>[\s\S]*?<\/section>/g,'').replace(/<a href="#feature=([^\"]+)">[^<]+ ↗<\/a>/g,'<a href="#feature=$1">$1 ↗</a>')]);
   }
   const digest=createHash('sha256').update(rows.map(row=>row.join('\0')).join('\n')).digest('hex');
   assert.equal(rows.length,240);

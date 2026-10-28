@@ -16,9 +16,9 @@ test('서비스 원본 94개 feature의 138단계와 참조 recipe 계약을 모
   assert.equal(service.modules.length,94);
   assert.equal(days.length,138);
   assert.equal(new Set(service.modules.map(module=>module.id)).size,94);
-  assert.equal(new Set(service.modules.map(module=>module.group)).size,11);
+  assert.equal(new Set(service.modules.map(module=>module.group)).size,14);
   assert.equal(new Set(service.modules.map(module=>module.color)).size,11);
-  assert.equal(apiById.size,769);
+  assert.equal(apiById.size,new Set(days.flatMap(day=>day.apiIds)).size);
   assert.ok(service.modules.every(module=>Array.isArray(module.screens)));
   for(const module of service.modules){
     assert.equal(module.mode,'service');

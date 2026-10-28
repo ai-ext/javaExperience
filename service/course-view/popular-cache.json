@@ -65,12 +65,45 @@
     "board:cache": {
       "title": "캐시 장애에도 목록을 반환하고 변경 후 갱신하기",
       "goal": "인기글 GET 결과의 TTL과 SQL 호출을 관찰하고 Redis 지연·중단 시 DB 폴백, 글 상태 변경 후 커밋 시점에 맞춘 캐시 무효화를 구현하세요.",
-      "concept": "ACTIVE 글/좋아요를 포함한 인기 목록 · Redis popular key와 TTL"
+      "concept": "ACTIVE 글/좋아요를 포함한 인기 목록 · Redis popular key와 TTL",
+      "ticket": {
+        "id": "popular-cache:board:cache",
+        "from": "관리자 · 캐시 장애에도 목록을 반환하고 변경 후 갱신 요청",
+        "request": "인기글 GET 결과의 TTL과 SQL 호출을 관찰하고 Redis 지연·중단 시 DB 폴백, 글 상태 변경 후 커밋 시점에 맞춘 캐시 무효화를 구현하세요.",
+        "situation": "인기글을 빠르게 보여 주고, 저장소 장애나 글 변경 뒤에도 목록을 올바르게 제공합니다.",
+        "constraints": [
+          "인기글 TTL은 60초, Redis 명령 timeout은 500ms입니다.",
+          "요청에 적힌 기능 범위 안에서 구현합니다."
+        ],
+        "acceptance": [
+          "첫/재호출 popular 200, 60초 TTL·SQL hit, Redis 지연/중지 시 요청 및 요청을 확인했다.",
+          "삭제 204 200 후 commit된 글은 목록에서 빠지고 rollback 시 cache가 유지되는 순서를 검증했다.",
+          "B15 선택 ticket 후보로 유지하고 실제 수행한 경우에만 재현 로그를 붙였다."
+        ],
+        "basis": "course/days/D09.json"
+      }
     },
     "board:reload": {
       "title": "동시에 비어도 한 요청만 다시 채우기",
       "goal": "TTL 만료 순간 100개 동시 요청을 보내고 인기글 응답은 유지하면서 DB 목록 조회가 한 번만 발생하는지 확인합니다.",
-      "concept": "만료된 popular cache key · 100개 동시 GET과 barrier"
+      "concept": "만료된 popular cache key · 100개 동시 GET과 barrier",
+      "ticket": {
+        "id": "popular-cache:board:reload",
+        "from": "운영팀 · 동시에 비어도 한 요청만 다시 채우기 요청",
+        "request": "TTL 만료 순간 100개 동시 요청을 보내고 인기글 응답은 유지하면서 DB 목록 조회가 한 번만 발생하는지 확인합니다.",
+        "situation": "인기글을 빠르게 보여 주고, 저장소 장애나 글 변경 뒤에도 목록을 올바르게 제공합니다.",
+        "constraints": [
+          "TTL 만료 순간 100개 요청에서도 DB 목록 쿼리는 1회여야 합니다.",
+          "응답 형식은 기존 요청 계약과 같습니다.",
+          "단일 JVM 동기화와 여러 인스턴스 분산 조정의 적용 범위를 구분해 선택 근거를 기록합니다."
+        ],
+        "acceptance": [
+          "TTL 만료 순간 100건 동시 GET에서 100개 200과 DB query 정확히 1회를 확인했다.",
+          "재생성 TTL ≤60초와 후속 cache hit, 기존 response 형식 보존을 확인했다.",
+          "E01 필수 산출물을 작성했고 B15는 실행 여부와 무관하게 선택 등급을 유지했다."
+        ],
+        "basis": "course/tickets/E01.md"
+      }
     }
   }
 }

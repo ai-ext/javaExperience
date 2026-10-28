@@ -6,7 +6,17 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const GROUP_COLORS = {
   '포인트와 상점': 'amber', '조회와 성능': 'cyan', '예약과 지급': 'orange', '개발과 검증': 'blue',
   '자동화와 작업': 'violet', '운영과 안전': 'rose', '게시글과 소통': 'teal', '회원과 접근': 'indigo',
-  '데이터 정합성': 'green', '개발 준비': 'slate', '배포와 복구': 'lime',
+  '데이터 정합성': 'green', '개발 준비': 'slate', '배포와 복구': 'lime', '게시글 상호작용': 'teal', '활동 집계·순위': 'cyan', '신고·운영': 'rose',
+};
+const GROUP_OVERRIDES = {
+  polls: '게시글 상호작용',
+  'weekly-snapshots': '활동 집계·순위',
+  'hall-of-fame': '활동 집계·순위',
+  'coupon-bulk': '포인트와 상점',
+  'report-csv': '신고·운영',
+  'report-moderation': '신고·운영',
+  'community-moderation': '신고·운영',
+  'change-delivery': '개발과 검증',
 };
 const PROJECT_LABELS = { board: '게시판', community: '커뮤니티', 'project-v1': '프로젝트 v1', practice: '실습' };
 const asArray = (value) => Array.isArray(value) ? value : [];
@@ -54,7 +64,7 @@ function stageData(feature, variant, stage, recipeById, sourceIndex) {
   const scenarios = asArray(brief.scenario).map((item) => [item.start,item.action,item.result,item.after].filter(Boolean).join(' → '));
   const errors = asArray(brief.failures).map(item => `${item.when || item.condition || '실패 조건'}: ${item.result || item.expected || ''}${item.unchanged ? ` · 유지: ${item.unchanged}` : ''}`);
   const screenSource=stage.screens ?? brief.screens ?? feature.screens;
-  const screens=asArray(screenSource).map((item,index)=>({name:text(item.name||item.title||`원문 화면 ${index+1}`),columns:asArray(item.columns||item.fields).map(field=>text(typeof field==='string'?field:field.label||field.name)),actions:text(item.actions||item.description||'')}));
+  const screens=asArray(screenSource).map((item,index)=>({name:text(item.name||item.title||`원문 화면 ${index+1}`),columns:asArray(item.columns||item.fields).map(field=>text(typeof field==='string'?field:field.label||field.name)),actions:text(item.actions||item.description||''),basis:text(item.basis||'')}));
   const common = {
     purpose: brief.purpose || feature.summary || '',
     story: [...scenarios, ...asArray(brief.preconditions)].join('\n'),
@@ -100,6 +110,8 @@ export function convertServiceCourse({root=ROOT, features, contracts, sourceInde
   const recipes = asArray(apiContracts.recipes);
   const recipeById = new Map(recipes.map(recipe => [recipe.id,recipe]));
   const apiById = new Map(recipes.map(recipe => [recipe.id,recipeApi(recipe,recipes)]));
+  const conceptLinksFile=path.join(root,'java-service/concept-links.json');
+  const serviceStageConcepts=fs.existsSync(conceptLinksFile)?JSON.parse(fs.readFileSync(conceptLinksFile,'utf8')).serviceStages||{}:{};
   let dayNumber=0;
   const modules=files.map((feature,index) => {
     const variants=asArray(feature.variants);
@@ -107,7 +119,8 @@ export function convertServiceCourse({root=ROOT, features, contracts, sourceInde
     const days=variants.flatMap(variant => asArray(variant.stages).map(stage => {
       const day=stageData(feature,variant,stage,recipeById,sourceIndex);
       const copy=overlay.days?.[`${variant.id}:${stage.id}`]||{};
-      return {...day,title:copy.title||day.title,goal:copy.goal||day.goal,concept:copy.concept||day.concept};
+      return {...day,title:copy.title||day.title,goal:copy.goal||day.goal,concept:copy.concept||day.concept,
+        concepts:(serviceStageConcepts[day.id]||day.concepts).map(item=>({...item,href:item.href?.startsWith('/')?item.href.slice(1):item.href})),ticket:copy.ticket};
     })).map(day=>({...day,day:++dayNumber}));
     const apiIds=unique(days.flatMap(day=>day.apiIds));
     const sqls=unique(apiIds.flatMap(id=>asArray(recipeById.get(id)?.manualDb).map(item=>item.sql)));
@@ -117,7 +130,7 @@ export function convertServiceCourse({root=ROOT, features, contracts, sourceInde
     return {
       id:feature.id,mode:'service',number:String(index+1).padStart(2,'0'),title:overlay.title||feature.title,label:feature.group || '기능',
       color:GROUP_COLORS[feature.group] || 'slate',level:feature.difficulty,result:overlay.result||feature.summary,
-      group:feature.group, prerequisites:asArray(feature.prerequisites), variants:mappedVariants, days,
+      group:GROUP_OVERRIDES[feature.id]||feature.group, prerequisites:asArray(feature.prerequisites), variants:mappedVariants, days,
       projectOptions:Object.entries(PROJECT_LABELS).map(([project,label])=>({project,label})),
       brief:{purpose:overlay.brief?.purpose||feature.summary,story:overlay.brief?.story||days.map(day=>day.brief.story).filter(Boolean).join('\n\n'),scope:overlay.brief?.scope||days.map(day=>day.brief.scope).filter(Boolean).join('\n\n'),excluded:overlay.brief?.excluded||unique(days.map(day=>day.brief.excluded)).join('\n\n')},
       policies:overlay.policies||policies,acceptance:overlay.acceptance||acceptance,screens:overlay.screens||days.flatMap(day=>day.screens),tables:days.flatMap(day=>day.tables),apis:apisForModule(apiIds,days,apiById),
