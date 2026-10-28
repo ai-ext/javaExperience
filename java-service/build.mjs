@@ -6,13 +6,14 @@ import {esc,range,route,homeMarkup} from './view.mjs';
 
 const serviceCourse=loadServiceCourse();
 const mergePlan=JSON.parse(fs.readFileSync(new URL('./merge-plan.json',import.meta.url),'utf8'));
+const beginnerConceptLinks=JSON.parse(fs.readFileSync(new URL('./concept-links.json',import.meta.url),'utf8'));
 const selectedCourse=combineCourses(course,serviceCourse,mergePlan);
 const beginnerModules=selectedCourse.modules.filter(module=>module.source==='beginner');
 const serviceModules=selectedCourse.modules.filter(module=>module.source==='service');
 
 const read=name=>fs.readFileSync(new URL(name,import.meta.url),'utf8');
 const css=read('./style.css');
-const view=read('./view.mjs').replace(/^export /gm,'');
+const view=read('./view.mjs').replace("import {readFileSync} from 'node:fs';\n\n",'').replace("const beginnerConceptLinks=JSON.parse(readFileSync(new URL('./concept-links.json',import.meta.url),'utf8'));",`const beginnerConceptLinks=${JSON.stringify(beginnerConceptLinks)};`).replace("const mergePlan=JSON.parse(readFileSync(new URL('./merge-plan.json',import.meta.url),'utf8'));",`const mergePlan=${JSON.stringify(mergePlan)};`).replace(/^export /gm,'');
 const request=read('./request.mjs').replace(/^export /gm,'');
 const progress=read('./progress.mjs').replace(/^export /gm,'');
 const app=read('./app.js');

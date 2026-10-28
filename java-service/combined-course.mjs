@@ -7,11 +7,18 @@ export function validateMergePlan(plan, beginnerCourse, serviceCourse) {
   const modules=new Map(beginnerCourse.modules.map(module=>[module.id,module]));
   for(const entry of entries){
     if(!['extend','link','append'].includes(entry.type)) throw new Error(`잘못된 배치 유형: ${entry.feature}`);
-    if(entry.type==='append') continue;
-    const module=modules.get(entry.module);
-    if(!module) throw new Error(`입문 기능을 찾을 수 없습니다: ${entry.module}`);
+    const module=entry.type==='append'?null:modules.get(entry.module);
+    if(entry.type!=='append'&&!module) throw new Error(`입문 기능을 찾을 수 없습니다: ${entry.module}`);
     if(entry.type==='extend' && !module.days.some(day=>day.day===entry.after)) throw new Error(`입문 회차를 찾을 수 없습니다: ${entry.module}/${entry.after}`);
     if(entry.type==='link' && !module.days.some(day=>day.day===entry.day)) throw new Error(`입문 회차를 찾을 수 없습니다: ${entry.module}/${entry.day}`);
+    if(entry.overlap!==undefined){
+      if(!Array.isArray(entry.overlap)||entry.overlap.length===0) throw new Error(`겹침 안내 형식이 잘못되었습니다: ${entry.feature}`);
+      for(const overlap of entry.overlap){
+        const beginnerModule=modules.get(overlap.beginnerModule||entry.module);
+        if(!Number.isInteger(overlap.beginnerDay)||!beginnerModule?.days.some(day=>day.day===overlap.beginnerDay)) throw new Error(`겹침 안내 입문 회차를 찾을 수 없습니다: ${entry.feature}/${overlap.beginnerModule||entry.module}/${overlap.beginnerDay}`);
+        if(typeof overlap.note!=='string'||!overlap.note.trim()) throw new Error(`겹침 안내 문구가 비어 있습니다: ${entry.feature}/${overlap.beginnerDay}`);
+      }
+    }
   }
   const append=entries.filter(entry=>entry.type==='append').map(entry=>entry.order).sort((a,b)=>a-b);
   if(new Set(append).size!==append.length || append.some((order,index)=>order!==index+13)) throw new Error('append 순서는 13부터 중복 없이 이어져야 합니다.');
@@ -21,18 +28,19 @@ export function validateMergePlan(plan, beginnerCourse, serviceCourse) {
 export function combineCourses(beginnerCourse, serviceCourse, plan) {
   validateMergePlan(plan,beginnerCourse,serviceCourse);
   const byId=new Map(serviceCourse.modules.map(module=>[module.id,module]));
+  const serviceDays=(feature,entry)=>feature.days.map(day=>({...day,mode:'service',source:'service',featureId:feature.id,progressId:`service:${day.id}`,attachedTo:entry.module,overlap:(entry.overlap||[]).map(item=>({...item,beginnerModule:item.beginnerModule||entry.module}))}));
   const beginnerModules=beginnerCourse.modules.map(module=>{
-    const extensions=plan.entries.filter(entry=>entry.type==='extend'&&entry.module===module.id).map(entry=>byId.get(entry.feature));
-    return {...module,source:'beginner',days:[...module.days.map(day=>({...day,progressId:day.day})),...extensions.flatMap(feature=>feature.days.map(day=>({...day,mode:'service',source:'service',featureId:feature.id,progressId:`service:${day.id}`,attachedTo:module.id})))],
+    const extensions=plan.entries.filter(entry=>entry.type==='extend'&&entry.module===module.id).map(entry=>({...byId.get(entry.feature),merge:entry}));
+    return {...module,source:'beginner',days:[...module.days.map(day=>({...day,progressId:day.day})),...extensions.flatMap(feature=>serviceDays(feature,feature.merge))],
     serviceExtensions:extensions,
     serviceLinks:plan.entries.filter(entry=>entry.type==='link'&&entry.module===module.id).map(entry=>({...entry,serviceModule:byId.get(entry.feature)})),
   };});
-  const serviceModules=plan.entries.filter(entry=>entry.type==='append').sort((a,b)=>a.order-b.order).map((entry,index)=>({...byId.get(entry.feature),number:String(entry.order).padStart(2,'0'),appendOrder:entry.order,source:'service',days:byId.get(entry.feature).days.map(day=>({...day,progressId:`service:${day.id}`}))}));
+  const serviceModules=plan.entries.filter(entry=>entry.type==='append').sort((a,b)=>a.order-b.order).map(entry=>({...byId.get(entry.feature),number:String(entry.order).padStart(2,'0'),appendOrder:entry.order,source:'service',merge:entry,days:serviceDays(byId.get(entry.feature),entry)}));
   return {
     ...beginnerCourse,
     mode:'combined',
     modules:[...beginnerModules,...serviceModules],
-    attachedModules:plan.entries.filter(entry=>entry.type!=='append').map(entry=>({...byId.get(entry.feature),source:'service',merge:entry,days:byId.get(entry.feature).days.map(day=>({...day,progressId:`service:${day.id}`}))})),
+    attachedModules:plan.entries.filter(entry=>entry.type!=='append').map(entry=>({...byId.get(entry.feature),source:'service',merge:entry,days:serviceDays(byId.get(entry.feature),entry)})),
     serviceModuleIds:serviceModules.map(module=>module.id),
   };
 }

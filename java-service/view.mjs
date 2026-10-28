@@ -1,3 +1,7 @@
+import {readFileSync} from 'node:fs';
+
+const beginnerConceptLinks=JSON.parse(readFileSync(new URL('./concept-links.json',import.meta.url),'utf8'));
+const mergePlan=JSON.parse(readFileSync(new URL('./merge-plan.json',import.meta.url),'utf8'));
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const pad = n => String(n).padStart(2,'0');
 export const dayLabel = d => `${typeof d.progressId==='string'&&d.progressId.startsWith('service:')?'S':''}${pad(d.day)}`;
@@ -28,7 +32,7 @@ export function moduleMarkup(m,d,tab,completed=[]) {
   const allDays=m.days;
   return `<div class="breadcrumb"><a href="#overview">전체 커리큘럼</a><span>/</span><span>${m.number} ${esc(m.title)}</span></div>
   <div class="module-heading tone-${m.color}"${m.source==='service'?' data-source="service"':''}><div><div class="eyebrow">MODULE ${m.number} <span>·</span> ${range(m)}</div><h1>${esc(m.title)}</h1><p>${esc(m.result)}</p></div><span class="level-tag">${esc(m.level)}</span></div>
-  ${coursePairLinks(m)}${m.serviceExtensions?.length?`<section class="service-extra attached-service"><h3>🐝 실무 심화 회차</h3><p>입문 회차 뒤에 이어지는 실무 기능입니다. 별도 진도와 원문 단계는 그대로 유지합니다.</p>${m.serviceExtensions.map(service=>`<a class="text-link" href="${route(service)}">${esc(service.title)} · ${service.days.length}단계 →</a>`).join('')}</section>`:''}${m.serviceLinks?.length?`<section class="service-extra linked-service"><h3>🐝 다른 프로젝트 사례 더 보기</h3>${m.serviceLinks.map(link=>`<a class="text-link" href="${route(link.serviceModule)}">${esc(link.serviceModule.title)} · 입문 ${link.day}회차와 연결 →</a>`).join('')}</section>`:''}
+  ${coursePairLinks(m)}${overlapMarkup(d)}${m.serviceExtensions?.length?`<section class="service-extra attached-service"><h3>🐝 실무 심화 회차</h3><p>입문 회차 뒤에 이어지는 실무 기능입니다. 별도 진도와 원문 단계는 그대로 유지합니다.</p>${m.serviceExtensions.map(service=>`<a class="text-link" href="${route(service)}">${esc(service.title)} · ${service.days.length}단계 →</a>`).join('')}</section>`:''}${m.serviceLinks?.length?`<section class="service-extra linked-service"><h3>🐝 다른 프로젝트 사례 더 보기</h3>${m.serviceLinks.map(link=>`<a class="text-link" href="${route(link.serviceModule)}">${esc(link.serviceModule.title)} · 입문 ${link.day}회차와 연결 →</a>`).join('')}</section>`:''}
   ${m.mode==='service'&&m.variants.length>1?`<label class="project-choice"><span>실습 프로젝트</span><select id="project-select">${m.variants.map(v=>`<option value="${esc(v.project)}">${esc(v.label)}</option>`).join('')}</select></label>`:''}
   <nav class="day-nav" aria-label="이 기능의 학습 회차">${allDays.filter(x=>m.mode!=='service'||x.project===d.project).map(x=>`<a href="${route(m,x,tab)}" class="day-chip ${(d.mode==='service'?x.id===d.id:x.day===d.day)?'active':''} ${completed.includes(x.progressId??x.day)?'done':''}" ${(d.mode==='service'?x.id===d.id:x.day===d.day)?'aria-current="step"':''}><span>${x.source==='service'?'🐝 ':''}DAY ${dayLabel(x)}</span><strong>${esc(x.title)}</strong>${completed.includes(x.progressId??x.day)?'<i aria-label="완료">✓</i>':''}</a>`).join('')}</nav>
   <div class="day-title"><div><span class="section-label">TODAY'S MISSION · DAY ${dayLabel(d)}</span><h2>${esc(d.title)}</h2><p>${esc(d.goal)}</p></div><button class="button ${completed.includes(d.progressId??d.day)?'completed':'secondary'}" id="complete-day" data-day="${d.day}" aria-pressed="${completed.includes(d.progressId??d.day)}">${completed.includes(d.progressId??d.day)?'✓ 학습 완료 · 취소':'학습 완료로 표시'}</button></div>
@@ -37,25 +41,32 @@ export function moduleMarkup(m,d,tab,completed=[]) {
   <div class="day-footer"><span>진도는 직접 표시합니다. 요청 성공만으로 완료되지 않습니다.</span><div id="day-pagination"></div></div>`;
 }
 
-const coursePairs={
-  board:['posts-create-read','posts-find','posts-edit-remove'], 'search-comments':['integrated-search','comments'],
-  members:['members-auth','sessions'], files:['post-images'], catalog:['points-coupon-shop'], orders:['points-coupon-shop','coupon-limits'],
-  concurrency:['bounded-workers','transaction-consistency'], performance:['db-list-queries','diagnose-slow-requests'],
-  quality:['contract-tests','api-compatibility'], operations:['runtime-ready','release-containers'],
-  recovery:['purge-trash','trash-restore'], handover:['change-delivery','independent-repair'],
-};
 function coursePairLinks(m){
   if(m.mode==='service'){
-    const beginnerId=Object.keys(coursePairs).find(id=>coursePairs[id].some(serviceId=>m.id===serviceId));
-    return beginnerId?`<nav class="course-cross-links"><span>입문 과정에서 먼저</span><a href="#m=${beginnerId}">${beginnerId} ↗</a><span>실무 과정에서 이어서</span></nav>`:'';
+    const entry=m.merge||mergePlan.entries.find(item=>item.feature===m.id);
+    const pair=entry?.coursePairs?.[0];
+    if(!pair)return '';
+    return `<nav class="course-cross-links"><span>입문 과정에서 먼저</span><a href="#m=${esc(pair.module)}">${esc(pair.module)} ↗</a><span>실무 과정에서 이어서</span></nav>`;
   }
-  const ids=coursePairs[m.id]||[];
-  return ids.length?`<nav class="course-cross-links"><span>입문 과정에서 먼저</span><span>${esc(m.title)}</span><span>실무 과정에서 이어서</span>${ids.map(id=>`<a href="#feature=${id}">${esc(id)} ↗</a>`).join('')}</nav>`:'';
+  const pairs=mergePlan.entries.flatMap(entry=>(entry.coursePairs||[]).filter(pair=>pair.module===m.id).map(pair=>({...pair,feature:entry.feature}))).sort((a,b)=>a.order-b.order);
+  const ids=pairs.map(pair=>pair.feature);
+  return ids.length?`<nav class="course-cross-links"><span>입문 과정에서 먼저</span><span>${esc(m.title)}</span><span>실무 과정에서 이어서</span>${ids.map(id=>`<a href="#feature=${esc(id)}">${esc(id)} ↗</a>`).join('')}</nav>`:'';
+}
+
+function overlapMarkup(d){
+  if(!d.overlap?.length)return '';
+  return d.overlap.map(item=>`<section class="overlap-note service-extra"><h3>🌱 Day ${pad(item.beginnerDay)}에서 이미 만든 부분</h3><p>${esc(item.note)}</p><a class="text-link" href="#m=${encodeURIComponent(item.beginnerModule)}&d=${item.beginnerDay}&t=task">🌱 Day ${pad(item.beginnerDay)} 입문 회차 보기 →</a></section>`).join('');
+}
+
+function conceptLinksMarkup(items){
+  const links=(items||[]).filter(item=>item?.href).map(item=>`<a class="concept-link" data-concept-link href="${esc(item.href.startsWith('/')?item.href.slice(1):item.href)}">${esc(item.label)} ↗</a>`);
+  return links.length?`<nav class="concept-links service-extra source-links" aria-label="오늘의 개념 문서 · 관련 개념">${links.join('')}</nav>`:'';
 }
 
 function taskMarkup(m,d) {
   const work=d.mode==='service'?serviceExtras(d):'';
-  return `${d.ticket?ticketMarkup(d.ticket):''}<div class="task-grid"><section class="panel"><div class="section-label">BUILD TODAY</div><h2>오늘 직접 구현할 내용</h2><ol class="task-list">${d.tasks.map((task,i)=>`<li><span>${pad(i+1)}</span><p>${esc(task)}</p></li>`).join('')}</ol><div class="task-callout"><span>작업 범위</span><p>오늘 회차의 기능을 직접 작성하세요. 완성 코드를 복사하기보다 입력·판단·저장·반환을 연결하는 것이 목표입니다.</p></div><a class="text-link" href="${route(m,d,'brief')}">${m.mode==='service'?'단계 기획서 읽기':'기능 전체의 공통 기획서 읽기'} <span>→</span></a>${work}</section><div class="task-side">${panel('JAVA FOR TODAY','오늘 필요한 개념',`<p class="concept-text">${esc(d.concept)}</p><p class="subtle">낯선 개념은 오늘 만드는 값으로 확인하세요. DTO는 일반 클래스로 작성합니다.</p>`)}${panel('CHECK YOUR WORK','이렇게 확인하세요.',bullets(d.check,'checks'))}<a class="api-shortcut" href="${route(m,d,'api')}"><div><span class="section-label">TRY IT YOURSELF</span><strong>실제 API 요청 보내기</strong><p>예상 응답과 실제 응답을 비교합니다.</p></div><span>↗</span></a></div></div>`;
+  const concepts=d.mode==='service'?d.concepts:beginnerConceptLinks[String(d.day)];
+  return `${d.ticket?ticketMarkup(d.ticket):''}<div class="task-grid"><section class="panel"><div class="section-label">BUILD TODAY</div><h2>오늘 직접 구현할 내용</h2><ol class="task-list">${d.tasks.map((task,i)=>`<li><span>${pad(i+1)}</span><p>${esc(task)}</p></li>`).join('')}</ol><div class="task-callout"><span>작업 범위</span><p>오늘 회차의 기능을 직접 작성하세요. 완성 코드를 복사하기보다 입력·판단·저장·반환을 연결하는 것이 목표입니다.</p></div><a class="text-link" href="${route(m,d,'brief')}">${m.mode==='service'?'단계 기획서 읽기':'기능 전체의 공통 기획서 읽기'} <span>→</span></a>${work}</section><div class="task-side">${panel('JAVA FOR TODAY','오늘 필요한 개념',`<p class="concept-text">${esc(d.concept)}</p>${conceptLinksMarkup(concepts)}<p class="subtle">낯선 개념은 오늘 만드는 값으로 확인하세요. DTO는 일반 클래스로 작성합니다.</p>`)}${panel('CHECK YOUR WORK','이렇게 확인하세요.',bullets(d.check,'checks'))}<a class="api-shortcut" href="${route(m,d,'api')}"><div><span class="section-label">TRY IT YOURSELF</span><strong>실제 API 요청 보내기</strong><p>예상 응답과 실제 응답을 비교합니다.</p></div><span>↗</span></a></div></div>`;
 }
 
 function legacyServiceExtras(d){const hints=d.hints?.length?`<details class="service-extra"><summary>막힐 때 질문형 힌트 보기 · ${d.hints.length}개</summary><ol>${d.hints.map(item=>`<li>${esc(item)}</li>`).join('')}</ol></details>`:'';const checks=d.executionChecks?.length?`<section class="service-extra"><h3>실행 확인</h3>${d.executionChecks.map(check=>`<article><strong>${esc(check.title)}</strong>${check.command?`<pre>${esc(check.command)}</pre>`:''}<p><b>확인할 결과</b> · ${esc(check.expected)}</p><p><b>기록할 것</b> · ${esc(typeof check.record==='string'?check.record:JSON.stringify(check.record))}</p></article>`).join('')}</section>`:'';const links=d.sourceLinks?.length?`<nav class="service-extra source-links"><h3>원본 일자·시나리오</h3>${d.sourceLinks.map(item=>`<a href="${esc(item.href)}">${esc(item.label)} ↗</a>`).join('')}</nav>`:'';return `${checks}${hints}${links}`;}
@@ -64,7 +75,7 @@ function serviceExtras(d){
   const hints=d.hints?.length?`<section class="service-extra hint-box" data-hint-index="-1"><h3>막힐 때 질문형 힌트</h3><p data-hint-text>힌트를 열어도 학습 진도로 기록되지 않습니다.</p><div><button type="button" data-hint-open>힌트 보기</button><button type="button" data-hint-prev disabled>이전 힌트</button><button type="button" data-hint-next hidden>다음 힌트</button></div><script type="application/json" data-hint-data>${JSON.stringify(d.hints).replace(/</g,'\\u003c')}</script></section>`:'';
   const checks=d.executionChecks?.length?`<section class="service-extra"><h3>실행 확인</h3>${d.executionChecks.map(check=>`<article><label><input type="checkbox"> <strong>${esc(check.title)}</strong></label>${check.command?`<pre>${esc(check.command)}</pre>`:''}<p><b>확인할 결과</b> · ${esc(check.expected)}</p><p><b>기록할 것</b> · ${esc(typeof check.record==='string'?check.record:JSON.stringify(check.record))}</p><label>실행 기록<textarea rows="2" placeholder="직접 확인한 결과를 기록하세요."></textarea></label></article>`).join('')}</section>`:'';
   const links=(title,items)=>items?.length?`<nav class="service-extra source-links"><h3>${title}</h3>${items.map(item=>`<a href="${esc(item.href)}">${esc(item.label)} ↗</a>`).join('')}</nav>`:'';
-  return `${checks}${hints}${links('원본 일자·시나리오',d.sourceLinks)}${links('관련 개념',d.concepts)}${links('참고 자료',d.references)}`;
+  return `${checks}${hints}${links('원본 일자·시나리오',d.sourceLinks)}${links('참고 자료',d.references)}`;
 }
 
 function ticketMarkup(t) {
