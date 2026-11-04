@@ -342,6 +342,9 @@ assert.equal(shortTitle('(전부 괄호)'), '(전부 괄호)', '비면 원래 �
   assert.deepEqual(findInjectedLinkErrors(outputs, fake), ['dataOnly', 'commentOnly', 'scriptOnly', 'absent'].map((h) => `course/spring/D99.html: 없는 앵커 → ../tickets/T01.html#${h}`), '실제 id만 앵커로 인정');
   outputs.set(`${fake}/course/spring/D98.html`, '<a href="../tickets/T02.html">없는 파일</a>');
   assert.ok(findInjectedLinkErrors(outputs, fake).includes('course/spring/D98.html: 없는 파일 → ../tickets/T02.html'), '없는 파일도 잡는다');
+  outputs.set(`${fake}/README.html`, '<a href="course/tickets/T01.html#group=service">경로 해시</a><a href="course/tickets/T01.html#nope">없는 앵커</a>');
+  const homeErrors = findInjectedLinkErrors(outputs, fake).filter((e) => e.startsWith('README.html'));
+  assert.deepEqual(homeErrors, ['README.html: 없는 앵커 → course/tickets/T01.html#nope'], '`=`가 든 해시 경로는 앵커 검사에서 빼고 일반 앵커는 계속 검사');
 }
 
 // ---------------------------------------------------------------- 일자 페이지

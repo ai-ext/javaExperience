@@ -946,7 +946,9 @@ export function findInjectedLinkErrors(outputs, root) {
       const target = pathPart ? path.resolve(path.dirname(out), pathPart.split('?')[0]) : out;
       if (!outputs.has(target) && !fs.existsSync(target)) { errors.push(`${relOut}: 없는 파일 → ${href}`); continue; }
       const targetHtml = outputs.get(target) ?? (target.endsWith('.html') ? fs.readFileSync(target, 'utf8') : null);
-      if (hash && targetHtml !== null && !idsOf(target, targetHtml).has(decodeURIComponent(hash))) errors.push(`${relOut}: 없는 앵커 → ${href}`);
+      // `#group=service`·`#feature=…&stage=…`처럼 `=`가 든 해시는 대상 페이지 스크립트가 읽는 경로라 요소 id로 검사하지 않는다.
+      const isHashRoute = hash?.includes('=');
+      if (hash && !isHashRoute && targetHtml !== null && !idsOf(target, targetHtml).has(decodeURIComponent(hash))) errors.push(`${relOut}: 없는 앵커 → ${href}`);
     }
   }
   return errors;
