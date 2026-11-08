@@ -12,10 +12,17 @@ const opt = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 
 const root = path.resolve(opt('--root', fileURLToPath(new URL('../../../', import.meta.url))));
 const out = path.resolve(opt('--out', path.join(os.tmpdir(), 'javaexperience-contrast')));
 const quick = args.includes('--quick');
+// 증거 fixture, 과거 생성 스냅샷, 팀원 소유의 입문 원본은 학습 페이지 검사에서 제외한다.
+const excludedPages = new Map([
+  ['docs/design/d11-2026-10-25/proof-sol-logs/attempt1/fixture-page.html', '검증 증거 fixture'],
+  ['docs/design/concept-main-integration-2026-10-25/historical/generated/D11-original.html', '과거 생성 스냅샷'],
+  ['docs/design/concept-main-integration-2026-10-25/historical/generated/D12-original.html', '과거 생성 스냅샷'],
+  ['java-beginner.html', '팀원 원본 과정 페이지'],
+]);
 // 새 서비스 대표 화면과 독립 지도도 같은 PC 다크 대비 기준으로 검사한다.
 const representatives = ['index.html','scenario/README.html','scenario/features/posts-create-read.html','course/map.html','course/README.html','course/spring/D01.html','course/spring/D05.html','course/spring/D11.html','course/java/J01.html','course/tickets/B01.html','scenario/ch0-first-steps/0-1-ts-to-java.html','scenario/ch1-create-post/1-1-receive-request.html','scenario/ch1-create-post/1-5-validation.html','scenario/ch10-project/10-4-login-jwt.html','scenario/labs/l12-query-methods/README.html','docs/knowledge/P02-mvc-layered-architecture.html','docs/knowledge/README.html','lessons/concept-core.html','docs/knowledge/J01-types-string.html','docs/knowledge/P09-java-syntax-basics.html','lessons/A1-client-server-http.html','docs/knowledge/D12-linux-terminal-basics.html'];
 const walk = dir => fs.readdirSync(dir, {withFileTypes:true}).flatMap(e => e.name.startsWith('.') || e.name === 'node_modules' ? [] : e.isDirectory() ? walk(path.join(dir,e.name)) : e.name.endsWith('.html') ? [path.relative(root,path.join(dir,e.name))] : []);
-const discover = () => (quick ? representatives : walk(root).sort()).filter(file => !opt('--match','') || new RegExp(opt('--match','')).test(file)).slice(0, Number(opt('--limit', '0')) || undefined);
+const discover = () => (quick ? representatives : walk(root).sort()).filter(file => !excludedPages.has(file)).filter(file => !opt('--match','') || new RegExp(opt('--match','')).test(file)).slice(0, Number(opt('--limit', '0')) || undefined);
 const result = { viewport:{width:1440,height:900}, startedAt:new Date().toISOString(), pages:0, states:0, textNodes:0, controlEdges:0, findings:[], errors:[], coverage:{html:[],stateTypes:{}} };
 let server, browser;
 let files = [];
