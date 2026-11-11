@@ -49,7 +49,7 @@ function coursePairLinks(m){
     const entry=m.merge||mergePlan.entries.find(item=>item.feature===m.id);
     const pair=entry?.coursePairs?.[0];
     if(!pair)return '';
-    return `<nav class="course-cross-links"><span>입문 과정에서 먼저</span><a href="#m=${esc(pair.module)}">${esc(beginnerModuleTitles[pair.module]||pair.module)} ↗</a><span>실무 과정에서 이어서</span></nav>`;
+    return `<nav class="course-cross-links"><span>입문 과정에서 먼저</span><a href="#m=${esc(pair.module)}">${esc(beginnerModuleTitles[pair.module]||pair.module)} ↗</a></nav>`;
   }
   const pairs=mergePlan.entries.flatMap(entry=>(entry.coursePairs||[]).filter(pair=>pair.module===m.id).map(pair=>({...pair,feature:entry.feature}))).sort((a,b)=>a.order-b.order);
   const ids=pairs.map(pair=>pair.feature);
