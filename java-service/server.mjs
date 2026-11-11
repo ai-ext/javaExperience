@@ -4,6 +4,18 @@ import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 
 const htmlPath=new URL('../java-service.html',import.meta.url);
+const repoRoot=path.resolve(fileURLToPath(new URL('..',import.meta.url)));
+// 통합 과정이 연결하는 개념 학습 페이지와 그 스타일·이미지를 같은 실행기에서 열 수 있게 정적 파일을 제한적으로 제공한다.
+const staticTypes={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.woff2':'font/woff2','.ico':'image/x-icon'};
+function staticFile(rawPath){
+  let decoded;
+  try{decoded=decodeURIComponent(rawPath);}catch{return null;}
+  const segments=decoded.split('/').filter(Boolean);
+  if(!segments.length||segments.some(s=>s.startsWith('.')||s==='node_modules'||/[\\\u0000]/.test(s)))return null;
+  const file=path.resolve(repoRoot,...segments);
+  if(!file.startsWith(repoRoot+path.sep)||!staticTypes[path.extname(file).toLowerCase()])return null;
+  return file;
+}
 const localHosts=new Set(['localhost','127.0.0.1','[::1]']);
 const noForward=new Set(['host','connection','content-length','transfer-encoding','upgrade','keep-alive','te','trailer','proxy-authorization','proxy-authenticate','origin','referer','accept-encoding']);
 function json(res,status,value){res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});res.end(JSON.stringify(value));}
@@ -63,8 +75,12 @@ export function createCourseServer({target='http://127.0.0.1:8080'}={}) {
       try {const html=await readFile(htmlPath);res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(html);} catch {json(res,500,{code:'HTML_NOT_BUILT',message:'저장소 루트에서 node java-service/build.mjs를 실행하세요.'});}
       return;
     }
+    if(req.method==='GET'){
+      const file=staticFile(rawPath);
+      if(file){try{const body=await readFile(file);res.writeHead(200,{'Content-Type':staticTypes[path.extname(file).toLowerCase()],'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(body);return;}catch{}}
+    }
     if(rawPath==='/favicon.ico'){res.writeHead(204);res.end();return;}
-    json(res,404,{code:'NOT_FOUND',message:'독립 학습 HTML과 API 전달 경로만 제공합니다.'});
+    json(res,404,{code:'NOT_FOUND',message:'학습 페이지·정적 파일과 API 전달 경로만 제공합니다.'});
   });
 }
 

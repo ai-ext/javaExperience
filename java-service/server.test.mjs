@@ -68,3 +68,17 @@ test('실행기 설정 응답은 화면이 실행기를 알아보도록 API 대�
   assert.equal(response.status,200);
   assert.deepEqual(await response.json(),{target:'http://127.0.0.1:8081'},'빈 설정이면 화면이 요청 버튼을 막는다');
 });
+
+test('실행기는 개념 학습 페이지 같은 저장소 정적 파일만 제공하고 숨김·의존성·상위 경로·소스 파일은 막는다', async (t) => {
+  const {createCourseServer} = await import('./server.mjs');
+  const runner=createCourseServer({target:'http://127.0.0.1:8081'});
+  runner.listen(0,'127.0.0.1'); await once(runner,'listening'); t.after(()=>runner.close());
+  const base=`http://127.0.0.1:${runner.address().port}`;
+  const ok=await fetch(`${base}/docs/knowledge/W09-why-dto.html`);
+  assert.equal(ok.status,200,'통합 과정이 연결한 개념 페이지');
+  assert.match(ok.headers.get('content-type'),/text\/html/);
+  assert.equal((await fetch(`${base}/tools/site/site-frame.css`)).status,200,'개념 페이지 스타일');
+  for(const blocked of ['/.git/config','/tools/site/node_modules/jsdom/package.json','/%2e%2e/%2e%2e/etc/hosts','/java-service/server.mjs','/service/api-contracts.json','/docs/..%2f..%2fREADME.md']){
+    assert.equal((await fetch(base+blocked)).status,404,`${blocked} 차단`);
+  }
+});
