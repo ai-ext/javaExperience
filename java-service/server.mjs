@@ -23,7 +23,7 @@ export function createCourseServer({target='http://127.0.0.1:8080'}={}) {
     if(!localHosts.has(own.hostname)) return json(res,403,{code:'LOCAL_ONLY',message:'로컬 주소에서만 사용합니다.'});
     const origin=req.headers.origin;
     const rawPath=(req.url || '/').split('?')[0];
-    if(rawPath==='/__config' && req.method==='GET') return json(res,200,{target:upstream.origin});
+    if(rawPath==='/__config' && req.method==='GET') return json(res,200,{target:upstream});
     if(rawPath.startsWith('/__api/')) {
       if((origin && origin!==own.origin) || req.headers['sec-fetch-site']==='cross-site') return json(res,403,{code:'ORIGIN_REJECTED',message:'실행기가 제공한 로컬 페이지에서 요청하세요.'});
       const requestUrl=new URL(req.url,'http://runner.invalid');

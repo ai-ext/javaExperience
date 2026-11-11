@@ -73,6 +73,11 @@ function render(keepScroll=false){
 async function mountApi(){
   const pageGeneration=generation;
   const preferred=[...new Set(current.d.apiIds.length?current.d.apiIds:current.m.apis.map(a=>a.id))];
+  if(!preferred.some(id=>byId.has(id))){
+    // 직접 SQL 실습·실행 관찰·설계 단계처럼 브라우저로 호출할 API가 없는 단계
+    $('tab-content').innerHTML=`<section class="panel"><div class="section-label">NO API TODAY</div><h2>이 단계는 직접 호출할 API가 없습니다.</h2><p class="body-copy">오늘 할 일과 완료 기준에 적힌 방법(SQL 실행, 실행 결과 관찰, 설계 문서 작성)으로 확인하세요. 다음 단계에서 API를 만들면 이 탭에서 요청을 보낼 수 있습니다.</p></section>`;
+    return;
+  }
   const options=ids=>ids.map(id=>byId.get(id)).filter(Boolean).map(a=>`<option value="${esc(a.id)}">${esc(a.method)} · ${esc(a.title)}</option>`).join('');
   const sourceModules=allModules.filter(module=>module.source===current.m.source);
   $('api-select').innerHTML=`<optgroup label="오늘 확인할 API">${options(preferred)}</optgroup>${sourceModules.map(m=>`<optgroup label="${m.number} ${esc(m.title)}">${options(m.apis.map(a=>a.id).filter(id=>!preferred.includes(id)))}</optgroup>`).join('')}`;

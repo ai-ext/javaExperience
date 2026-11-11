@@ -59,3 +59,12 @@ test('서비스 과정은 선택한 로컬 프로젝트 서버로 전달하고 �
   assert.equal(rejected.status,400);
   assert.equal((await rejected.json()).code,'INVALID_TARGET');
 });
+
+test('실행기 설정 응답은 화면이 실행기를 알아보도록 API 대상 주소를 돌려준다', async (t) => {
+  const {createCourseServer} = await import('./server.mjs');
+  const runner=createCourseServer({target:'http://127.0.0.1:8081'});
+  runner.listen(0,'127.0.0.1'); await once(runner,'listening'); t.after(()=>runner.close());
+  const response=await fetch(`http://127.0.0.1:${runner.address().port}/__config`);
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{target:'http://127.0.0.1:8081'},'빈 설정이면 화면이 요청 버튼을 막는다');
+});
