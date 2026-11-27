@@ -83,3 +83,15 @@ test('실무 개념 링크는 단계 근거와 연결 수·문서 분포 기준�
     if(count>Math.floor(Object.keys(stages).length*.25)) assert.ok(exceptions[href]?.trim(),`${href}가 실무 단계의 25% 초과 사용: ${count}`);
   }
 });
+
+test('오늘 필요한 개념 링크 아래에 reason을 표시하고 reason이 없으면 생략한다',()=>{
+  const service=loadServiceCourse();
+  const module=service.modules.find(item=>item.days.some(day=>day.concepts.some(link=>link.reason)));
+  const day=module.days.find(item=>item.concepts.some(link=>link.reason));
+  const withReason=moduleMarkup(module,day,'task');
+  const linked=day.concepts.find(link=>link.reason);
+  assert.ok(withReason.includes(`<p class="concept-reason">${linked.reason}</p>`));
+  const withoutReason=moduleMarkup(module,{...day,concepts:[{label:'개념 제목',href:'docs/knowledge/P16-json-jackson-practical.html'}]},'task');
+  assert.match(withoutReason,/개념 제목/);
+  assert.doesNotMatch(withoutReason,/class="concept-reason"/);
+});
