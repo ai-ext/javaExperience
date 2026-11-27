@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {convertServiceCourse} from './service-course.mjs';
+import {convertServiceCourse,loadServiceCourse} from './service-course.mjs';
 import {moduleMarkup,route} from './view.mjs';
 import {readServiceProgress,writeServiceProgress} from './progress.mjs';
 
@@ -31,6 +31,7 @@ test('서비스 원본 94개 feature의 138단계와 참조 recipe 계약을 모
       for(const key of ['purpose','story','scope','excluded','inputs','preconditions','scenarios','policies','success','failures','examples','done'])assert.ok(Object.hasOwn(day.brief,key),`${module.id}/${day.id}: brief.${key} 필드 누락`);
       assert.ok(day.brief.purpose&&day.brief.scope&&day.brief.excluded);
       for(const key of ['hints','executionChecks','sourceUnits','sourceLinks','concepts','references','tables','screens','apiIds'])assert.ok(Array.isArray(day[key]),`${module.id}/${day.id}: ${key} 배열 필드 누락`);
+      assert.ok(Array.isArray(day.manualDbSql),`${module.id}/${day.id}: DB 확인 SQL 배열 필드 누락`);
       for(const id of day.apiIds){
         const recipe=apiById.get(id);
         const contract=contractById.get(id);
@@ -55,6 +56,18 @@ test('서비스 원본 94개 feature의 138단계와 참조 recipe 계약을 모
   assert.match(markup,/실행 확인/);
   assert.match(markup,/관련 개념/);
   assert.match(route(multi,first),new RegExp(`^#feature=${multi.id}&project=${first.project}&stage=${encodeURIComponent(first.id)}&d=\\d+&t=task$`));
+});
+
+test('실무 API 탭은 단계 SQL과 복사 버튼을 보여 주고 SQL 없는 단계는 칸을 만들지 않는다',()=>{
+  const service=loadServiceCourse();
+  const withSql=service.modules.flatMap(module=>module.days).find(day=>day.manualDbSql.length);
+  const withoutSql=service.modules.flatMap(module=>module.days).find(day=>!day.manualDbSql.length);
+  const sqlMarkup=moduleMarkup(service.modules.find(module=>module.id===withSql.featureId),withSql,'api',[]);
+  const emptyMarkup=moduleMarkup(service.modules.find(module=>module.id===withoutSql.featureId),withoutSql,'api',[]);
+  assert.match(sqlMarkup,/요청 뒤 DB에서 확인하기/);
+  assert.match(sqlMarkup,/data-copy=/);
+  for(const sql of withSql.manualDbSql)assert.ok(sqlMarkup.includes(sql));
+  assert.doesNotMatch(emptyMarkup,/요청 뒤 DB에서 확인하기/);
 });
 
 test('서비스 진도는 기존 v1 저장 구조·키를 보존하며 feature·project·stage별로 기록한다',()=>{

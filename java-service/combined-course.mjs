@@ -28,7 +28,14 @@ export function validateMergePlan(plan, beginnerCourse, serviceCourse) {
 export function combineCourses(beginnerCourse, serviceCourse, plan) {
   validateMergePlan(plan,beginnerCourse,serviceCourse);
   const byId=new Map(serviceCourse.modules.map(module=>[module.id,module]));
-  const serviceDays=(feature,entry)=>feature.days.map(day=>({...day,mode:'service',source:'service',featureId:feature.id,progressId:`service:${day.id}`,attachedTo:entry.module,overlap:(entry.overlap||[]).map(item=>({...item,beginnerModule:item.beginnerModule||entry.module}))}));
+  const serviceDays=(feature,entry)=>{
+    const stageNumbers=new Map();
+    return feature.days.map(day=>{
+      const stageNumber=(stageNumbers.get(day.project)||0)+1;
+      stageNumbers.set(day.project,stageNumber);
+      return {...day,stageNumber,mode:'service',source:'service',featureId:feature.id,progressId:`service:${day.id}`,attachedTo:entry.module,overlap:(entry.overlap||[]).map(item=>({...item,beginnerModule:item.beginnerModule||entry.module}))};
+    });
+  };
   const beginnerModules=beginnerCourse.modules.map(module=>{
     const extensions=plan.entries.filter(entry=>entry.type==='extend'&&entry.module===module.id).map(entry=>({...byId.get(entry.feature),merge:entry}));
     return {...module,source:'beginner',days:[...module.days.map(day=>({...day,progressId:day.day})),...extensions.flatMap(feature=>serviceDays(feature,feature.merge))],

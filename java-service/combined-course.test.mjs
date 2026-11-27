@@ -24,8 +24,20 @@ test('두 과정의 기능 순서, 출처, 고유 회차 식별자를 합친다'
   const board=combined.modules[0],firstExtension=board.days.find(day=>day.source==='service');
   assert.ok(board.days.indexOf(firstExtension)>7);
   assert.match(route(board,firstExtension),new RegExp(`^#feature=${firstExtension.featureId}&project=${firstExtension.project}&stage=`));
-  assert.match(moduleMarkup(board,board.days[0],'task',[]),/🐝 DAY S\d{2}/);
+  assert.match(moduleMarkup(board,board.days.find(day=>day.source==='service'),'task',[]),/feature=.+&project=.+&stage=/);
+  const firstServiceModule=combined.modules.find(module=>module.source==='service');
+  assert.match(moduleMarkup(firstServiceModule,firstServiceModule.days[0],'task',[]),/🐝 1단계/);
+  const extensionStages=board.days.filter(day=>day.source==='service');
+  for(const featureId of new Set(extensionStages.map(day=>day.featureId))){
+    const featureStages=extensionStages.filter(day=>day.featureId===featureId);
+    assert.deepEqual(featureStages.map(day=>day.stageNumber),featureStages.map((_,index)=>index+1));
+  }
+  assert.ok(extensionStages.every(day=>day.progressId===`service:${day.id}`));
   assert.equal(combined.modules[12].days[0].progressId,`service:${combined.modules[12].days[0].id}`);
+  const app=readFileSync(new URL('./app.js',import.meta.url),'utf8');
+  assert.match(app,/d\.project===params\.get\('project'\)&&d\.sourceStageId===params\.get\('stage'\)\)\|\|m\.days\.find\(d=>d\.day===Number\(params\.get\('d'\)\)\)/);
+  assert.match(route(firstServiceModule,firstServiceModule.days[0]),/#feature=.+&project=.+&stage=.+&d=\d+&t=task$/);
+  assert.equal(readFileSync(new URL('./progress.mjs',import.meta.url),'utf8').includes('javaexperience.service.progress.v1'),true);
   assert.throws(()=>validateMergePlan({...mergePlan,entries:mergePlan.entries.slice(1)},course,loadServiceCourse()),/94개/);
 });
 
