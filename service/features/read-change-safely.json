@@ -34,15 +34,15 @@
           ],
           "brief": {
             "purpose": "코드 진입점부터 Security filter, Controller, Service, Repository까지 실제 요청 경로와 현재 동작을 확인합니다.",
-            "task": "board 서버 구조·설정·프로파일을 읽어 요청 흐름 지도를 만들고 characterization test로 글·회원 응답의 현재 필드를 고정하세요. 보안 문제는 수정 전 재현 증거를 구분합니다.",
+            "task": "D11에서 인수한 messy-server 사본의 실제 요청 흐름·설정 출처·현재 결함 증거를 확인합니다. board-server는 비교 자료이며 작업 대상이 아닙니다.",
             "preconditions": [
-              "D11-1/D11-2 원문이 정한 읽기 순서와 재현 스크립트를 따른다. board-server 실제 package, SecurityFilterChain, controllers/services/repositories, application profile을 확인한다.",
+              "작업 대상은 D11에서 인수한 messy-server 사본입니다. 현재 사본의 Application/SecurityFilterChain/Controller와 실행 프로파일을 확인하고 실제 경로를 기록하세요. board-server는 구현 비교 자료이며 그곳에 B08/B11/B14가 그대로 있다고 가정하지 않습니다.",
               "현재 user implementation의 characterization test는 수정 전에 실행한다. 민감한 actuator response 값과 실제 비밀번호는 캡처하지 않는다."
             ],
             "scenario": [
               {
-                "start": "수정 전 board user server다. USER 회원 GET /api/members/me의 현재 필드를 먼저 저장하고 prod profile에서 인증 없이 /actuator/env가 노출되는지 확인할 준비를 한다.",
-                "action": "Application entry→SecurityFilterChain→Controller→Service→Repository 순으로 요청 지도와 읽은 순서를 그린다. PostServiceCharacterizationTest/MemberApiCharacterizationTest를 실행하고 B14 repro 및 B11 repro 출력을 확인한다.",
+                "start": "수정 전 D11에서 인수한 messy-server 사본이다. USER 회원 GET /api/members/me의 현재 필드를 기록하고 prod profile에서 인증 없이 /actuator/env가 노출되는지 확인할 준비를 한다.",
+                "action": "messy-server 사본의 Application entry→SecurityFilterChain→Controller→Service→Repository 순으로 실제 요청 지도를 그립니다. 특성화 테스트와 B11/B14 재현을 사본의 ticket·실행 절차에 맞춰 수행합니다.",
                 "result": "지도는 로그인/글 API 요청 흐름을 한 장으로 보여 준다. 현행 characterization은 글 create/update/delete 알림 호출을 고정하고 내 정보 응답의 passwordHash 노출을 B08 증거로 기록한다. B14 재현은 prod 무인증 GET /actuator/env → 200, B11은 propertySources에서 설정값 제공 출처를 찾는다.",
                 "after": "아직 코드는 고치지 않는다. `passwordHash` 노출, actuator 공개, expiresIn 설정 출처의 현재 상태와 테스트 기대값을 수정 전 기준으로 보존하고 secret 값은 마스킹한다."
               }
@@ -76,7 +76,7 @@
               "원문 완료 기준: `MemberApiCharacterizationTest` 통과: 지금의 `GET /api/members/me` 응답 필드를 그대로 고정 (`passwordHash`가 보이는 것이 B08의 증거)"
             ],
             "inputs": [
-              "지도 대상은 board-server의 실제 Application, SecurityFilterChain, member/post controller-service-repository다.",
+              "지도 대상은 D11에서 인수한 messy-server 사본의 실제 Application, SecurityFilterChain, member/post controller-service-repository다. board-server는 비교 자료다.",
               "`PostServiceCharacterizationTest`, `MemberApiCharacterizationTest`; prod 재현 `bash tickets/B14/repro.sh`, 설정 추적 `bash tickets/B11/repro.sh`.",
               "현재 상태로 prod `GET /actuator/env`(token 없음) → 200이 B14 문제 재현이다. 이 관찰은 수정 전 기준이며 완료 기대값은 아니다."
             ],
@@ -100,19 +100,19 @@
             "examples": [
               {
                 "title": "B08 수정 전 응답 고정",
-                "start": "현재 board member endpoint 응답의 field set을 아직 테스트하지 않았다.",
+                "start": "messy-server 사본의 member endpoint 응답 field set을 아직 테스트하지 않았다.",
                 "action": "MemberApiCharacterizationTest와 GET /api/members/me를 관찰한다.",
                 "result": "현재 passwordHash 포함 여부를 기록하고 이를 B08 문제 재현 기준으로 남긴다. 아직 수정 결과로 오인하지 않는다."
               },
               {
                 "title": "prod 설정 출처 확인",
-                "start": "prod profile에서 actuator env를 token 없이 조회할 수 있는 문제 상태다.",
+                "start": "messy-server 사본의 prod profile에서 actuator env 공개 여부를 아직 확인하지 않았다.",
                 "action": "B14와 B11 repro script를 실행하고 propertySources 이름·우선순위를 본다.",
                 "result": "B14 200 재현 및 B11에서 expiresIn 등 값의 출처를 특정하되 비밀 value는 마스킹한다."
               }
             ],
             "work": [
-              "실제 source tree를 따라 계층별 entry point를 그리고 파일/호출 관계를 적는다.",
+              "messy-server 사본의 실제 source tree를 따라 계층별 entry point를 그리고 파일/호출 관계를 적는다.",
               "characterization test가 무엇을 고정하는지와 현재 response JSON field를 보존한다.",
               "B11/B14 문제의 재현·원인 후보·property source를 수정 전 증거로만 기록한다."
             ],
@@ -207,7 +207,7 @@
             ],
             "policies": [
               "B08·B11은 D11-3 연습이고 B14는 선택 수행입니다. 세 티켓을 모두 mandatory로 승격하지 않습니다.",
-              "수정 뒤 내 정보 응답에 passwordHash가 없어야 하며 prod의 /actuator/env는 인증 없이 401이어야 합니다.",
+              "B08을 수행하면 내 정보에서passwordHash가없어야 합니다. B14를선택한 경우에만 prod 무인증 /actuator/env401·USER403·ADMIN200과비밀값비노출을검증합니다. B11은로그인 expiresIn1800과 설정출처를확인합니다. B14미선택은미수행으로기록합니다.",
               "prod 로그인 expiresIn은 1800이며 재현 출력에서 값을 제공한 property source를 확인합니다.",
               "ticket 원문에 없는 비밀값·운영정보는 결과물에 복사하지 않습니다.",
               "원문 완료 기준: 리뷰 메모 필수 / B08·B11 연습 / B14 선택 시 수행",
@@ -293,10 +293,16 @@
               "record": "수정 전후 JSON 필드와 characterization test 결과를 기록한다."
             },
             {
-              "title": "프로파일 설정 출처",
-              "command": "bash tickets/B14/repro.sh && bash tickets/B11/repro.sh",
-              "expected": "B14 선택 수행 시 prod 무인증 /actuator/env는 401, B11 연습 수정 후 expiresIn은 1800이고 출처가 출력된다.",
-              "record": "실행한 티켓과 원문 요구별 결과를 구분해 기록한다."
+              "title": "B11 연습 수정 뒤 설정 출처 확인",
+              "command": "bash tickets/B11/repro.sh",
+              "expected": "로그인 expiresIn=1800과 그 값을 제공하는 property source를 확인합니다.",
+              "record": "실행 환경·expiresIn·설정 출처 metadata를 기록하고 비밀값은 복사하지 않습니다."
+            },
+            {
+              "title": "B14 선택 수정 결과 확인",
+              "command": "B14를 선택한 경우에만 실행: bash tickets/B14/repro.sh",
+              "expected": "선택 수행 시 prod 무인증 /actuator/env는 401입니다. 선택하지 않았다면 미수행으로 기록합니다.",
+              "record": "B14 선택 여부와 실행 결과를 B11 필수 연습 결과와 분리해 기록합니다."
             }
           ],
           "choices": [],

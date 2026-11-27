@@ -95,9 +95,11 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
   }
   const knowledgeCategories=[...new Set([...doc.querySelectorAll('button[data-kc-category]')].map(button=>button.dataset.kcCategory))];
   const servicePanels=[...doc.querySelectorAll('[data-sf-stage-panel]')].map(e=>({id:e.id,variant:e.dataset.sfVariant,stage:e.dataset.sfStage}));
+  // 단계별 힌트 보조 영역도 첫 페인트에서 선택 단계와 같이 보여야 스크립트가 나중에 펼치며 아래 내용을 밀지 않는다.
+  const serviceAsides=[...doc.querySelectorAll('[data-sf-aside-stage]')].map(e=>({variant:e.dataset.sfVariant,stage:e.dataset.sfStage}));
   const dayPanels=[...doc.querySelectorAll('.day-stepper-main > [data-day-panel]')].map(e=>({id:e.id,display:e.matches('.day-stage-wrap')?'grid':'block',initial:!e.hidden}));
   const prepare=doc.createElement('script');
-  prepare.textContent=`(${prepareFirstPaint.toString()})(${JSON.stringify({panelMap,dayPanels,servicePanels,knowledgeCategories})});`;
+  prepare.textContent=`(${prepareFirstPaint.toString()})(${JSON.stringify({panelMap,dayPanels,servicePanels,serviceAsides,knowledgeCategories})});`;
   // 서비스 전용 보기는 다른 영역의 초기 렌더링 코드와 분리한다.
   if(doc.querySelector('[data-sf-catalog]')) prepare.textContent += `;(${prepareServiceCatalogFirstPaint.toString()})();`;
   if (doc.querySelector('.kc-catalog')) prepare.textContent += `;(${prepareConceptPanel.toString()})(${JSON.stringify(panelMap)});`;
@@ -111,9 +113,39 @@ export function renderInitialPage(html, sourcePath = 'README.md') {
 }
 
 // head에서 실행된다. 런타임이 같은 선택을 인계받은 뒤 임시 CSS만 제거한다.
-function prepareFirstPaint({panelMap,dayPanels,servicePanels,knowledgeCategories}) {
+function prepareFirstPaint({panelMap,dayPanels,servicePanels,serviceAsides=[],knowledgeCategories}) {
   const root=document.documentElement;
   root.classList.add('js');
+  document.addEventListener('click',event=>{
+    const apiButton=event.target?.closest?.('[data-sf-api-collapse]');
+    if(apiButton){
+      const catalog=apiButton.closest('[data-sf-catalog]');
+      for(const group of catalog?.querySelectorAll('[data-sf-api-group]')||[]){
+        if(group===apiButton.closest('[data-sf-api-group]'))continue;
+        const rows=group.querySelector('[data-sf-api-rows]'),button=group.querySelector('[data-sf-api-collapse]');
+        if(rows&&button){rows.hidden=true;button.setAttribute('aria-expanded','false');const icon=button.querySelector('[aria-hidden="true"]');if(icon)icon.textContent='›';}
+      }
+    }
+    const link=event.target?.closest?.('a[href]');if(!link)return;
+    let target;try{target=new URL(link.href,location.href)}catch{return}
+    if(!/\/(?:docs\/knowledge|lessons)\//.test(target.pathname))return;
+    const current=new URL(location.href);
+    const carried=current.searchParams.get('return');
+    const eligible=/\/(?:course\/(?:spring\/D\d{2}|java\/J\d{2})|scenario\/features\/[^/]+)\.html$/.test(current.pathname);
+    const destination=carried|| (eligible?current.pathname+current.search+current.hash:'');
+    if(destination)target.searchParams.set('return',destination);
+    link.href=target.href;
+  },true);
+  const returnValue=new URLSearchParams(location.search).get('return');
+  if(returnValue && /^(?:\/(?:course\/(?:spring\/D\d{2}|java\/J\d{2})|scenario\/features\/[^/]+)\.html)(?:[?#].*)?$/.test(returnValue)){
+    const addReturn=()=>{
+      if(!document.querySelector('main.site-main .site-concept-frame'))return;
+      if(document.querySelector('.concept-return-link'))return;
+      const heading=document.querySelector('main.site-main .site-frame-content h1');if(!heading)return;
+      const link=document.createElement('a');link.className='concept-return-link';link.href=returnValue;link.textContent='이전 작업 화면으로 돌아가기';heading.before(link);
+    };
+    document.addEventListener('DOMContentLoaded',addReturn,{once:true});
+  }
   let format='yml';try {if(localStorage.getItem('javaexperience.course.config-format.v1')==='properties')format='properties';}catch{}
   root.dataset.configFormat=format;
   let id='';try{id=decodeURIComponent(location.hash.slice(1));}catch{}
@@ -143,7 +175,11 @@ function prepareFirstPaint({panelMap,dayPanels,servicePanels,knowledgeCategories
     const params=new URLSearchParams(location.search);
     const selected=servicePanels.find(p=>p.id===id)||servicePanels.find(p=>p.variant===params.get('variant')&&p.stage===params.get('stage'))||servicePanels[0];
     style.textContent+=servicePanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===selected.id?'block':'none'}!important}`).join('');
-    style.textContent+=`html.js body main [data-sf-aside-stage]{display:none!important}html.js body main [data-sf-aside-stage][data-sf-variant="${CSS.escape(selected.variant)}"][data-sf-stage="${CSS.escape(selected.stage)}"]{display:block!important}`;
+    style.textContent+=serviceAsides.map(a=>`html.js body main [data-sf-aside-stage][data-sf-variant="${CSS.escape(a.variant||'')}"][data-sf-stage="${CSS.escape(a.stage||'')}"]{display:${a.variant===selected.variant&&a.stage===selected.stage?'block':'none'}!important}`).join('');
+    // 단계 주소로 바로 열면 단계 타일 선택 표시도 첫 페인트부터 맞춘다(스크립트가 나중에 옮기며 점프하지 않게).
+    const markStage=()=>{for(const link of document.querySelectorAll('[data-sf-stage-link]'))link.setAttribute('aria-current',link.dataset.sfVariant===selected.variant&&link.dataset.sfStage===selected.stage?'step':'false');};
+    const stageObserver=new MutationObserver(markStage);stageObserver.observe(document,{childList:true,subtree:true});
+    document.addEventListener('DOMContentLoaded',()=>{markStage();stageObserver.disconnect();},{once:true});
   }
   if(dayPanels.length)style.textContent+=dayPanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===active?p.display:'none'}!important}`).join('');
   // 설정 형식은 CSS가 첫 페인트부터, controller가 DOM·키보드 상태를 이어받는다.

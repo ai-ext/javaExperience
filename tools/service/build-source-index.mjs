@@ -78,9 +78,12 @@ function courseUnits() {
     const rel = `course/days/${file}`;
     const day = readJson(rel);
     const dayId = day.id;
+    const dayTitle = day.roadmap?.title || day.java?.topic || dayId;
+    const searchAliases = unique([dayId, dayTitle, ...dayTitle.split(/[\s·,:/]+/).filter((term) => term.length > 1)]);
     if (dayId === 'D00') {
       units.push({
         id: 'course:D00', kind: 'course', title: day.java?.topic || 'Java 워밍업',
+        dayId, dayTitle, searchAliases,
         href: 'course/spring/D00.html#오늘-할-것', project: 'board', required: true,
         requirements: day.java?.basics ? [day.java.basics] : [], hints: day.hints || [],
         apiRefs: [], sourceRefs: [{ path: rel, pointer: '/java' }, ...existingSourceRefs(['course/java/J00.md'])],
@@ -102,6 +105,7 @@ function courseUnits() {
       ];
       units.push({
         id: `course:${sourceId}`, kind: 'course', title: step.title,
+        dayId, dayTitle, searchAliases,
         href: `course/spring/${dayId}.html#step-${sourceId.toLowerCase()}`, project: 'board', required: true,
         requirements: unique([step.requirement, ...(step.done || [])]), hints: hintSet,
         apiRefs: apiChecks([...(step.done || []), ...(step.specRefs || [])].join('\n')),
@@ -142,7 +146,7 @@ function scenarioUnits() {
     const hints = sectionListItems(body, /^힌트/);
     units.push({
       id: `legacy:${level.id}`, kind: 'legacy-scenario', title,
-      href: sourcePath.replace(/\.md$/, '.html'), project: String(level.id).startsWith('10-') ? 'project-v1' : 'community', required: true,
+      href: sourcePath.replace(/\.md$/, '.html'), project: String(level.id).startsWith('10-') ? 'project-v1' : 'community', required: !/\*\*선택 단계/.test(body.slice(0, 500)),
       requirements: requirementItems, hints, apiRefs: [...structuredApiRefs(body), ...apiChecks(body)],
       sourceRefs: [{ path: sourcePath }, ...existingSourceRefs(linksIn(body))],
     });

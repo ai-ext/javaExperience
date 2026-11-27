@@ -1,0 +1,67 @@
+{
+  "id": "post-drafts",
+  "title": "글을 임시저장했다가 발행하기",
+  "result": "초안은 작성자에게만 보이고 발행 시각부터 공개 목록에 참여해야 한다.",
+  "brief": {
+    "purpose": "초안은 작성자에게만 보이고 발행 시각부터 공개 목록에 참여해야 한다.",
+    "story": "로그인한 김자바가 아직 공개할 수 없는 글을 임시저장합니다. DRAFT로 등록한 글을 내 초안에서 확인한 뒤 같은 글을 발행합니다. 초안은 작성자만 읽고, 발행 뒤 공개 범위에 맞는 사용자에게 보입니다.",
+    "scope": "작성 요청에서 status를 받아 DRAFT/PUBLISHED 전이를 구현하고 내 초안 목록과 발행 동작을 연결한다.",
+    "excluded": "원본 기획서에 별도 제외 범위가 명시되어 있지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "임시 저장 글 관리",
+      "columns": [
+        "게시판",
+        "제목",
+        "본문",
+        "저장 상태"
+      ],
+      "actions": "글을 임시 저장하고 내 임시 저장 목록에서 확인합니다."
+    },
+    {
+      "name": "임시 저장 글 발행",
+      "columns": [
+        "게시글 번호",
+        "작성자",
+        "발행 상태"
+      ],
+      "actions": "작성자는 임시 저장 글을 발행하고, 다른 사람의 글은 발행할 수 없는지 확인합니다."
+    }
+  ],
+  "policies": [
+    "DRAFT 상세는 작성자만 200, 다른 사람은 404; 발행은 404→403→409 순서로 대상·작성자·상태를 검사한다. 이미 발행된 글의 published_at은 덮어쓰지 않는다.",
+    "status 생략 또는 null은 기존 생성 계약의 기본 상태를 적용합니다. DRAFT의 published_at은 null이며 발행 성공 시 설정됩니다. 이미 발행된 글을 다시 발행하면 409이고 기존 published_at은 유지됩니다.",
+    "status 생략 또는 null은 PUBLISHED이고 빈 문자열은 400입니다. DRAFT 상세는 작성자 200·다른 회원 404이며 공개 목록에서는 빠집니다. 발행 성공은 status·published_at·목록 노출을 확인하고 내 초안 목록은 원문 cursor 정책을 따릅니다.",
+    "GET /api/me/drafts 입력이 원문 실패 check 조건에 해당 → HTTP 401 — 원문 check의 실패 응답 → 해당 post.status/published_at과 post/tag 연결을 요청 직전 그대로 보존한다."
+  ],
+  "acceptance": [
+    "초안은 작성자만 읽고, 발행 뒤 공개 범위에 맞는 사용자에게 보입니다.",
+    "발행 시각은 처음 발행할 때만 정해집니다. 다시 발행하면 409이며 기존 발행 시각은 유지됩니다.",
+    "GET /api/me/drafts 입력이 원문 실패 check 조건에 해당 → HTTP 401 — 원문 check의 실패 응답 해당 post.status/published_at과 post/tag 연결을 요청 직전 그대로 보존한다.",
+    "POST /api/posts/{{P0.body.id}}/publish · [교육용 fixture · legacy:11-1:P6] P6 또 발행 → HTTP 409 (P6) post.status/published_at과 post/tag 연결은 실패 전 그대로다.",
+    "POST 응답과 상세에 status·publishedAt; 발행 후 게시판 목록 최신순은 발행 시각 기준."
+  ],
+  "days": {
+    "community:publish": {
+      "title": "초안과 공개 상태 구분해 전환하기",
+      "goal": "작성 요청에서 status를 받아 DRAFT/PUBLISHED 전이를 구현하고 내 초안 목록과 발행 동작을 연결한다.",
+      "concept": "post.status, published_at · post.author_id",
+      "ticket": {
+        "id": "WORK-143",
+        "from": "회원 · 초안 발행",
+        "situation": "초안은 작성자에게만 보이고 발행 뒤 공개 범위에 따라 보여야 합니다.",
+        "request": "초안 저장과 발행을 연결하고 내 초안 목록을 제공해 주세요.",
+        "constraints": [
+          "상태를 생략하면 기존 생성 규칙을 따른다.",
+          "발행 시각은 처음 발행할 때만 정한다."
+        ],
+        "acceptance": [
+          "초안은 작성자에게만 보이고 발행 글은 공개 대상에게 보인다.",
+          "다시 발행하면 409이고 기존 발행 시각이 유지된다."
+        ],
+        "basis": "scenario/ch11-post-advanced/11-1-draft-publish.md"
+      }
+    }
+  }
+}

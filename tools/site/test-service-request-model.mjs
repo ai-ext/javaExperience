@@ -13,6 +13,9 @@ test('요청 빌더가 편집된 path/query/header/body와 토큰을 요청에�
   const malformed = buildServiceRequest(recipe, {base:'http://localhost:8080',path:'/api/posts',bodyText:'{invalid json'});
   assert.equal(malformed.init.body,'{invalid json');
   assert.throws(() => buildServiceRequest({...recipe,path:'/api/posts/{postId}'},{base:'http://localhost:8080',pathParams:{postId:'042'}}), /양의 정수 ID/);
+  const charge=buildServiceRequest({...recipe,path:'/api/charges/{orderId}'},{base:'http://localhost:8080',pathParams:{orderId:'CHG-94f346ef-84c5-413f-b7d7-57ddc1f558a9'}});
+  assert.equal(charge.url,'http://localhost:8080/api/charges/CHG-94f346ef-84c5-413f-b7d7-57ddc1f558a9');
+  assert.throws(() => buildServiceRequest({...recipe,path:'/api/charges/{orderId}'},{base:'http://localhost:8080',pathParams:{orderId:'bad/id'}}), /안전한 자원 ID/);
 });
 
 test('multipart는 브라우저가 boundary를 넣도록 Content-Type을 설정하지 않는다', () => {
@@ -83,4 +86,11 @@ test('실제 board 생성 recipe의 빈 본문과 Location ID를 함께 확인�
   const actual=inspectServiceResponse(recipe,{status:201,body:'',headers:{location:'/api/posts/42'},requestUrl:'http://localhost:8080/api/posts'});
   assert.equal(actual.bodyMatches,true);
   assert.equal(actual.resourceId,'42');
+});
+
+test('JSON 응답에서 숫자형·문자열형 생성 ID를 모두 보존한다', () => {
+  const recipe={expected:{statuses:[201],bodyMode:'json',fields:['orderId']},capture:{key:'orderId',jsonPath:'orderId'}};
+  const actual=inspectServiceResponse(recipe,{status:201,body:'{"orderId":"CHG-94f346ef-84c5-413f-b7d7-57ddc1f558a9"}'});
+  assert.equal(actual.bodyMatches,true);
+  assert.equal(actual.resourceId,'CHG-94f346ef-84c5-413f-b7d7-57ddc1f558a9');
 });

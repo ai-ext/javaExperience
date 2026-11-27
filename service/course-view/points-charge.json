@@ -1,0 +1,86 @@
+{
+  "id": "points-charge",
+  "title": "결제 결과에 맞게 포인트 충전하기",
+  "result": "충전이 지연되거나 거절되어도 잔액을 지키고 같은 충전이 중복 승인되지 않게 합니다.",
+  "brief": {
+    "purpose": "충전이 지연되거나 거절되어도 잔액을 지키고 같은 충전이 중복 승인되지 않게 합니다.",
+    "story": "팀원 김민수는 잔액 2,000점에서 1,000점을 충전하고, 운영 담당자 이지은은 잔액이 3,000점으로 바뀌는지 확인합니다. 두 사람은 결제 업체의 응답 지연이나 거절, 연결 문제 때 잔액이 잘못 늘지 않고 같은 충전이 두 번 승인되지 않는지도 살펴봅니다.",
+    "scope": "충전 요청 접수, PG callback, 포인트 반영을 차례로 확인하고 접수 응답과 지급 완료를 구분합니다.",
+    "excluded": "원본 기획서에 별도 제외 범위가 명시되어 있지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "포인트 충전",
+      "columns": [
+        "중복 요청 키(Idempotency-Key)",
+        "충전 금액(amount)",
+        "주문 번호(orderId)",
+        "처리 상태(status)",
+        "잔액(balance)"
+      ],
+      "actions": "포인트 충전을 요청하고 PG 지연·거절·연결 실패에 따른 처리 상태와 잔액을 확인합니다. 같은 요청을 반복해도 중복 충전되지 않는지 확인합니다."
+    },
+    {
+      "name": "포인트 잔액",
+      "columns": [
+        "로그인 정보(Authorization)",
+        "잔액(balance)"
+      ],
+      "actions": "로그인한 회원의 포인트 잔액을 열고 충전 또는 사용 결과가 반영되었는지 확인합니다."
+    },
+    {
+      "name": "결제 완료 알림 처리",
+      "columns": [
+        "요청 형식(Content-Type)",
+        "서명(X-PG-Signature)",
+        "주문 번호(orderId)",
+        "결제 키(paymentKey)",
+        "처리 상태(status)",
+        "충전 금액(amount)"
+      ],
+      "actions": "PG 결제 완료 알림을 전달하고 서명과 주문 정보에 따라 충전이 한 번만 처리되는지 확인합니다."
+    }
+  ],
+  "policies": [
+    "충전 amount는 1,000~1,000,000의 1,000 단위입니다. Idempotency-Key는 8~64자의 영문·숫자·하이픈입니다.",
+    "PG 호출을 트랜잭션 밖에 둡니다. 요청 기록 → 외부 호출 → 결과 상태·포인트 반영을 구분해 설명합니다.",
+    "연결 실패와 5xx만 같은 키로 최대 2회 재시도하며 backoff는 200ms·400ms입니다. 4xx는 재시도하지 않습니다. 응답 timeout은 승인됐을 수 있어 UNKNOWN으로 남기고 재시도하지 않습니다.",
+    "거절은 502 /errors/pg-declined, timeout 또는 5xx 재시도 소진은 504 /errors/pg-timeout이며 잔액은 UNKNOWN 상태에서 늘지 않습니다. B10은 D13의 선택 연습 티켓입니다. 수행 여부를 필수 과제로 승격하지 않고 원문 등급을 유지합니다.",
+    "원문 완료 기준: `PgClientTest` 통과: WireMock 4초 지연 → 3초에 응답 타임아웃 예외, 닫힌 포트 → 즉시 연결 실패(연결 거부), 응답 없는 주소 → 1초에 연결 타임아웃 예외, 풀 대기 2초 초과 → 예외",
+    "원문 완료 기준: `PgPaymentRepositoryTest` 통과: 같은 충전 멱등 키의 중복 저장을 거부하고 서버가 만든 orderId가 재조회된다"
+  ],
+  "acceptance": [
+    "PgClientTest의 response 3초, connection 1초, pool wait 2초 조건을 각각 확인했다.",
+    "key/orderId 중복 저장 방지와 1,000 단위 amount 검증, 정상 201/202, 502 FAILED, 504 UNKNOWN 결과를 기록했다.",
+    "timeout 뒤 잔액 불변·같은 key PG 재호출 없음·GET balance 및 orderId 상태 대사를 끝냈다. B10은 D13의 선택 연습으로 남겼다.",
+    "POST /api/me/points/charges + amount 1,000: HTTP 201 뒤 pg_payment.status=DONE, balance 2,000→3,000 및 CHARGE 이력 +1,000 한 건을 각각 조회한다.",
+    "amount=1,500 → 400 validation. PG 4xx/연결 불가 → 502 `/errors/pg-declined`; PG 5xx 재시도 소진 또는 응답 timeout → 504 `/errors/pg-timeout`, 결과 불명은 UNKNOWN으로 기록한다."
+  ],
+  "days": {
+    "board:charge": {
+      "title": "느린 결제에도 중복 없이 충전 접수하기",
+      "goal": "충전 요청 접수, PG callback, 포인트 반영을 차례로 확인하고 접수 응답과 지급 완료를 구분합니다.",
+      "concept": "charge request와 Idempotency-Key · 서버 생성 orderId와 pg_payment.status",
+      "ticket": {
+        "id": "WORK-137",
+        "from": "결제 담당자 · 충전 처리",
+        "situation": "결제가 느리거나 응답이 불분명해도 포인트가 중복 충전되면 안 됩니다.",
+        "request": "충전 접수와 결제 결과를 구분하고 잔액을 안전하게 반영해 주세요.",
+        "constraints": [
+          "충전 금액은 1,000원 단위로 받는다.",
+          "결제사 호출은 데이터베이스 트랜잭션 밖에서 한다."
+        ],
+        "acceptance": [
+          "같은 요청 키로 결제를 다시 보내도 중복 충전되지 않는다.",
+          "시간 초과 뒤 잔액과 결제 상태가 확인 가능하다."
+        ],
+        "basis": "course/days/D08.json"
+      }
+    },
+    "board:callback": {
+      "title": "서명된 결제 알림으로 결과 확정하기",
+      "goal": "서명된 callback으로 충전 결과를 확정하고 pg_payment·잔액·CHARGE ledger를 각각 대조합니다.",
+      "concept": "raw callback body bytes · X-PG-Signature와 secret key"
+    }
+  }
+}

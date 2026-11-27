@@ -48,7 +48,7 @@
             ],
             "data": [
               {
-                "name": "report(post_id, reporter_member_id)",
+                "name": "report(post_id, reporter_id)",
                 "reason": "신고 대상과 신고자를 외래키로 묶고 동일 조합 중복을 제약한다."
               },
               {
@@ -76,7 +76,7 @@
               "원문 완료 기준: `POST /api/admin/posts/{postId}/hide` → 200, 이후 `GET /api/posts/{postId}` → 404, 연결한 신고는 `RESOLVED`, 인기글에서도 바로 빠진다"
             ],
             "inputs": [
-              "USER A: POST /api/posts/101/reports JSON은 recipe의 reason sample을 사용하고 유효 token을 포함한다. 기대 첫 201; 같은 회원/글 중복 409.",
+              "ACTIVE 글의 실제 id를 P로 기록하고 USER A가 {reason:\"SPAM\",detail:\"반복 광고\"}로 신고합니다.201의reportId를R-A로기록합니다. 같은A/P재신고 409,다른USER B신고201이며ADMIN목록에서R-A/R-B를확인합니다. reason은SPAM/ABUSE/ETC,detail은선택·최대300자입니다.",
               "USER B는 같은 post에 신고해도 별도 reporter라면 201이다.",
               "GET /api/admin/reports: ADMIN Bearer → 200 `{items,nextCursor}`; USER Bearer → 403 `/errors/forbidden`; token 없음은 401."
             ],
@@ -260,7 +260,9 @@
             "board:post-detail:normal",
             "board:post-popular:normal",
             "board:admin-reports:normal",
-            "board:admin-hide:normal"
+            "board:admin-hide:normal",
+            "board:admin-audit-logs:normal",
+            "board:post-report:normal"
           ],
           "executionChecks": [
             {
@@ -274,6 +276,12 @@
               "command": "./gradlew test --tests \"*AdminFlowIntegrationTest\"",
               "expected": "Testcontainers MySQL에서 신고→숨김→감사 로그 흐름이 연결되는지 확인한다.",
               "record": "통합 테스트 결과와 트랜잭션/DB 관찰을 기록한다."
+            },
+            {
+              "title": "기획 조건 저장 결과 확인",
+              "command": "선택한 실행 환경에서 원문에 정한 확인 절차 실행",
+              "expected": "기획서의 전후 사례와 일치",
+              "record": "실제 id, HTTP 결과, 확인한 저장값을 기록"
             }
           ],
           "choices": [],

@@ -391,7 +391,7 @@ function mountOne(root, deps) {
     const key = root.dataset.srqResourceKey, id = get('resource-id').value.trim(), base = safeOrigin(get('base').value);
     if (!key || !base || !store) return;
     try {
-      if (/^[1-9][0-9]*$/.test(id)) store.setItem(storageKey(key, base), id);
+      if (/^(?:[1-9][0-9]*|[A-Za-z][A-Za-z0-9._:-]{0,127})$/.test(id)) store.setItem(storageKey(key, base), id);
       else store.removeItem(storageKey(key, base));
     } catch {}
   }
@@ -400,13 +400,29 @@ function mountOne(root, deps) {
   get('example')?.addEventListener('change', () => {
     const example = activeCases[Number(get('example').value)];
     if (!example) return;
+    if (example.expected?.statuses?.length) {
+      const isUnauthorizedCase = example.expected.statuses.includes(401);
+      const isSourceCase = Array.isArray(currentRecipe?.sourceCases) && currentRecipe.sourceCases.includes(example);
+      currentRecipe = {
+        ...currentRecipe,
+        expected:{...currentRecipe.expected, ...example.expected, ...(isSourceCase && !Array.isArray(example.expected.fields) ? {fields:[]} : {})},
+        requiresToken:example.requiresToken ?? (isUnauthorizedCase ? false : currentRecipe.requiresToken),
+        failures:[{...example.expected, when:example.condition ?? example.label ?? '선택한 실패 사례', result:example.expected.description ?? example.condition ?? example.label ?? ''}],
+      };
+      if (isUnauthorizedCase) get('token').value = '';
+      get('expected').textContent = expectedLabel(currentRecipe);
+    }
     if (example.body !== undefined) get('body').value = typeof example.body === 'string' ? example.body : JSON.stringify(example.body, null, 2);
     if (example.bodyKind) get('body-kind').value = example.bodyKind;
     if (example.query) get('query').value = JSON.stringify(example.query, null, 2);
     if (example.headers) get('headers').value = JSON.stringify(example.headers, null, 2);
     get('body').closest('.srq-body-field').hidden = get('body-kind').value === 'none'; get('file-row').hidden = get('body-kind').value !== 'multipart'; updateBodyLabel();
     revision++; editedAfterSend = pending || editedAfterSend; updateSendState();
-    get('status').textContent = 'Source 사례의 요청 입력을 적용했습니다. 전송은 직접 눌러야 합니다.';
+    const explanationOnly = Array.isArray(currentRecipe?.sourceCases) && currentRecipe.sourceCases.includes(example)
+      && !['body', 'bodyKind', 'query', 'headers'].some(key => Object.hasOwn(example, key));
+    get('status').textContent = explanationOnly
+      ? `실패 조건을 선택했습니다. ${example.expected?.statuses?.includes(401) ? 'Bearer 토큰은 비웠고, 나머지 ' : ''}요청 입력은 자동으로 바뀌지 않았습니다. ${example.condition ?? example.label ?? '선택한 조건'}을 만족하도록 입력을 직접 바꾸세요.`
+      : '사례의 요청 입력을 적용했습니다. 전송은 직접 눌러야 합니다.';
   });
   get('apply-binding')?.addEventListener('click', applyBinding);
   get('send')?.addEventListener('click', sendRequest);

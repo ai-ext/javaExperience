@@ -136,6 +136,41 @@ test('상태가 없는 legacy 요청은 원문을 보존하고 준비/수동 확
   assert.ok(unresolved.caseOnly);
 });
 
+test('D10 회원 가입 기대값은 원문 응답 상태와 채점 제외 관찰을 구분한다', () => {
+  const contracts = readJson('../../service/api-contracts.json');
+  for (const id of ['legacy:10-3:A', 'legacy:10-3:B1', 'legacy:10-3:B2']) {
+    const recipe=contracts.recipes.find((item) => item.id === id);
+    assert.deepEqual(recipe.expected.statuses,[201],id);
+    assert.deepEqual(recipe.expected.fields,['data.id'],id);
+    assert.deepEqual(recipe.capture,{key:'userId',jsonPath:'data.id'},id);
+  }
+  assert.deepEqual(contracts.recipes.find((item) => item.id === 'legacy:10-3:B')?.expected.statuses,[409]);
+  assert.deepEqual(contracts.recipes.find((item) => item.id === 'legacy:10-3:C')?.expected.statuses,[409]);
+  assert.deepEqual(contracts.recipes.find((item) => item.id === 'legacy:10-3:O1')?.expected.statuses,[]);
+});
+
+test('게시판 page 응답은 root 필드만 검사하고 선택 시나리오는 선택으로 색인한다', () => {
+  const contracts = readJson('../../service/api-contracts.json');
+  assert.deepEqual(contracts.recipes.find((recipe) => recipe.id === 'board:activity-ranking:normal').expected.fields, ['items', 'nextCursor']);
+  assert.deepEqual(contracts.recipes.find((recipe) => recipe.id === 'board:admin-audit-logs:normal').expected.fields, ['items', 'nextCursor']);
+  assert.deepEqual(contracts.recipes.find((recipe) => recipe.id === 'board:admin-bulk-coupon:normal').expected.fields, ['issued', 'skipped']);
+  assert.match(contracts.recipes.find((recipe) => recipe.id === 'board:activity-ranking:normal').manualCheck.join(' '), /배열 원소·중첩 DTO/);
+  const boardDelete=contracts.recipes.find((recipe) => recipe.id === 'board:post-delete:normal');
+  const projectV1Delete=contracts.recipes.find((recipe) => recipe.id === 'legacy:10-8:D');
+  assert.deepEqual(boardDelete.expected.statuses,[204]);
+  assert.equal(boardDelete.expected.bodyMode,'empty');
+  assert.deepEqual(projectV1Delete.expected.statuses,[200]);
+  assert.equal(projectV1Delete.expected.bodyMode,'any');
+  const { units } = readJson('../../service/generated-source-index.json');
+  const d30=units.find((unit) => unit.id === 'course:D30-1');
+  assert.equal(d30.dayId,'D30');
+  assert.equal(d30.dayTitle,'API 변경 협의와 하위 호환');
+  assert.ok(d30.searchAliases.includes('D30'));
+  assert.ok(d30.searchAliases.includes('API 변경 협의와 하위 호환'));
+  assert.equal(units.find((unit) => unit.id === 'legacy:10-12').required, false);
+  assert.equal(units.find((unit) => unit.id === 'legacy:10-11').required, true);
+});
+
 test('L15 auth recipe는 README에 적힌 네 route만 선언하고 cookie/token 값은 저장하지 않는다', () => {
   const data = readJson('../../service/authoring/session-recipes.json');
   assert.equal(data.source.sourceUnitId, 'support:scenario/labs/l15-session-auth/README.md');

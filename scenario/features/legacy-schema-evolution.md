@@ -3,4 +3,4 @@
 
 > 기획 원본 · 상세 기획 원본은 service/features/legacy-schema-evolution.json입니다.
 
-9-1 기준선, 9-3 excerpt backfill, 9-5 bookmark memo에서 note로 expand/contract를 연결해 기존 row를 보존한다.
+기존 데이터와 앱 동작을 유지하며 스키마를 단계적으로 바꿉니다.

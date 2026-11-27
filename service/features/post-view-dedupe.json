@@ -28,7 +28,7 @@
           ],
           "brief": {
             "purpose": "로그인 회원의 같은 날짜 재조회와 작성자 조회는 카운트를 늘리지 않는다.",
-            "task": "상세 읽기에서 post_view 기록이 새로 생성된 경우에만 원자적으로 view_count를 증가시킨다.",
+            "task": "같은 회원의 같은 날 재조회와 작성자 조회는 세지 않고, 비로그인 조회는 매번 세는지 확인합니다.",
             "preconditions": [
               "시나리오 DB(`community`). 이번 단계 마이그레이션은 `V21`이다.",
               "community V21, 서버 기준 시간대 Asia/Seoul. 상세 API/기존 응답 구조를 유지한다."
@@ -38,7 +38,7 @@
                 "start": "새 글의 조회수는 0입니다. 김자바·박디비·작성자와 비로그인 요청을 구분합니다.",
                 "action": "김자바가 같은 날 두 번, 박디비가 한 번, 비로그인이 두 번, 작성자가 한 번 읽습니다.",
                 "result": "조회수는 0→1→1→2→3→4→4이며 회원별 날짜는 Asia/Seoul을 사용합니다.",
-                "after": "같은 회원/글/날짜의 기록은 한 행만 남고, 작성자 조회는 증가시키지 않습니다. 다음 날짜의 판정은 고정 Clock으로 별도 확인합니다."
+                "after": "비가시 글은 404이며 post_view 행 수와 view_count는 그대로입니다. 다음 날짜·동시성은 현재 recipe에 없는 별도 실행 확인입니다."
               }
             ],
             "data": [
@@ -52,9 +52,9 @@
               }
             ],
             "policies": [
-              "복합 PK(post_id, member_id, viewed_on)에서 같은 회원·글·날짜는 한 행만 남긴다. Asia/Seoul 날짜를 기준으로 한다.",
-              "W1 김자바 첫 조회는 viewCount=1, W2 같은 회원 재조회도 1, W3 박디비 조회는 2다. W4·W5 비로그인 조회는 각각 3·4로 증가하고, W6 작성자 조회는 4를 유지한다.",
-              "상세 응답 viewCount는 이번 조회 반영값; 목록은 DB view_count 그대로. 새 post_view 행이 만들어졌을 때만 UPDATE post SET view_count=view_count+1 한다."
+              "같은 회원·글·Asia/Seoul 날짜의 로그인 조회는 기록을 한 행만 남기고 최초 요청만 view_count를 올립니다. 비로그인 조회는 post_view를 만들지 않고 매회 view_count를 1씩 올립니다. 작성자 조회는 증가·기록하지 않습니다.",
+              "볼 수 없는 글 상세는 HTTP 404이며 post_view 행과 view_count는 요청 전 값 그대로입니다. 상세 응답은 현재 조회 반영 뒤 값이고 목록은 저장된 view_count를 반환합니다.",
+              "W0~W7 후 post_view 행 수와 post.view_count를 원문 11-3 확인 SQL로 대조합니다. 비가시 글 404 규칙은 같은 응답 전후 값을 비교하고, 다음 날짜·동시 요청 검증은 현재 recipe에 없는 실행 항목으로 분리합니다."
             ],
             "inputs": [
               "legacy:11-3:W0: POST /api/posts; body={\"boardSlug\":\"free\",\"title\":\"[채점] 조회수 확인\",\"content\":\"x\"}; case=W0 이스프링의 새 글; source expected/status checks=[{\"id\":\"C1\",\"pointer\":\"/checks/0\",\"request\":\"W0\",\"expect\":{\"status\":201}}]",
@@ -72,9 +72,9 @@
             ],
             "failures": [
               {
-                "when": "상세 요청에서 대상 게시글을 확인할 수 없는 경우",
-                "result": "11-3 원문 check에 없는 글 없음/차단 사례는 HTTP 상태 미확인으로 유지한다.",
-                "unchanged": "상태 미확인; 신규 post_view 행/view_count 증가 여부는 추가 source check가 필요하다."
+                "when": "조회자가 접근할 수 없는 글을 상세 조회",
+                "result": "HTTP 404 (원문 11-3 규칙)",
+                "unchanged": "post_view 행 수와 post.view_count는 요청 전 값 그대로다."
               }
             ],
             "examples": [
@@ -82,7 +82,7 @@
                 "title": "교육용 데이터로 전후 확인",
                 "start": "새 글의 조회수는 0입니다. 김자바·박디비·작성자와 비로그인 요청을 구분합니다.",
                 "action": "김자바가 같은 날 두 번, 박디비가 한 번, 비로그인이 두 번, 작성자가 한 번 읽습니다.",
-                "result": "같은 회원/글/날짜의 기록은 한 행만 남고, 작성자 조회는 증가시키지 않습니다. 다음 날짜의 판정은 고정 Clock으로 별도 확인합니다."
+                "result": "비가시 글은 404이고 저장 행/조회수는 변하지 않습니다. W0~W7의 관찰 후 view_count=4입니다."
               }
             ],
             "work": [
@@ -91,13 +91,13 @@
             "done": [
               "조회수는 0→1→1→2→3→4→4이며 회원별 날짜는 Asia/Seoul을 사용합니다.",
               "같은 회원/글/날짜의 기록은 한 행만 남고, 작성자 조회는 증가시키지 않습니다. 다음 날짜의 판정은 고정 Clock으로 별도 확인합니다.",
-              "상세 요청에서 대상 게시글을 확인할 수 없는 경우 → 11-3 원문 check에 없는 글 없음/차단 사례는 HTTP 상태 미확인으로 유지한다. 상태 미확인; 신규 post_view 행/view_count 증가 여부는 추가 source check가 필요하다."
+              "비가시 글 404 전후에 post_view 행 수와 post.view_count가 같고, W0~W7 뒤 값은 4다."
             ]
           },
           "hints": [
-            "같은 날짜의 두 요청이 동시에 들어오면 애플리케이션의 사전 조회만으로 중복을 막을 수 있을까요?",
-            "INSERT가 실제로 1행을 만들었는지를 조회수 증가 조건으로 쓰면 어떤 race가 사라질까요?",
-            "작성자와 비로그인 사용자는 post_view 행을 남기지 않는다는 규칙을 어느 분기에서 표현할까요?"
+            "김자바의 첫 조회와 같은 날 두 번째 조회에서 view_count와 post_view 행은 각각 어떻게 달라야 하나요?",
+            "비로그인 조회가 view_count를 올려도 post_view 행을 만들지 않는 정책은 무엇을 구분하나요?",
+            "볼 수 없는 글에서 404를 받은 뒤 view_count와 post_view가 그대로인지 어떤 조회로 확인하나요?"
           ],
           "recipeIds": [
             "legacy:11-3:W0",

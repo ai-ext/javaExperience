@@ -3,4 +3,4 @@
 
 > 기획 원본 · 상세 기획 원본은 service/features/legacy-runtime.json입니다.
 
-0장 여덟 단계를 하나의 실행 흐름으로 묶어 route·path/query/header/body, DTO·Java type, annotation, stack trace, Gradle/YAML, Lombok, response JSON을 확인한다.
+서버 실행·종료·재시작 뒤에도 준비 상태와 기존 API 응답이 유지되는지 확인합니다.

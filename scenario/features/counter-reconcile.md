@@ -3,4 +3,4 @@
 
 > 기획 원본 · 상세 기획 원본은 service/features/counter-reconcile.json입니다.
 
-8-5 ADMIN recount에서 실제 post_like 및 nondeleted comment 관계와 counter 불일치만 집합 갱신한다.
+게시글의 좋아요·댓글 숫자가 실제 관계 수와 다른 행만 고치세요. 운영자 실행 후 불일치가 0이고 두 번째 실행은 값을 더 바꾸지 않으면 끝입니다.

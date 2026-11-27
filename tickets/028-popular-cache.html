@@ -16,18 +16,48 @@
 
 <link rel="stylesheet" href="../tools/site/course-tokens.css?v=7d70b43e3c66">
 <link rel="stylesheet" href="../tools/site/course-content.css?v=526afc2a1110">
-<link rel="stylesheet" href="../tools/site/contrast.css?v=fa9b5b7d70bc">
-<link rel="stylesheet" href="../tools/site/course-navigation.css?v=036941f5c2c9">
+<link rel="stylesheet" href="../tools/site/contrast.css?v=480ce1665b53">
+<link rel="stylesheet" href="../tools/site/course-navigation.css?v=919065dc7e5e">
 <link rel="stylesheet" href="../tools/site/course-data-blocks.css?v=7207893bf610">
 <link rel="stylesheet" href="../tools/site/course-semantics.css?v=8632fefaa184">
 <link rel="stylesheet" href="../tools/site/course-flow-layout.css?v=b33e13ca0173">
 <link rel="stylesheet" href="../tools/site/section-switcher.css?v=975a56e01be7">
-<link rel="stylesheet" href="../tools/site/site-frame.css?v=f528fcef5e04">
+<link rel="stylesheet" href="../tools/site/site-frame.css?v=68cf09371520">
 
 
-<script>(function prepareFirstPaint({panelMap,dayPanels,servicePanels,knowledgeCategories}) {
+<script>(function prepareFirstPaint({panelMap,dayPanels,servicePanels,serviceAsides=[],knowledgeCategories}) {
   const root=document.documentElement;
   root.classList.add('js');
+  document.addEventListener('click',event=>{
+    const apiButton=event.target?.closest?.('[data-sf-api-collapse]');
+    if(apiButton){
+      const catalog=apiButton.closest('[data-sf-catalog]');
+      for(const group of catalog?.querySelectorAll('[data-sf-api-group]')||[]){
+        if(group===apiButton.closest('[data-sf-api-group]'))continue;
+        const rows=group.querySelector('[data-sf-api-rows]'),button=group.querySelector('[data-sf-api-collapse]');
+        if(rows&&button){rows.hidden=true;button.setAttribute('aria-expanded','false');const icon=button.querySelector('[aria-hidden="true"]');if(icon)icon.textContent='›';}
+      }
+    }
+    const link=event.target?.closest?.('a[href]');if(!link)return;
+    let target;try{target=new URL(link.href,location.href)}catch{return}
+    if(!/\/(?:docs\/knowledge|lessons)\//.test(target.pathname))return;
+    const current=new URL(location.href);
+    const carried=current.searchParams.get('return');
+    const eligible=/\/(?:course\/(?:spring\/D\d{2}|java\/J\d{2})|scenario\/features\/[^/]+)\.html$/.test(current.pathname);
+    const destination=carried|| (eligible?current.pathname+current.search+current.hash:'');
+    if(destination)target.searchParams.set('return',destination);
+    link.href=target.href;
+  },true);
+  const returnValue=new URLSearchParams(location.search).get('return');
+  if(returnValue && /^(?:\/(?:course\/(?:spring\/D\d{2}|java\/J\d{2})|scenario\/features\/[^/]+)\.html)(?:[?#].*)?$/.test(returnValue)){
+    const addReturn=()=>{
+      if(!document.querySelector('main.site-main .site-concept-frame'))return;
+      if(document.querySelector('.concept-return-link'))return;
+      const heading=document.querySelector('main.site-main .site-frame-content h1');if(!heading)return;
+      const link=document.createElement('a');link.className='concept-return-link';link.href=returnValue;link.textContent='이전 작업 화면으로 돌아가기';heading.before(link);
+    };
+    document.addEventListener('DOMContentLoaded',addReturn,{once:true});
+  }
   let format='yml';try {if(localStorage.getItem('javaexperience.course.config-format.v1')==='properties')format='properties';}catch{}
   root.dataset.configFormat=format;
   let id='';try{id=decodeURIComponent(location.hash.slice(1));}catch{}
@@ -57,15 +87,19 @@
     const params=new URLSearchParams(location.search);
     const selected=servicePanels.find(p=>p.id===id)||servicePanels.find(p=>p.variant===params.get('variant')&&p.stage===params.get('stage'))||servicePanels[0];
     style.textContent+=servicePanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===selected.id?'block':'none'}!important}`).join('');
-    style.textContent+=`html.js body main [data-sf-aside-stage]{display:none!important}html.js body main [data-sf-aside-stage][data-sf-variant="${CSS.escape(selected.variant)}"][data-sf-stage="${CSS.escape(selected.stage)}"]{display:block!important}`;
+    style.textContent+=serviceAsides.map(a=>`html.js body main [data-sf-aside-stage][data-sf-variant="${CSS.escape(a.variant||'')}"][data-sf-stage="${CSS.escape(a.stage||'')}"]{display:${a.variant===selected.variant&&a.stage===selected.stage?'block':'none'}!important}`).join('');
+    // 단계 주소로 바로 열면 단계 타일 선택 표시도 첫 페인트부터 맞춘다(스크립트가 나중에 옮기며 점프하지 않게).
+    const markStage=()=>{for(const link of document.querySelectorAll('[data-sf-stage-link]'))link.setAttribute('aria-current',link.dataset.sfVariant===selected.variant&&link.dataset.sfStage===selected.stage?'step':'false');};
+    const stageObserver=new MutationObserver(markStage);stageObserver.observe(document,{childList:true,subtree:true});
+    document.addEventListener('DOMContentLoaded',()=>{markStage();stageObserver.disconnect();},{once:true});
   }
   if(dayPanels.length)style.textContent+=dayPanels.map(p=>`html.js body main #${CSS.escape(p.id)}{display:${p.id===active?p.display:'none'}!important}`).join('');
   // 설정 형식은 CSS가 첫 페인트부터, controller가 DOM·키보드 상태를 이어받는다.
   style.textContent+=`html.js body main [data-config-panel]{display:none!important}html.js body main [data-config-panel="${format}"]{display:block!important}`;
   document.head.append(style);
-})({"panelMap":{"browser-requests-1":"browser-requests-1","browser-request-1-1":"browser-request-1-1","request-status-1-1":"browser-request-1-1","browser-request-1-2":"browser-request-1-2","request-status-1-2":"browser-request-1-2","browser-request-1-3":"browser-request-1-3","request-status-1-3":"browser-request-1-3","browser-request-1-4":"browser-request-1-4","request-status-1-4":"browser-request-1-4","browser-request-1-5":"browser-request-1-5","request-status-1-5":"browser-request-1-5","browser-request-1-6":"browser-request-1-6","request-status-1-6":"browser-request-1-6"},"dayPanels":[],"servicePanels":[],"knowledgeCategories":[]});</script><noscript><style>body main [data-day-panel][hidden],body main [data-wrap-panel][hidden],body main [data-section-panel][hidden],body main [data-config-panel][hidden],body main [data-sf-stage-panel][hidden],body main [data-sf-aside-stage][hidden],body main [data-sf-group-cards][hidden],body main [data-sf-api-rows][hidden]{display:block!important}body .section-switcher,body .day-wrap-tabs,body [data-day-expand]{display:none!important}</style></noscript></head>
+})({"panelMap":{"browser-requests-1":"browser-requests-1","browser-request-1-1":"browser-request-1-1","request-status-1-1":"browser-request-1-1","browser-request-1-2":"browser-request-1-2","request-status-1-2":"browser-request-1-2","browser-request-1-3":"browser-request-1-3","request-status-1-3":"browser-request-1-3","browser-request-1-4":"browser-request-1-4","request-status-1-4":"browser-request-1-4","browser-request-1-5":"browser-request-1-5","request-status-1-5":"browser-request-1-5","browser-request-1-6":"browser-request-1-6","request-status-1-6":"browser-request-1-6"},"dayPanels":[],"servicePanels":[],"serviceAsides":[],"knowledgeCategories":[]});</script><noscript><style>body main [data-day-panel][hidden],body main [data-wrap-panel][hidden],body main [data-section-panel][hidden],body main [data-config-panel][hidden],body main [data-sf-stage-panel][hidden],body main [data-sf-aside-stage][hidden],body main [data-sf-group-cards][hidden],body main [data-sf-api-rows][hidden]{display:block!important}body .section-switcher,body .day-wrap-tabs,body [data-day-expand]{display:none!important}</style></noscript></head>
 <body>
-<header class="topbar site-topbar"><a class="home-brand" href="../index.html"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴"><a href="../index.html">홈</a><a href="../course/map.html">과정 지도</a><a href="../scenario/README.html" aria-current="page">서비스 만들기</a><a href="../practice/MISSIONS.html">실전 미션</a><a href="../docs/knowledge/README.html">개념 학습</a></nav></header>
+<header class="topbar site-topbar"><a class="home-brand" href="../index.html"><span class="site-brand-mark" aria-hidden="true">Jw</span><span class="site-brand-name">javaExperience<small>FROM FIRST REQUEST TO REAL WORK</small></span></a><nav aria-label="주 메뉴"><a href="../index.html">홈</a><a href="../course/map.html">과정 지도</a><a href="../scenario/README.html" aria-current="page">서비스 만들기</a><a href="../practice/MISSIONS.html">실전 미션</a><a href="../docs/knowledge/README.html">개념 학습</a></nav><span class="site-header-context">JAVA 21 · SPRING</span></header>
 <a class="site-skip" href="#site-main">본문으로 건너뛰기</a>
 <main id="site-main" class="has-section-switcher site-main"><div class="site-frame"><aside class="site-frame-sidebar" aria-label="영역 및 페이지 탐색"><p class="page-sidebar-caption">서비스 만들기</p><nav class="section-navigation" aria-label="서비스 만들기 영역"><a href="../scenario/README.html">기능 목록</a><a href="../scenario/README.html#visual-catalog">단계별 시안</a><a href="../scenario/README.html#journey-all-apis">API EXPLORER</a><p class="page-sidebar-caption section-navigation-reference">참고</p><a href="../course/spring/README.html">일자 목록</a><a href="../course/java/README.html">Java</a><a href="../course/tickets/README.html">티켓</a><a href="../course/start/README.html">출발 자료</a><a class="section-navigation-child" href="../course/start/dummy/README.html">더미 데이터</a><a class="section-navigation-child" href="../course/start/ops/README.html">운영 실습</a><a href="../course/README.html">과정 안내</a></nav><aside class="page-sidebar site-local-navigation" aria-label="페이지 탐색"><p class="page-sidebar-caption">이 페이지</p><nav class="section-switcher" aria-label="이 페이지 내용 선택" role="tablist" aria-orientation="vertical"><button type="button" id="section-tab-0" role="tab" data-section-target="section-all" data-panel-id="" data-phase="" aria-selected="true" tabindex="0">전체</button><button type="button" id="section-tab-1" role="tab" data-section-target="browser-request-1-1" aria-controls="browser-request-1-1" data-panel-id="browser-request-1-1" data-phase="" aria-selected="false" tabindex="-1">인기글</button><button type="button" id="section-tab-2" role="tab" data-section-target="browser-request-1-2" aria-controls="browser-request-1-2" data-panel-id="browser-request-1-2" data-phase="" aria-selected="false" tabindex="-1">바로 다시</button><button type="button" id="section-tab-3" role="tab" data-section-target="browser-request-1-3" aria-controls="browser-request-1-3" data-panel-id="browser-request-1-3" data-phase="" aria-selected="false" tabindex="-1">1위 글을 팔로워 공개로</button><button type="button" id="section-tab-4" role="tab" data-section-target="browser-request-1-4" aria-controls="browser-request-1-4" data-panel-id="browser-request-1-4" data-phase="" aria-selected="false" tabindex="-1">인기글 — 바로 빠졌나</button><button type="button" id="section-tab-5" role="tab" data-section-target="browser-request-1-5" aria-controls="browser-request-1-5" data-panel-id="browser-request-1-5" data-phase="" aria-selected="false" tabindex="-1">다시 공개</button><button type="button" id="section-tab-6" role="tab" data-section-target="browser-request-1-6" aria-controls="browser-request-1-6" data-panel-id="browser-request-1-6" data-phase="" aria-selected="false" tabindex="-1">인기글 — 바로 돌아왔나</button></nav></aside></aside><div class="site-frame-content"><div class="page-navigation-layout"><div class="page-navigation-content">
 <nav class="site-breadcrumb" aria-label="현재 위치"><a href="../index.html">홈</a><span aria-hidden="true">›</span> <a href="../scenario/README.html">서비스 만들기</a></nav>

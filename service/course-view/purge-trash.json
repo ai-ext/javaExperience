@@ -1,0 +1,42 @@
+{
+  "id": "purge-trash",
+  "title": "오래된 휴지통 글을 작은 묶음으로 정리하기",
+  "result": "삭제 후 30일이 지난 글을 자식 관계부터 1000개 청크 단위로 물리 삭제한다.",
+  "brief": {
+    "purpose": "삭제 후 30일이 지난 글을 자식 관계부터 1000개 청크 단위로 물리 삭제한다.",
+    "story": "원본 fixedClock은 2026-10-05이고 정리 경계는 2026-09-05 00:00입니다. 만료한 교육용 부모 2404개를 1000건씩 정리하고 각 자식 관계·commit 경계를 확인합니다. 9월 4일 23:59:59 삭제 행은 정리하고 정확히 9월 5일 00:00 행은 남습니다. 자식부터 지워 FK를 지킵니다.",
+    "scope": "휴지통 정리 배치와 자식별 삭제 건수·청크 커밋을 구현한다.",
+    "excluded": "원본 기획서에 별도 제외 범위가 명시되어 있지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "만료된 휴지통 게시글 정리",
+      "columns": [],
+      "actions": "고정 기준 시각에서 만료된 게시글을 정리하고 자식 관계가 먼저 삭제되는지 확인합니다. 1,000건 단위로 처리되며 2026년 9월 4일 23시 59분 59초의 글은 삭제되고 9월 5일 0시의 글은 남는지 확인합니다."
+    },
+    {
+      "name": "미래 기준일 정리 거절",
+      "columns": [],
+      "actions": "미래 날짜를 기준으로 휴지통 정리를 요청합니다. 배치가 시작되기 전에 요청이 거절되고 게시글과 자식 관계가 모두 그대로인지 확인합니다."
+    }
+  ],
+  "policies": [
+    "기준 시각은 practice Clock 2026-10-05 00:00, cutoff=2026-09-05 00:00:00. 정확 cutoff 시각 행은 남고 2026-09-04 23:59:59는 삭제한다.",
+    "원문 seed의 만료 parent는 2,404개(기존 42·59·60·67 포함); 청크는 1,000씩 transaction commit한다. 부모 post보다 child FK부터 지우며 답글→원댓글 순이다.",
+    "11·14장 FK 대상도 적용된 경우 post_image/view/revision/reaction/poll_option/poll_vote/poll/pin/series_post/recent_view를 함께 처리한다. series 자체는 남긴다.",
+    "미래 date 입력으로 실행 전 검증에서 거절 → HTTP 400 (T4); $.errors[*].field contains \"date\" → 사전 검증에서 거절되어 배치는 시작하지 않으며 부모·자식 행은 모두 요청 전과 같습니다."
+  ],
+  "acceptance": [
+    "9월 4일 23:59:59 삭제 행은 정리하고 정확히 9월 5일 00:00 행은 남습니다. 자식부터 지워 FK를 지킵니다.",
+    "미래 날짜의 T4는 실행 전 검증에서 400(date field)로 거절되며 배치가 시작되지 않고 모든 부모·자식 행이 그대로다.",
+    "만료 대상 2,404개를 청크 [1000,1000,404]로 삭제한다.",
+    "원문 check의 deleted child counts: likes=4827, replies=2401, comments=2408, bookmarks=2407, notifications=480; exact cutoff와 20개 미만료 글은 남는다."
+  ],
+  "days": {
+    "community:purge": {
+      "title": "자식 관계부터 지우고 다음 묶음 이어 가기",
+      "goal": "휴지통 정리 배치와 자식별 삭제 건수·청크 커밋을 구현한다.",
+      "concept": "post.deleted_at, child FK rows · chunk size=1000; expired seed=2,400; total old deleted=2,404"
+    }
+  }
+}

@@ -61,7 +61,7 @@ export function renderSiteNavigation(sourcePath) {
   const href = target => path.posix.relative(path.posix.dirname(sourcePath), target);
   const study = /^course\/(?:spring\/D\d{2}|java\/J\d{2}|tickets\/)/.test(sourcePath);
   const links = spaces.map(({ label, target }) => `<a href="${href(target)}"${label === current ? ' aria-current="page"' : ''}>${label}</a>`).join('');
-  return `<header class="topbar site-topbar${study ? ' study-topbar' : ''}"><a class="home-brand" href="${href('index.html')}"><span aria-hidden="true">&lt;/&gt;</span> javaExperience</a><nav aria-label="주 메뉴">${links}</nav></header>`;
+  return `<header class="topbar site-topbar${study ? ' study-topbar' : ''}"><a class="home-brand" href="${href('index.html')}"><span class="site-brand-mark" aria-hidden="true">Jw</span><span class="site-brand-name">javaExperience<small>FROM FIRST REQUEST TO REAL WORK</small></span></a><nav aria-label="주 메뉴">${links}</nav><span class="site-header-context">JAVA 21 · SPRING</span></header>`;
 }
 
 // 현재 문서 제목은 본문 머리에서 한 번만 읽고, 경로에는 소속 공간만 표시한다.

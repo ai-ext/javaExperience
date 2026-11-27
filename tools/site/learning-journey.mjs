@@ -89,7 +89,7 @@ export function renderLearningJourney(manifest, catalog, levelHref) {
     }).join('');
     return `<details class="visual-chapter"><summary><img src="visuals/${esc(first.id)}.svg" alt="" loading="lazy"><span><small>${esc(chapter.title.split(' — ')[0])} · ${levels.length}단계</small><strong>${esc(chapter.title.split(' — ')[1] || chapter.title)}</strong></span><span class="visual-chapter-open">시안 보기 ↓</span></summary><div class="visual-stage-grid">${cards}</div></details>`;
   }).join('');
-  const routeMarkup = projectRoutes.map(({ project, groups }) => {
+  const routeMarkup = projectRoutes.map(({ project, groups }, projectIndex) => {
     const features = [...groups].map(([feature, routes]) => {
       const endpoints = routes.map((route) => {
         const stages = linkedStages(route);
@@ -102,7 +102,8 @@ export function renderLearningJourney(manifest, catalog, levelHref) {
       }).join('');
       return `<details class="journey-feature" data-feature><summary><span>${esc(feature)}</span><small>${routes.length}개 API</small></summary><ul>${endpoints}</ul></details>`;
     }).join('');
-    return `<section class="journey-project" aria-label="${esc(project.label)}"><h4>${esc(project.label)}</h4><p>${esc(project.description || '')}</p>${features}</section>`;
+    const count = [...groups.values()].reduce((total, routes) => total + routes.length, 0);
+    return `<details class="journey-project" name="journey-project" data-journey-project${projectIndex === 0 ? ' open' : ''}><summary><strong>${esc(project.label)}</strong><small>${count}개 API</small></summary><p>${esc(project.description || '')}</p>${features}</details>`;
   }).join('');
   return `<section class="learning-journey" aria-labelledby="journey-title">
     <section class="journey-entry" aria-labelledby="journey-entry-title"><div><p class="journey-eyebrow">START · 첫 실습</p><h2 id="journey-entry-title">처음이면 작은 API 하나부터 만드세요</h2><p>0-1에서 Java와 요청을 익힙니다. 이미 익숙하면 1-1의 <code>success</code> 응답부터 시작하세요. DB 조회는 별도 SQL 경로로 연습할 수 있습니다.</p></div><nav aria-label="첫 실습 선택"><a class="journey-entry-primary" href="${esc(firstJavaHref)}">0-1 첫 API 만들기 →</a><a href="${esc(firstPostHref)}">1-1 게시글 요청부터 →</a><a href="db-query-journey/db-01-response-to-query.html">DB-01 SQL부터 →</a></nav></section>
@@ -138,6 +139,7 @@ export function renderLearningJourney(manifest, catalog, levelHref) {
       }
       for (const project of root.querySelectorAll('.journey-project')) {
         project.hidden = !project.querySelector('.journey-feature:not([hidden])');
+        if (!project.hidden && (term || selected !== 'all')) project.open = true;
       }
       root.querySelector('[data-journey-result]').textContent = visible ? visible + '개 API 표시' : '일치하는 API가 없습니다';
     };

@@ -1,0 +1,59 @@
+{
+  "id": "coupon-limits",
+  "title": "동시에 받아도 쿠폰 수량 지키기",
+  "result": "쿠폰이 10장일 때 신청자가 100명이어도 10명에게만 발급하고 수량을 맞게 관리합니다.",
+  "brief": {
+    "purpose": "쿠폰이 10장일 때 신청자가 100명이어도 10명에게만 발급하고 수량을 맞게 관리합니다.",
+    "story": "운영 담당자 김민수는 준비된 쿠폰 10장을 팀원 100명이 동시에 신청하는 상황을 확인합니다. 팀원 이지은은 정확히 10명만 쿠폰을 받고, 실패한 사람의 결과까지 포함해 남은 수량과 발급 수가 일치하는지 살펴봅니다.",
+    "scope": "Redis 원자적 감소와 DB 발급량·회원별 보유 기록을 연결해 100명의 동시 요청 중 설정한 총량만 성공하게 하세요. 실패한 요청은 500 대신 계약된 충돌 결과로 돌려줍니다.",
+    "excluded": "원문에 적힌 요청과 완료 기준 밖의 기능은 이번 범위에 넣지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "경쟁 요청에서도 DB 수량과 발급을 일치시키기 화면",
+      "columns": [
+        "couponId (positive)",
+        "Authorization",
+        "응답 memberCouponId"
+      ],
+      "actions": "POST /api/coupons/{couponId}/issue 요청 후 명시된 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "기준 데이터는 DB이며 Redis는 요청을 거르는 보조 수단입니다. Redis 값만을 최종 발급 근거로 사용하지 않습니다.",
+    "쿠폰 수량 10장에 100명 동시 요청이면 발급 정확히 10장, DB 발급량 10건이어야 합니다. 11번째 요청은 409 /errors/coupon-exhausted입니다.",
+    "D13-2와 B07의 재현에서는 동시 20건이 모두 201 또는 정해진 409로 종료되고 500은 없어야 합니다. B07은 원문 티켓의 지원 등급을 유지합니다. B07은 D13의 선택 연습 티켓이며 원하는 경우에만 수행합니다.",
+    "원문 완료 기준: `CouponIssueConcurrencyTest` 통과: 수량 10장에 100명 동시 요청 → 정확히 10장, DB 발급량 = 10",
+    "원문 완료 기준: 11번째 `POST /api/coupons/{couponId}/issue` → 409 `/errors/coupon-exhausted`",
+    "원문 완료 기준: `SHOW ENGINE INNODB STATUS`에서 500이 난 순간의 기록을 찾아 근거로 남긴다"
+  ],
+  "acceptance": [
+    "10장 fixture/100 요청에서 성공 10·소진409·500 0, DB issued/member_coupon 10을 대조했다.",
+    "11번째 요청 409와 Redis/DB 불일치 복구를 확인했다.",
+    "B07은 선택 ticket으로 남기고 수행 시 deadlock 기록 및 20요청 status를 남겼다. seed 30일은 고정 정책이 아니다.",
+    "100명 동시 요청에서 201=10, 409 exhaustion=90, 500=0; DB issued_quantity=10≤total_quantity=10 및 member_coupon=10행.",
+    "POST /api/coupons/1/issue 11번째 추가 요청 → 409 `/errors/coupon-exhausted`; Redis 잔여=0, DB 수량 불변."
+  ],
+  "days": {
+    "board:issue": {
+      "title": "경쟁 요청에서도 DB 수량과 발급을 일치시키기",
+      "goal": "Redis 원자적 감소와 DB 발급량·회원별 보유 기록을 연결해 100명의 동시 요청 중 설정한 총량만 성공하게 하세요.",
+      "concept": "동시 요청과 수량 제한",
+      "ticket": {
+        "id": "WORK-117",
+        "from": "쿠폰 운영자 · 발급 제한",
+        "situation": "쿠폰 열 장에 신청 백 건이 겹쳐도 정해진 수량만 지급해야 합니다.",
+        "request": "동시 신청에서도 쿠폰 수량과 회원별 지급 기록을 맞춰 주세요.",
+        "constraints": [
+          "쿠폰 수량의 기준은 데이터베이스에 둔다.",
+          "수량이 열 장이면 지급도 열 장으로 제한한다."
+        ],
+        "acceptance": [
+          "동시 신청 결과와 저장된 지급 건수가 모두 열 건이다.",
+          "수량이 다 떨어진 뒤 요청은 409로 끝난다."
+        ],
+        "basis": "course/days/D09.json"
+      }
+    }
+  }
+}

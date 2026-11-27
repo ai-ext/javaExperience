@@ -13,6 +13,11 @@ for(const entry of catalog.features){
  const source=JSON.parse(fs.readFileSync(new URL(`service/${entry.file}`,root),'utf8'));
  const dom=new JSDOM(fs.readFileSync(new URL(`scenario/features/${entry.id}.html`,root),'utf8'),{url:`http://localhost:3000/scenario/features/${entry.id}.html`});
  const doc=dom.window.document;
+ const redirect=doc.querySelector('.course-redirect');
+ assert.ok(redirect,`${entry.id}: 기존 기능 주소에서 통합 화면으로 이동 안내`);
+ assert.ok(redirect.querySelector('a[href*="java-service.html#feature="]'),`${entry.id}: 기능별 통합 주소 링크`);
+ assert.match(redirect.querySelector('script')?.textContent||'',/get\('variant'\).*get\('stage'\)/,`${entry.id}: 기존 프로젝트·단계 주소를 읽어야 함`);
+ assert.ok(JSON.parse(redirect.querySelector('script').textContent.match(/const map=(\[[^;]+\]);/)[1]).length>0,`${entry.id}: 원문 단계 대응표`);
  assert.ok([...doc.querySelectorAll('link[rel=stylesheet]')].some(link=>link.getAttribute('href').includes('service-request.css')),`${entry.id}: 요청 도구 stylesheet`);
  const values=new Map([['course.progress','kept'],['javaExperience.home.activeTask.v1','kept']]);
  const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
@@ -44,4 +49,9 @@ for(const entry of catalog.features){
  rows.push({featureId:entry.id,variants:source.variants.length,stages:source.variants.reduce((n,v)=>n+v.stages.length,0)});pages++;dom.window.close();
 }
 assert.equal(fetches,0,'선택·힌트·수동 진도로 API가 자동 호출되지 않음');
+const catalogDom=new JSDOM(fs.readFileSync(new URL('scenario/README.html',root),'utf8'),{url:'http://localhost:3000/scenario/README.html'});
+assert.ok(catalogDom.window.document.querySelector('.course-redirect a[href="../java-service.html#group=service"]'),'기존 기능 목록 주소에서 통합 실무 묶음으로 안내');
+assert.match(catalogDom.window.document.querySelector('.course-redirect script')?.textContent||'',/location\.replace/,'목록 주소를 통합 과정으로 이동');
+const home=fs.readFileSync(new URL('index.html',root),'utf8');
+assert.match(home,/class="home-course-path home-course-path-service" href="java-service\.html#group=service"/,'홈의 실무 과정 카드가 통합 화면의 실무 묶음을 연다');
 console.log(JSON.stringify({scope:'generated DOM; not native browser',pages,stages,hintNextTransitions:hints,requestForms:forms,automaticFetches:fetches,features:rows}));

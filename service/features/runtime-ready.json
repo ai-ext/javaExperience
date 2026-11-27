@@ -32,16 +32,16 @@
           ],
           "brief": {
             "purpose": "Java 서버와 MySQL을 로컬에서 재현 가능하게 띄우고, 실행 환경별 설정과 기본 동작을 구분합니다.",
-            "task": "주어진 board 시작 자료로 서버·DB 실행 기반을 마련하고 health 상태를 확인하세요. DB·프로파일·비밀값·요청 처리를 따로 관찰해 실행이 된 이유를 기록합니다.",
+            "task": "새 프로젝트의 실행 기반을 직접 만들고 서버·DB 기동, health, 프로파일 설정을 확인하세요. D00 값 전달은 원할 때 참고용 워밍업으로 별도 실행합니다.",
             "preconditions": [
-              "board-server의 `build.gradle`, `compose.yaml`, `src/main/resources/application*.yml`을 기준으로 실행한다. Java 21과 Spring Boot 4.1, MySQL 8.4를 사용한다.",
+              "새 프로젝트 루트 (board-server는 비교 자료)의 `build.gradle`, `compose.yaml`, `src/main/resources/application*.yml`을 기준으로 실행한다. Java 21과 Spring Boot 4.1, MySQL 8.4를 사용한다.",
               "`data-local.sql`은 local profile에서만 실행되는 예시 seed다. 실제 비밀값은 파일에 넣지 않고 환경 변수로 전달한다."
             ],
             "scenario": [
               {
-                "start": "새 board 실행 환경이다. D00 값 전달 예제와 D01 local MySQL 연결 설정을 준비한다.",
-                "action": "`docker compose up -d` 뒤 `./gradlew bootRun --args=\"--spring.profiles.active=local\"`로 기동하고 `GET /actuator/health`를 호출한다. D00의 primitive 변경, 객체 필드 변경, 매개변수 재할당 테스트도 실행한다.",
-                "result": "MySQL 연결 로그가 확인되고 health는 HTTP 200, JSON `status=UP`이다. D00 테스트는 primitive 호출자 값 유지, 객체 필드 변경 반영, 새 객체 재할당은 호출자 값 유지로 끝난다.",
+                "start": "새 프로젝트 루트의 build.gradle, compose.yaml, application 설정을 준비합니다. D00 값 전달 예제는 필수 시작 조건이 아닙니다.",
+                "action": "새 프로젝트 루트에서 필수 서버 준비 확인을 수행합니다. D00 값 전달 테스트는 선택 워밍업으로 따로 실행할 때만 기록합니다.",
+                "result": "필수 확인은 local 기동·MySQL 연결·health 200/status UP·포트 override·prod 필수 설정 누락 실패·HTTP env 비노출입니다. D00 결과는 필수 완료 판정에 포함하지 않습니다.",
                 "after": "local 설정의 datasource가 MySQL 8.4를 가리키는지와 `SERVER_PORT=8081` 지정 시 `http://localhost:8081/actuator/health`가 200인지 확인한다. prod의 `DB_PASSWORD` 미설정 기동은 실패하고 `/actuator/env`는 노출되지 않는 것을 별도로 확인한다."
               }
             ],
@@ -66,8 +66,8 @@
             "policies": [
               "과정 시작 자료의 compose.yaml을 사용하고 이 단계에서는 Flyway를 도입하지 않습니다.",
               "비밀값을 파일이나 학습 기록에 실제 값으로 저장하지 말고 환경 변수 자리표시자로 둡니다.",
-              "D00의 값 전달 테스트는 primitive 값 복사와 객체 참조 복사를 구분합니다.",
-              "원문 완료 기준: 값 전달 테스트 3개: 메서드 안에서 `int`를 바꾸면 호출한 쪽은 그대로, 객체 필드를 바꾸면 호출한 쪽도 바뀜, 매개변수에 새 객체를 대입하면 호출한 쪽은 그대로",
+              "D00 값 전달 테스트는 선택 워밍업이며 서버 준비 필수 완료 조건에 포함하지 않는다. 필수 확인은 새 프로젝트 루트에서 수행한다.",
+              "선택 워밍업 참고: 값 전달 테스트 3개에서 primitive 호출자 값은 그대로, 객체 필드 변경은 반영, 매개변수 재할당은 반영되지 않는다. 서버 준비 완료 기준에는 포함하지 않는다.",
               "원문 완료 기준: `./gradlew bootRun`으로 기동 (D01 ③에서 datasource를 `local` 프로파일로 옮긴 뒤로는 `./gradlew bootRun --args='--spring.profiles.active=local'`로 띄운다)",
               "원문 완료 기준: `GET /actuator/health` → 200, 본문의 `status`가 `UP` (Boot 4는 `groups`도 함께 준다)",
               "원문 완료 기준: `docker compose up -d` 뒤 기동 로그에 `HikariPool-1 - Start completed`",
@@ -89,7 +89,7 @@
             "success": [
               "`docker compose up -d` 뒤 MySQL이 healthy이고 기동 로그에 HikariPool 시작 완료가 남는다.",
               "`GET /actuator/health` → 200, `status=UP`; `SERVER_PORT=8081`이면 8081 포트 health도 200이다.",
-              "D00 값 전달 세 테스트 결과가 각각 호출자 primitive 불변, 공유 객체 필드 반영, 매개변수 재할당 비반영이다.",
+              "D00 값 전달을 워밍업으로 실행했다면 primitive·객체 필드·매개변수 재할당 결과를 별도 참고 기록으로 남긴다. 서버 준비 필수 완료에는 포함하지 않는다.",
               "prod에서 `DB_PASSWORD` 없는 기동은 실패하며 `GET /actuator/env`는 404다."
             ],
             "failures": [
@@ -119,14 +119,14 @@
               }
             ],
             "work": [
-              "D00의 매개변수 전달 결과를 세 경우로 나누어 테스트한다.",
+              "새 프로젝트 루트에서 서버 준비 조건을 확인하고 board-server는 구현 비교 자료로만 사용합니다.",
               "MySQL 기동, datasource 연결, health 요청을 각각 실행해 어느 계층이 확인됐는지 기록한다.",
               "local/prod 설정에서 키의 출처와 환경 변수 우선순위를 대조한다."
             ],
             "done": [
               "Java 21·Boot 4.1 구성과 네 의존성을 확인했다.",
               "MySQL 8.4 연결 로그와 health 200/status UP을 확인했고 8081 환경 변수 override도 확인했다.",
-              "D00의 세 값 전달 테스트와 prod 비밀값 누락 기동 실패, actuator 비노출 결과를 각각 기록했다."
+              "D00 값 전달 세 테스트는 선택 워밍업입니다. 필수 확인은 local 기동, MySQL 연결, health 200/status UP, 포트 override, prod 필수 설정 누락 실패, HTTP env 비노출입니다."
             ]
           },
           "hints": [

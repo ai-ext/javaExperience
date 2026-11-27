@@ -17,7 +17,7 @@ const sourceMap = readJson('service/source-map.json');
 const contracts = readJson('service/api-contracts.json');
 const sourceIds = new Set(sourceIndex.units.map((unit) => unit.id));
 const requiredIds = new Set(sourceIndex.units.filter((unit) => unit.required).map((unit) => unit.id));
-if (requiredIds.size !== 244) errors.push(`필수 source 단위가 244개가 아닙니다: ${requiredIds.size}`);
+if (requiredIds.size !== 243) errors.push(`필수 source 단위가 243개가 아닙니다: ${requiredIds.size}`);
 const sourceUnits = new Map(sourceIndex.units.map((unit) => [unit.id, unit]));
 
 const features = new Map();

@@ -54,7 +54,8 @@ for (const page of [...legacy, ...knowledge]) {
   assert.equal(context?.kind, legacy.includes(page) ? 'legacy' : 'knowledge', page);
   assert.equal(doc.querySelectorAll('[data-frc-root]').length, legacy.includes(page) ? 1 : 0);
   if (legacy.includes(page)) {
-    assert.match(html, /<script src="[^"]*functional-reference\.bundle\.js[^\"]*" defer>/);
+    // 생성 단계가 불리언 속성을 `defer=""`로 직렬화하므로 두 표기를 모두 받는다.
+    assert.match(html, /<script src="[^"]*functional-reference\.bundle\.js[^\"]*" defer(?:="")?>/);
     assert.match(html, /<link rel="stylesheet" href="[^"]*functional-reference-context\.css/);
     assert.ok(doc.querySelector('[data-frc-root]').hidden, '직접 방문·script 전에는 안내를 숨긴다');
     initFunctionalReferenceContext(doc, dom.window);

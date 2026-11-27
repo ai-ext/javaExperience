@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {test} from 'node:test';
 import {JSDOM} from 'jsdom';
 import {renderServiceRequestTool} from './service-request-renderer.mjs';
@@ -35,6 +36,46 @@ test('명시적 전송은 실제 응답과 Location 자원 ID만 session에 연�
   assert.ok(!storage.getItem(storage.key(0)).includes('secret-token'));
   assert.equal(dom.window.localStorage.length,0);
   dom.window.close();
+});
+
+test('문자열 orderId 응답은 같은 project/server session에 저장된다', async () => {
+  const chargeId='CHG-94f346ef-84c5-413f-b7d7-57ddc1f558a9';
+  const charge={id:'charge',project:'board',method:'POST',path:'/api/me/points/charges',bodyKind:'json',body:{amount:1000},expected:{statuses:[201],bodyMode:'json',fields:['orderId']},capture:{key:'orderId',jsonPath:'orderId'}};
+  const dom=new JSDOM(renderServiceRequestTool({scopeKey:'charge',project:'board',recipes:[charge]}),{url:'http://localhost:3000'});
+  const root=dom.window.document.querySelector('[data-srq-root]');root.querySelector('[data-srq-base]').value='http://localhost:8080';
+  const [mounted]=mountServiceRequestTools(dom.window.document,{fetchImpl:async()=>response(201,JSON.stringify({orderId:chargeId,amount:1000,status:'DONE',balance:1000}))});
+  await mounted.sendRequest();
+  assert.equal(root.querySelector('[data-srq-resource-id]').value,chargeId);
+  assert.equal(dom.window.sessionStorage.getItem(`javaexperience.service.resources.v1:board:http%3A%2F%2Flocalhost%3A8080:orderId`),chargeId);
+  dom.window.close();
+});
+
+test('실패 사례를 고르면 해당 실패 상태를 기대하고 401에는 토큰을 요구하지 않는다', async () => {
+  const failureRecipe={...recipe,requiresToken:true,sourceCases:[{id:'unauthenticated',label:'401 인증 없음',condition:'토큰 없음',expected:{statuses:[401],bodyMode:'json'}}]};
+  const dom=new JSDOM(renderServiceRequestTool({scopeKey:'failure-case',project:'board',recipes:[failureRecipe]}),{url:'http://localhost:3000'});
+  const doc=dom.window.document,root=doc.querySelector('[data-srq-root]'),calls=[];
+  const [mounted]=mountServiceRequestTools(doc,{fetchImpl:async(url,init)=>{calls.push({url,init});return response(401,'{"type":"/errors/unauthorized"}');}});
+  root.querySelector('[data-srq-base]').value='http://localhost:8080';
+  root.querySelector('[data-srq-token]').value='stale-token';
+  const example=root.querySelector('[data-srq-example]'); example.value='0'; example.dispatchEvent(new dom.window.Event('change',{bubbles:true}));
+  assert.equal(root.querySelector('[data-srq-send]').disabled,false);
+  assert.match(root.querySelector('[data-srq-expected]').textContent,/401/);
+  assert.equal(root.querySelector('[data-srq-token]').value,'');
+  assert.doesNotMatch(root.querySelector('[data-srq-expected]').textContent,/필수 필드/);
+  assert.doesNotMatch(root.querySelector('[data-srq-expected]').textContent,/필수 필드/);
+  assert.match(root.querySelector('[data-srq-status]').textContent,/요청 입력은 자동으로 바뀌지 않았습니다/);
+  await mounted.sendRequest();
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].init.headers.Authorization,undefined);
+  assert.match(root.querySelector('[data-srq-verdict]').textContent,/기획한 실패 응답: 토큰 없음/);
+  assert.doesNotMatch(root.querySelector('[data-srq-verdict]').textContent,/본문 형식\/필드/);
+  dom.window.close();
+});
+
+test('Location 노출과 PG 서명 헤더가 CORS 계약에 등록되어 있다', () => {
+  const config=fs.readFileSync(new URL('../../board-server/src/main/java/com/example/board/config/CorsConfig.java',import.meta.url),'utf8');
+  assert.match(config,/setExposedHeaders\(List\.of\("Location"\)\)/);
+  assert.match(config,/"X-PG-Signature"/);
 });
 
 test('session recipe는 명시한 credentials를 사용하고 쿠키 값을 요청 헤더나 저장소로 복사하지 않는다', async () => {

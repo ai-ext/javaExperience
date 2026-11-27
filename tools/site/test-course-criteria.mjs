@@ -69,12 +69,37 @@ test('모든 일자의 완료 조건·SQL·관찰·말하기를 원본과 대조
     for (const step of day.steps) {
       const section = doc.querySelector(`#step-${day.id.toLowerCase()}-${step.no}`);
       assert.equal(section.dataset.presentation, step.presentation, `${day.id}-${step.no}: 표시 유형`);
-      const criteria = [...section.querySelectorAll('.fact-done li')].map(li=>norm(li.textContent));
+      const criteriaNodes = [...section.querySelectorAll('.fact-done li')].filter(li => !li.closest('.task-visual'));
+      const criteria = criteriaNodes.map(li=>norm(li.textContent));
       if (day.phase === 'maintain') for (const value of criteria) assert.match(value, /^\[(공통|[BE]\d{2} (필수|선택|연습|고도화))\] /);
-      const actual = criteria.map(value=>day.phase === 'maintain' ? value.replace(/^\[[^\]]+\] /, '') : value);
+      let actual = criteria.map(value=>day.phase === 'maintain' ? value.replace(/^\[[^\]]+\] /, '') : value);
       const expected = step.done.map(text);
+      if (step.visualGuide?.coversDone?.length) {
+        const covered = [...new Set(step.visualGuide.coversDone)].toSorted();
+        assert.equal(covered.length, step.visualGuide.coversDone.length, `${day.id}-${step.no}: 중복 완료 조건 매핑 없음`);
+        assert.ok(covered.every(index => Number.isInteger(index) && index >= 0 && index < expected.length), `${day.id}-${step.no}: 시각 안내 완료 조건 인덱스 유효`);
+        const remaining = criteriaNodes.filter(li => li.hasAttribute('data-criterion-index'));
+        const remainingIndexes = remaining.map(li => Number(li.dataset.criterionIndex)).toSorted();
+        assert.deepEqual([...covered, ...remainingIndexes].toSorted(), expected.map((_, index) => index), `${day.id}-${step.no}: 시각 안내·접기 영역이 완료 조건을 빠짐없이 담당`);
+        const visual = section.querySelector('.fact-done > .task-visual');
+        assert.ok(visual, `${day.id}-${step.no}: 완료 조건 시각 안내 렌더`);
+        const renderedRows = visual.querySelectorAll('ol > li, tbody > tr').length;
+        assert.equal(renderedRows, step.visualGuide.rows.length, `${day.id}-${step.no}: 시각 안내 행 보존`);
+        if (step.id === 'D01-1') {
+          const visualText = norm(visual.textContent);
+          assert.match(visualText, /\.\/gradlew bootRun/, 'D01-1 실행 명령 보존');
+          assert.match(visualText, /GET \/actuator\/health/, 'D01-1 health endpoint 보존');
+          assert.match(visualText, /200.*status: UP/, 'D01-1 기대 상태 보존');
+        }
+        for (const li of remaining) {
+          const index = Number(li.dataset.criterionIndex);
+          const value = norm(li.textContent).replace(/^\[[^\]]+\] /, '');
+          assert.equal(value, expected[index], `${day.id}-${step.no}: 시각 안내 밖 완료 조건 ${index} 보존`);
+        }
+        actual = [];
+      }
       // 현재 stepper는 선택·연습 조건을 티켓별 접기로 재배치한다. 조건의 중복·누락은 계속 검사한다.
-      assert.deepEqual(day.phase === 'maintain' ? actual.toSorted() : actual, day.phase === 'maintain' ? expected.toSorted() : expected, `${day.id}-${step.no}: 완료 조건 보존`);
+      if (!step.visualGuide?.coversDone?.length) assert.deepEqual(day.phase === 'maintain' ? actual.toSorted() : actual, day.phase === 'maintain' ? expected.toSorted() : expected, `${day.id}-${step.no}: 완료 조건 보존`);
       for (const file of step.files) assert.ok(section.querySelector('.fact-files').textContent.includes(file), `${day.id}-${step.no}: ${file}`);
       const observations = hints.days[day.id].observations?.[String(step.no)] ?? [];
       const block = section.querySelector('.step-observations');

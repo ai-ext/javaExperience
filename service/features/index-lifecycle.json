@@ -2,7 +2,7 @@
   "version": 1,
   "id": "index-lifecycle",
   "title": "실제 조회를 측정하며 인덱스 선택하기",
-  "summary": "9-2 내 좋아요 cursor query의 실제 인덱스 사용·추정 rows·실제 rows·정렬 단계를 격리 DB에서 비교한다.",
+  "summary": "좋아요 목록 조회 결과를 유지하면서 인덱스 변경 전후 실행계획과 실제 행 수를 비교합니다.",
   "difficulty": "고급",
   "prerequisites": [
     "posts-find"
@@ -27,16 +27,16 @@
           ],
           "brief": {
             "purpose": "9-2 내 좋아요 cursor query의 실제 인덱스 사용·추정 rows·실제 rows·정렬 단계를 격리 DB에서 비교한다.",
-            "task": "post_like 회원별 목록 query를 기존 member_id index와 migration index 상태에서 EXPLAIN/EXPLAIN ANALYZE하고 결과 순서를 보존한다.",
+            "task": "좋아요 API의 5개 반환 결과와 실제 권한 JOIN 쿼리의 LIMIT 6을 구분해, 인덱스 변경 전후 실행계획과 행 수를 비교합니다.",
             "preconditions": [
               "4-3 seed에서 member_id 인덱스만 있는지 SHOW INDEX로 기록한다.",
               "이 실험은 disposable practice DB에서 실행하며 schema.sql 원본 index를 영구 변경하지 않는다."
             ],
             "scenario": [
               {
-                "start": "member12의 likes query `WHERE member_id=12 ORDER BY created_at DESC,id DESC LIMIT 6`; 기존 index와 rows를 기록한다.",
-                "action": "EXPLAIN과 EXPLAIN ANALYZE를 실행하고 V2 ix_post_like_member_created 및 ANALYZE TABLE 후 같은 plan/query를 재확인한다.",
-                "result": "actual API GET /api/me/likes?size=6의 IDs/순서는 전후 동일. key/rows/Extra와 actual rows/loops/time을 각 실행 결과 그대로 기록한다.",
+                "start": "member12의 API GET /api/me/likes?size=5는 5개를 반환합니다. 원문의 실제 권한 JOIN 조회는 추가 행 판별을 위해 LIMIT 6을 사용합니다. 기존 index와 rows를 기록합니다.",
+                "action": "`GET /api/me/likes?size=5` 응답 id 5개를 기록합니다. 단순 인덱스 후보 쿼리와 원문의 실제 권한 JOIN 쿼리를 구분해 각각 EXPLAIN/EXPLAIN ANALYZE로 비교하고, 실제 JOIN SQL은 원문대로 LIMIT 6을 유지합니다.",
+                "result": "API 응답은 postId 5개입니다. 실제 JOIN 조회는 최대 6행을 읽을 수 있어 API 5개 반환값과 쿼리 LIMIT 6을 같은 수로 취급하지 않습니다. EXPLAIN 추정과 ANALYZE 실측을 그대로 기록합니다.",
                 "after": "기존 foreign key index는 삭제하지 않는다. `Using filesort` 또는 작은 seed latency만으로 대량 속도 개선을 단정하지 않는다."
               }
             ],
@@ -46,7 +46,7 @@
                 "reason": "회원 조건과 cursor 정렬 키의 복합 인덱스 후보."
               },
               {
-                "name": "member12 likes rows and six result IDs",
+                "name": "member12 likes rows and five result IDs",
                 "reason": "계획 변경 후 user result ordering이 동일한지 확인."
               },
               {
@@ -67,19 +67,22 @@
               "EXPLAIN ANALYZE는 읽기 SELECT를 실행해 actual iterator rows/loops/time을 보여준다. 결과 데이터와 API 응답은 별도 확인한다.",
               "ANALYZE TABLE은 optimizer statistics refresh이며 EXPLAIN ANALYZE와 다른 조작이다.",
               "새 compound index migration에 `ANALYZE TABLE post_like`; FK index는 이번 단계에서 제거하지 않는다. 쿼리 결과는 동일해야 한다.",
-              "운영 큰 데이터 결과를 추정하거나 속도 수치를 만들어 쓰지 않는다."
+              "운영 큰 데이터 결과를 추정하거나 속도 수치를 만들어 쓰지 않는다.",
+              "API `GET /api/me/likes?size=5`의 반환은 5개입니다. 실제 API 권한 JOIN SQL은 페이지에 추가 행이 있는지 판별하므로 원문대로 LIMIT 6을 사용합니다. 이를 LIMIT 5 단순 인덱스 후보 쿼리와 구분하고, 두 쿼리의 계획/행 수를 각각 기록합니다."
             ],
             "inputs": [
-              "EXPLAIN SELECT l.id,l.post_id,l.created_at FROM post_like l WHERE l.member_id=12 ORDER BY l.created_at DESC,l.id DESC LIMIT 5.",
+              "EXPLAIN 단순 인덱스 후보 쿼리: member_id=12, ORDER BY created_at DESC,id DESC, LIMIT 5. 실제 API JOIN 쿼리는 별도로 원문 SQL의 LIMIT 6으로 측정한다.",
               "EXPLAIN ANALYZE same SELECT.",
               "V2 after index + ANALYZE TABLE; repeat.",
-              "API GET /api/me/likes?size=6."
+              "API GET /api/me/likes?size=5.",
+              "실제 API 권한 JOIN 쿼리는 원문 9-2 SQL과 같이 EXPLAIN 대상 LIMIT 6이며, API 응답 5개와 구분한다."
             ],
             "success": [
               "Index key/rows/Extra pre/post values are transcribed.",
               "EXPLAIN ANALYZE actual rows/loops/time kept separate from estimates.",
               "Same API response id order before and after index.",
-              "실제 route GET /api/me/likes?size=5는 200이며 seed postId 순서 [145,143,140,139,142]를 반환한다. EXPLAIN query는 size+1 처리용 limit을 포함할 수 있으므로 SQL과 API page size를 별도 기록한다."
+              "실제 route GET /api/me/likes?size=5는 200이며 seed postId 순서 [145,143,140,139,142]를 반환한다. EXPLAIN query는 size+1 처리용 limit을 포함할 수 있으므로 SQL과 API page size를 별도 기록한다.",
+              "실제 권한 JOIN SQL은 LIMIT 6, API `size=5` 응답은 5개임을 구분해 기록했다."
             ],
             "failures": [
               {
@@ -108,7 +111,7 @@
               {
                 "title": "After V2 candidate",
                 "start": "same data, new (member_id,created_at,id) index and stats refreshed",
-                "action": "repeat plan and API GET size6",
+                "action": "repeat plan and API GET size5",
                 "result": "plan may choose different key; response IDs/order remain the same"
               },
               {
@@ -127,7 +130,7 @@
             "work": [
               "Same database snapshot and SQL before/after.",
               "Copy plan columns key/rows/Extra and ANALYZE actual fields into notes.",
-              "Compare six IDs and cursor order before/after.",
+              "Compare five IDs and cursor order before/after.",
               "legacy:9-2:A의 정확한 GET /api/me/likes?size=5 응답 id와 EXPLAIN의 query limit을 구분한다."
             ],
             "done": [
@@ -141,13 +144,12 @@
               "What does ANALYZE TABLE change, and why is it not the same as EXPLAIN ANALYZE?",
               "Could a plan change still be a regression if the API returns the same items? Which measured fields would explain the tradeoff?",
               "왜 SQL의 limit=size+1과 API recipe의 `size=5`를 같은 수치로 취급하면 안 될까요?"
-            ]
+            ],
+            "executionChecks": []
           },
           "hints": [
-            "Which EXPLAIN field is an optimizer estimate rather than a measured runtime row count?",
-            "What does ANALYZE TABLE change, and why is it not the same as EXPLAIN ANALYZE?",
-            "Could a plan change still be a regression if the API returns the same items? Which measured fields would explain the tradeoff?",
-            "왜 SQL의 limit=size+1과 API recipe의 `size=5`를 같은 수치로 취급하면 안 될까요?"
+            "API `size=5` 응답 5개와 실제 권한 JOIN SQL의 LIMIT 6은 각각 어떤 용도이며 어떻게 구분해 기록하나요?",
+            "EXPLAIN rows와 EXPLAIN ANALYZE actual rows/loops/time 중 어느 값이 추정이며 어느 값이 실행 관찰인가요?"
           ],
           "recipeIds": [
             "legacy:9-2:A"
@@ -155,13 +157,13 @@
           "executionChecks": [
             {
               "title": "Baseline plan",
-              "command": "SHOW INDEX FROM post_like; EXPLAIN SELECT l.id,l.post_id,l.created_at FROM post_like l WHERE l.member_id=12 ORDER BY l.created_at DESC,l.id DESC LIMIT 6; EXPLAIN ANALYZE <same SELECT>",
+              "command": "SHOW INDEX FROM post_like; EXPLAIN SELECT l.id,l.post_id,l.created_at FROM post_like l WHERE l.member_id=12 ORDER BY l.created_at DESC,l.id DESC LIMIT 5; EXPLAIN ANALYZE <same SELECT>",
               "expected": "plan key/rows/Extra estimate and actual rows/loops/time shown separately.",
-              "record": "DB version, row distribution, exact plan output and six API result ids."
+              "record": "DB version, row distribution, exact plan output and five API result ids."
             },
             {
               "title": "Candidate index observation",
-              "command": "apply source V2 to disposable DB; ANALYZE TABLE post_like; rerun same EXPLAIN and GET /api/me/likes?size=6",
+              "command": "apply source V2 to disposable DB; ANALYZE TABLE post_like; rerun same EXPLAIN and GET /api/me/likes?size=5",
               "expected": "plan may choose candidate; API IDs/order remain identical.",
               "record": "before/after index definitions, plan output, result ids; no extrapolated speed claim."
             }

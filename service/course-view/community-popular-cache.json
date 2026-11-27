@@ -1,0 +1,42 @@
+{
+  "id": "community-popular-cache",
+  "title": "커뮤니티 인기글을 캐시하고 숨김 즉시 반영하기",
+  "result": "인기글 결과는 60초 재사용하되 숨기거나 삭제한 글은 즉시 목록에서 빼세요. 같은 요청의 HIT/MISS와 변경 후 목록을 확인합니다.",
+  "brief": {
+    "purpose": "인기글 결과는 60초 재사용하되 숨기거나 삭제한 글은 즉시 목록에서 빼세요. 같은 요청의 HIT/MISS와 변경 후 목록을 확인합니다.",
+    "story": "같은 기간/개수/버전으로 인기 글을 아직 읽지 않았습니다. 운영 담당자 김민수는 이 요구를 맡습니다. 팀원 이지은과 함께 첫 목록과 즉시 반복 목록을 비교한 뒤 공개 범위 변경이나 삭제를 성공시킵니다.",
+    "scope": "8-2 인기글 쿼리의 Caffeine cache, HIT/MISS 증거, mutation invalidation을 구현한다.",
+    "excluded": "원문에 적힌 요청과 완료 기준 밖의 기능은 이번 범위에 넣지 않습니다."
+  },
+  "screens": [
+    {
+      "name": "재사용 기간과 무효화 시점 지키기 화면",
+      "columns": [
+        "title"
+      ],
+      "actions": "PATCH /api/posts/144 요청 후 명시된 응답을 확인합니다."
+    }
+  ],
+  "policies": [
+    "popularPosts Caffeine cache: maximumSize=100, expireAfterWrite=60s; key=(days,limit,version), 반환 리스트는 불변이다.",
+    "첫 GET은 MISS, 즉시 같은 key 재조회는 HIT; 60초 동안 좋아요 변화는 이전 순위를 보여 주는 것이 허용된다.",
+    "성공한 visibility 변경/삭제는 모든 popularPosts key를 바로 비운다. 잘못된 요청·실패 변경에는 eviction 하지 않고 발행 대상 0건 배치도 cache를 유지한다.",
+    "처음 MISS·반복 HIT이며 60초 재사용합니다. 성공한 공개 범위 변경/삭제는 모든 인기 글 캐시를 즉시 비웁니다.",
+    "실패한 변경과 발행 대상 0건 배치는 캐시를 지우지 않습니다. 캐시 중 좋아요 변화의 기존 순위 허용과 숨김 즉시 반영을 구분합니다.",
+    "PATCH /api/posts/144 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 실패한 변경은 post visibility/deleted_at 및 cache generation을 바꾸지 않는다."
+  ],
+  "acceptance": [
+    "처음 MISS·반복 HIT이며 60초 재사용합니다. 성공한 공개 범위 변경/삭제는 모든 인기 글 캐시를 즉시 비웁니다.",
+    "실패한 변경과 발행 대상 0건 배치는 캐시를 지우지 않습니다. 캐시 중 좋아요 변화의 기존 순위 허용과 숨김 즉시 반영을 구분합니다.",
+    "PATCH /api/posts/144 입력이 원문 실패 check 조건에 해당 → HTTP 400 — 원문 check의 실패 응답 실패한 변경은 post visibility/deleted_at 및 cache generation을 바꾸지 않는다.",
+    "PATCH /api/posts/144 · [교육용 fixture · legacy:16-3:X5] 남의 글(회원 7) → HTTP 403 (X5) 실패 mutation은 post visibility/deleted_at과 cache generation을 바꾸지 않는다.",
+    "응답 본문은 8-2 배열, X-Cache만 진단 추가; MISS일 때 SQL 실행."
+  ],
+  "days": {
+    "community:cache": {
+      "title": "재사용 기간과 무효화 시점 지키기",
+      "goal": "8-2 인기글 쿼리의 Caffeine cache, HIT/MISS 증거, mutation invalidation을 구현한다.",
+      "concept": "캐시 재사용과 무효화"
+    }
+  }
+}

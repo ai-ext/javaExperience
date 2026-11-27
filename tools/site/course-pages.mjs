@@ -170,6 +170,14 @@ function renderExerciseDocument(body, id, isJava, springHref, visualGuide) {
     if (visualGuide && guideSection) guideSection.querySelector('h2').insertAdjacentHTML('afterend', renderVisualGuide(visualGuide));
     const topReturn = article.querySelector(':scope > .course-exercise-nav');
     if (topReturn) {
+      const dayLink = topReturn.querySelector('a');
+      if (dayLink) {
+        const primaryReturn = doc.createElement('a');
+        primaryReturn.className = 'exercise-return-primary';
+        primaryReturn.href = dayLink.href;
+        primaryReturn.textContent = `${dayLink.textContent.split(' · ')[0]}로 돌아가기`;
+        head.append(primaryReturn);
+      }
       const support = doc.createElement('details');
       support.className = 'exercise-context-links';
       support.innerHTML = '<summary>실행 위치·연결 일자·이전 연습</summary>';
@@ -341,8 +349,7 @@ function renderStepSection(section, fromRel, course, step) {
   const day = course.days.find(d => d.steps.some(s => s.id === step.id));
   const next = day.steps[day.steps.indexOf(step) + 1];
   const nextLink = `<a class="step-next" href="${next ? `#step-${next.id.toLowerCase()}` : '#오늘-순서'}">${next ? `다음 순서 ${NUMS[next.no - 1]} →` : '오늘 순서로 돌아가기 ↑'}</a>`;
-  const done = `<p class="step-done"><label><input type="checkbox" class="step-check" data-step="${esc(step.id)}"> 이 순서를 끝냈다</label></p>`;
-  return `${head}${facts}${renderCoursePostVisual({ stepId: step.id })}${renderCourseApiWorkspace({ stepId: step.id })}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${done}${nextLink}</div></section>`;
+  return `${head}${facts}${renderCoursePostVisual({ stepId: step.id })}${renderCourseApiWorkspace({ stepId: step.id })}<div class="step-help">${titleDetail}${tail}</div><div class="step-footer">${nextLink}</div></section>`;
 }
 
 function dayPager(day, fromRel, course) {
@@ -387,10 +394,7 @@ export function dayCrumbs(sourceRel, course) {
   const id = path.posix.basename(sourceRel, '.md');
   const day = course.days.find((d) => d.id === id);
   if (!day) return '';
-  const index = course.days.indexOf(day);
-  const prev = course.days[index - 1];
-  const next = course.days[index + 1];
-  return `<nav class="course-crumbs day-crumbs" aria-label="현재 위치"><div class="day-location-links"><p class="crumbs"><a href="../README.html">과정 안내</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <a href="README.html">일자 목록</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <span aria-current="page">${esc(day.id)}</span></p><p class="course-crumbs-jump">${prev ? `<a href="${prev.id}.html" rel="prev" aria-label="이전 날 ${prev.id}: ${esc(prev.title)}">← 이전 ${prev.id}</a>` : ''}${next ? `<a href="${next.id}.html" rel="next" aria-label="다음 날 ${next.id}: ${esc(next.title)}">다음 ${next.id} →</a>` : ''}</p></div></nav>`;
+  return `<nav class="course-crumbs day-crumbs" aria-label="현재 위치"><div class="day-location-links"><p class="crumbs"><a href="../README.html">과정 안내</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <a href="README.html">일자 목록</a> <svg class="crumb-separator" aria-hidden="true" viewBox="0 0 6 11"><polyline points="1,1 5,5.5 1,10" fill="none" stroke="currentColor" stroke-width="1.5"></polyline></svg> <span aria-current="page">${esc(day.id)}</span></p></div></nav>`;
 }
 
 export function renderDayPage(sourceRel, body, course) {
@@ -790,7 +794,11 @@ export function renderCourseHome(course) {
     steps: d.steps.map((s) => ({ id: s.id, title: plain(s.short), requirement: stepRequirement(s, d, course), ...(isExtraStep(s, course) ? { extra: true, choiceTickets: s.tickets.filter(id => course.tickets.find(t => t.id === id)?.pool) } : {}) })) }));
   const todaySteps = (d) => d.steps.map((s, i) => `<li><span aria-hidden="true">${NUMS[i]}</span> <a href="${esc(href(d.page))}#step-${d.id.toLowerCase()}-${s.no}">${inline(plain(s.short) + (stepRequirement(s,d,course) ? ' · ' + stepRequirement(s,d,course) : ''))}</a></li>`).join('');
   return `<section class="course-home" data-course-home aria-labelledby="course-home-title">
-  <div class="ch-intro"><h1 id="course-home-title">오늘 만들고, 결과로 확인하세요.</h1></div>
+  <div class="ch-intro"><h1 id="course-home-title">무엇을 만들게 되나요?</h1><p>만들고 싶은 과정으로 들어가 기능 하나씩 완성하세요.</p></div>
+  <section class="home-course-paths" aria-label="학습 과정 선택">
+    <a class="home-course-path home-course-path-beginner" href="${esc(href('java-beginner.html'))}"><span class="home-course-path-mark" aria-hidden="true">01</span><span class="home-course-path-copy"><small>JAVA BEGINNER</small><strong>입문 과정</strong><span>Java 기초부터 공지 게시판과 실무 기능까지 차근차근 만듭니다.</span></span><span class="home-course-path-count">12개 기능 <b>60회차</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
+    <a class="home-course-path home-course-path-service" href="${esc(href('java-service.html#group=service'))}"><span class="home-course-path-mark" aria-hidden="true">02</span><span class="home-course-path-copy"><small>SERVICE BUILD · 실무</small><strong>서비스 만들기</strong><span>기능 요구사항을 설계하고 직접 구현해 요청과 데이터로 확인합니다.</span></span><span class="home-course-path-count">94개 기능 <b>138단계</b></span><span class="home-course-path-arrow" aria-hidden="true">↗</span></a>
+  </section>
   <div class="ch-hero">
     <article class="ch-today" aria-labelledby="ch-today-title">
       <p class="ch-tag" data-today-tag>오늘 할 일 · 처음 시작</p>
@@ -938,7 +946,9 @@ export function findInjectedLinkErrors(outputs, root) {
       const target = pathPart ? path.resolve(path.dirname(out), pathPart.split('?')[0]) : out;
       if (!outputs.has(target) && !fs.existsSync(target)) { errors.push(`${relOut}: 없는 파일 → ${href}`); continue; }
       const targetHtml = outputs.get(target) ?? (target.endsWith('.html') ? fs.readFileSync(target, 'utf8') : null);
-      if (hash && targetHtml !== null && !idsOf(target, targetHtml).has(decodeURIComponent(hash))) errors.push(`${relOut}: 없는 앵커 → ${href}`);
+      // `#group=service`·`#feature=…&stage=…`처럼 `=`가 든 해시는 대상 페이지 스크립트가 읽는 경로라 요소 id로 검사하지 않는다.
+      const isHashRoute = hash?.includes('=');
+      if (hash && !isHashRoute && targetHtml !== null && !idsOf(target, targetHtml).has(decodeURIComponent(hash))) errors.push(`${relOut}: 없는 앵커 → ${href}`);
     }
   }
   return errors;

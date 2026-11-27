@@ -17,10 +17,11 @@ const flow = [
   { id: 'update', file: 'update-post.html', method: 'PATCH', status: 200 },
   { id: 'delete', file: 'delete-post.html', method: 'DELETE', status: 204 },
 ];
+// 이어하기 컨트롤러(home-learning)가 기능 스크립트보다 먼저 연결된다(공통 학습 기반 정리 이후 순서).
 const expectedScripts = [
+  '/tools/site/home-learning.bundle.js',
   '/tools/site/functional-scenario.js',
   '/tools/site/functional-visual-learning.bundle.js',
-  '/tools/site/home-learning.bundle.js',
 ];
 const jar = { localStorage: {}, sessionStorage: {} };
 const requests = [];
@@ -93,7 +94,7 @@ async function openGenerated(task) {
   Object.defineProperty(w.navigator, 'clipboard', { configurable: true, value: { writeText: async command => { copies.push({ task: task.id, command }); } } });
   const scripts = [...d.querySelectorAll('script[src]')].filter(script => expectedScripts.includes(new URL(script.src).pathname));
   assert.deepEqual(scripts.map(script => new URL(script.src).pathname), expectedScripts, task.id + ': 실제 HTML에 세 script가 순서대로 연결');
-  assert.equal(scripts[2].dataset.homeTask, 'flow-' + task.id);
+  assert.equal(scripts[0].dataset.homeTask, 'flow-' + task.id);
   for (const script of scripts) {
     const sourcePath = new URL(script.src).pathname.slice(1);
     w.eval(fs.readFileSync(new URL(sourcePath, root), 'utf8'));
