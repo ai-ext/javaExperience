@@ -9,6 +9,7 @@ const root=new URL('../../',import.meta.url);
 const catalog=JSON.parse(fs.readFileSync(new URL('service/catalog.json',root),'utf8'));
 let pages=0,stages=0,hints=0,forms=0,fetches=0;
 const rows=[];
+const redirectCases={comments:[{project:'community',stage:'edit',hash:true},{variant:'community',stage:'edit'},{project:'community',stage:'edit'}],'reservation-jobs':[{project:'board',stage:'restart',hash:true},{project:'board',stage:'restart'}]};
 for(const entry of catalog.features){
  const source=JSON.parse(fs.readFileSync(new URL(`service/${entry.file}`,root),'utf8'));
  const dom=new JSDOM(fs.readFileSync(new URL(`scenario/features/${entry.id}.html`,root),'utf8'),{url:`http://localhost:3000/scenario/features/${entry.id}.html`});
@@ -18,6 +19,12 @@ for(const entry of catalog.features){
  assert.ok(redirect.querySelector('a[href*="java-service.html#feature="]'),`${entry.id}: 기능별 통합 주소 링크`);
  assert.match(redirect.querySelector('script')?.textContent||'',/get\('variant'\).*get\('stage'\)/,`${entry.id}: 기존 프로젝트·단계 주소를 읽어야 함`);
  assert.ok(JSON.parse(redirect.querySelector('script').textContent.match(/const map=(\[[^;]+\]);/)[1]).length>0,`${entry.id}: 원문 단계 대응표`);
+ for(const item of redirectCases[entry.id]||[]){
+  const selector=item.variant?`variant=${item.variant}`:`project=${item.project}`;
+  const location={search:item.hash?'':`?${selector}&stage=${item.stage}`,hash:item.hash?`#project=${item.project}&stage=${item.stage}`:'',replace:url=>{location.destination=url;}};
+  new Function('location','URLSearchParams',redirect.querySelector('script').textContent)(location,URLSearchParams);
+  assert.ok(location.destination?.includes(`project=${item.project||'community'}&stage=${item.stage}`),`${entry.id}: ${item.hash?'해시':'쿼리'}의 ${item.project||item.variant}/${item.stage} 유지`);
+ }
  assert.ok([...doc.querySelectorAll('link[rel=stylesheet]')].some(link=>link.getAttribute('href').includes('service-request.css')),`${entry.id}: 요청 도구 stylesheet`);
  const values=new Map([['course.progress','kept'],['javaExperience.home.activeTask.v1','kept']]);
  const storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)};
