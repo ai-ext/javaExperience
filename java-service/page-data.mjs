@@ -25,7 +25,7 @@ export function preparePageData(course) {
   }
 
   const compactModule=module=>{
-    const {apis:moduleApis=[],serviceExtensions=[],serviceLinks=[],tables,sourceRefs,manualDb,...rest}=module;
+    const {apis:moduleApis=[],serviceExtensions=[],serviceLinks=[],...rest}=module;
     const compact={
       ...rest,
       days:module.days.map(compactServiceDay),
