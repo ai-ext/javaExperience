@@ -2,12 +2,14 @@ import fs from 'node:fs';
 import {course} from '../java-beginner/course.mjs';
 import {loadServiceCourse} from './service-course.mjs';
 import {combineCourses} from './combined-course.mjs';
+import {preparePageData} from './page-data.mjs';
 import {esc,range,route,homeMarkup} from './view.mjs';
 
 const serviceCourse=loadServiceCourse();
 const mergePlan=JSON.parse(fs.readFileSync(new URL('./merge-plan.json',import.meta.url),'utf8'));
 const beginnerConceptLinks=JSON.parse(fs.readFileSync(new URL('./concept-links.json',import.meta.url),'utf8'));
 const selectedCourse=combineCourses(course,serviceCourse,mergePlan);
+const pageData=preparePageData(selectedCourse);
 const beginnerModules=selectedCourse.modules.filter(module=>module.source==='beginner');
 const serviceModules=selectedCourse.modules.filter(module=>module.source==='service');
 
@@ -18,7 +20,7 @@ const request=read('./request.mjs').replace(/^export /gm,'');
 const progress=read('./progress.mjs').replace(/^export /gm,'');
 const app=read('./app.js');
 const script=`(()=>{\n'use strict';\n${view}\n${request}\n${progress}\n${app}\n})();`.replace(/<\/script/gi,'<\\/script');
-const data=JSON.stringify(selectedCourse).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
+const data=JSON.stringify(pageData).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029');
 const totalDays=new Set([...selectedCourse.modules,...selectedCourse.attachedModules].flatMap(m=>m.days).map(day=>day.progressId||`${day.featureId||''}:${day.day}`)).size;
 const courseTitle='입문 과정 · 실무 과정';
 const courseLabel='JAVA WORKSHOP · 통합 과정';

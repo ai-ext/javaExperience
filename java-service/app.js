@@ -1,7 +1,7 @@
 // Embedded into java-service.html by build.mjs. No imports or network dependencies.
 const course=JSON.parse(document.getElementById('course-data').textContent);
 const allModules=[...course.modules,...(course.attachedModules||[])];
-const apis=allModules.flatMap(m=>m.apis.map(a=>({...a,module:m})));
+const apis=course.apis.map(a=>({...a,module:allModules.find(module=>module.id===a.moduleId)}));
 const byId=new Map(apis.map(a=>[a.id,a]));
 const progressKey='java-beginner.standalone.progress.v2';
 const content=document.getElementById('content');
@@ -44,8 +44,8 @@ function render(keepScroll=false){
   const total=new Set(allModules.flatMap(m=>m.days).map(day=>day.progressId||`${day.featureId||''}:${day.day}`)).size;
   $('progress-count').textContent=`${completed.length} / ${total}`;
   $('progress-fill').style.width=`${completed.length/total*100}%`;
-  $('header-status').textContent=current.d?`Day ${dayLabel(current.d)} / ${total}`:`${completed.length}회차 완료`;
-  document.title=current.d?`Day ${dayLabel(current.d)} · ${current.d.title} — ${course.title}`:`${course.title} · ${total}회차`;
+  $('header-status').textContent=current.d?`${current.d.mode==='service'?dayLabel(current.d):`Day ${dayLabel(current.d)}`} / ${total}`:`${completed.length}회차 완료`;
+  document.title=current.d?`${current.d.mode==='service'?dayLabel(current.d):`Day ${dayLabel(current.d)}`} · ${current.d.title} — ${course.title}`:`${course.title} · ${total}회차`;
   if(current.view==='module'){
     $('complete-day').addEventListener('click',()=>{
       const n=current.d.day;
@@ -62,7 +62,7 @@ function render(keepScroll=false){
     if(current.tab==='api') mountApi();
   }
   for(const button of document.querySelectorAll('[data-copy]')) button.addEventListener('click',async()=>{
-    try{await navigator.clipboard.writeText(button.dataset.copy);toast('실행 명령을 복사했습니다.');}catch{toast('복사가 지원되지 않습니다. 옆의 실행 명령을 선택해 복사하세요.');}
+    try{await navigator.clipboard.writeText(button.dataset.copy);toast(button.dataset.copyMessage||'실행 명령을 복사했습니다.');}catch{toast('복사가 지원되지 않습니다. 옆의 실행 명령을 선택해 복사하세요.');}
   });
   if(!keepScroll){
     const group=current.view==='home'&&current.group?document.getElementById(`group-${current.group}`):null;
@@ -72,16 +72,16 @@ function render(keepScroll=false){
 
 async function mountApi(){
   const pageGeneration=generation;
-  const preferred=[...new Set(current.d.apiIds.length?current.d.apiIds:current.m.apis.map(a=>a.id))];
+  const preferred=[...new Set(current.d.apiIds.length?current.d.apiIds:current.m.apiIds)];
   if(!preferred.some(id=>byId.has(id))){
     // 직접 SQL 실습·실행 관찰·설계 단계처럼 브라우저로 호출할 API가 없는 단계
-    $('tab-content').innerHTML=`<section class="panel"><div class="section-label">NO API TODAY</div><h2>이 단계는 직접 호출할 API가 없습니다.</h2><p class="body-copy">오늘 할 일과 완료 기준에 적힌 방법(SQL 실행, 실행 결과 관찰, 설계 문서 작성)으로 확인하세요. 다음 단계에서 API를 만들면 이 탭에서 요청을 보낼 수 있습니다.</p></section>`;
+    $('tab-content').innerHTML=`<section class="panel"><div class="section-label">NO API TODAY</div><h2>이 단계는 직접 호출할 API가 없습니다.</h2><p class="body-copy">오늘 할 일과 완료 기준에 적힌 방법(SQL 실행, 실행 결과 관찰, 설계 문서 작성)으로 확인하세요. 다음 단계에서 API를 만들면 이 탭에서 요청을 보낼 수 있습니다.</p></section>${manualDbMarkup(current.d)}`;
     return;
   }
   const options=ids=>ids.map(id=>byId.get(id)).filter(Boolean).map(a=>`<option value="${esc(a.id)}">${esc(a.method)} · ${esc(a.title)}</option>`).join('');
   const sourceModules=allModules.filter(module=>module.source===current.m.source);
-  $('api-select').innerHTML=`<optgroup label="오늘 확인할 API">${options(preferred)}</optgroup>${sourceModules.map(m=>`<optgroup label="${m.number} ${esc(m.title)}">${options(m.apis.map(a=>a.id).filter(id=>!preferred.includes(id)))}</optgroup>`).join('')}`;
-  $('api-select').value=preferred[0] || current.m.apis[0].id;
+  $('api-select').innerHTML=`<optgroup label="오늘 확인할 API">${options(preferred)}</optgroup>${sourceModules.map(m=>`<optgroup label="${m.number} ${esc(m.title)}">${options(m.apiIds.filter(id=>!preferred.includes(id)))}</optgroup>`).join('')}`;
+  $('api-select').value=preferred[0] || current.m.apiIds[0];
   $('csrf-token').value=csrf;$('bearer-token').value=bearer;
   $('csrf-token').addEventListener('input',e=>{csrf=e.target.value;clearResponse('토큰을 변경했습니다. 다시 요청하면 새 입력이 반영됩니다.');});
   $('bearer-token').addEventListener('input',e=>{bearer=e.target.value;clearResponse('토큰을 변경했습니다. 다시 요청하면 새 입력이 반영됩니다.');});
@@ -233,7 +233,7 @@ $('course-search').addEventListener('input',event=>{
   const node=$('search-results');
   if(!query){node.hidden=true;node.replaceChildren();return;}
   const found=allModules.flatMap(m=>m.days.map(d=>({m,d}))).filter(({m,d})=>`${m.title} ${d.day} day${d.day} ${d.title} ${d.concept}`.toLocaleLowerCase().includes(query)).slice(0,10);
-  node.hidden=false;node.innerHTML=found.length?found.map(({m,d})=>`<a href="${route(m,d)}"><span>DAY ${pad(d.day)} · ${esc(m.title)}</span><strong>${esc(d.title)}</strong></a>`).join(''):'<p>검색 결과가 없습니다. 게시판·로그인·재고 같은 기능 이름으로 찾아보세요.</p>';
+  node.hidden=false;node.innerHTML=found.length?found.map(({m,d})=>`<a href="${route(m,d)}"><span>${d.mode==='service'?dayLabel(d):`DAY ${pad(d.day)}`} · ${esc(m.title)}</span><strong>${esc(d.title)}</strong></a>`).join(''):'<p>검색 결과가 없습니다. 게시판·로그인·재고 같은 기능 이름으로 찾아보세요.</p>';
 });
 $('search-results').addEventListener('click',event=>{if(event.target.closest('a')){$('course-search').value='';$('search-results').hidden=true;}});
 content.addEventListener('click',event=>{

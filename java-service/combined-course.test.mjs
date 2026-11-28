@@ -4,7 +4,8 @@ import {createHash} from 'node:crypto';
 import {course} from '../java-beginner/course.mjs';
 import {loadServiceCourse} from './service-course.mjs';
 import {combineCourses,validateMergePlan} from './combined-course.mjs';
-import {moduleMarkup,route} from './view.mjs';
+import {preparePageData} from './page-data.mjs';
+import {homeMarkup,moduleMarkup,route} from './view.mjs';
 import {readCourseProgress, writeServiceProgress} from './progress.mjs';
 import {readFileSync} from 'node:fs';
 
@@ -24,8 +25,20 @@ test('두 과정의 기능 순서, 출처, 고유 회차 식별자를 합친다'
   const board=combined.modules[0],firstExtension=board.days.find(day=>day.source==='service');
   assert.ok(board.days.indexOf(firstExtension)>7);
   assert.match(route(board,firstExtension),new RegExp(`^#feature=${firstExtension.featureId}&project=${firstExtension.project}&stage=`));
-  assert.match(moduleMarkup(board,board.days[0],'task',[]),/🐝 DAY S\d{2}/);
+  assert.match(moduleMarkup(board,board.days.find(day=>day.source==='service'),'task',[]),/feature=.+&project=.+&stage=/);
+  const firstServiceModule=combined.modules.find(module=>module.source==='service');
+    assert.match(moduleMarkup(firstServiceModule,firstServiceModule.days[0],'task',[]),/🐝 1단계/);
+  const extensionStages=board.days.filter(day=>day.source==='service');
+  for(const featureId of new Set(extensionStages.map(day=>day.featureId))){
+    const featureStages=extensionStages.filter(day=>day.featureId===featureId);
+    assert.deepEqual(featureStages.map(day=>day.stageNumber),featureStages.map((_,index)=>index+1));
+  }
+  assert.ok(extensionStages.every(day=>day.progressId===`service:${day.id}`));
   assert.equal(combined.modules[12].days[0].progressId,`service:${combined.modules[12].days[0].id}`);
+  const app=readFileSync(new URL('./app.js',import.meta.url),'utf8');
+  assert.match(app,/d\.project===params\.get\('project'\)&&d\.sourceStageId===params\.get\('stage'\)\)\|\|m\.days\.find\(d=>d\.day===Number\(params\.get\('d'\)\)\)/);
+  assert.match(route(firstServiceModule,firstServiceModule.days[0]),/#feature=.+&project=.+&stage=.+&d=\d+&t=task$/);
+  assert.equal(readFileSync(new URL('./progress.mjs',import.meta.url),'utf8').includes('javaexperience.service.progress.v1'),true);
   assert.throws(()=>validateMergePlan({...mergePlan,entries:mergePlan.entries.slice(1)},course,loadServiceCourse()),/94개/);
 });
 
@@ -72,4 +85,18 @@ test('통합 뒤에도 입문 과정 60회차 화면이 기존 렌더링과 같�
   const digest=createHash('sha256').update(rows.map(row=>row.join('\0')).join('\n')).digest('hex');
   assert.equal(rows.length,240);
   assert.equal(digest,'31c20d134c62d732c964a4ed7311ea9f25664d5216346aceeb1c6a5df94b4b41');
+});
+
+test('입문 기능 홈은 실무 심화를 기능명과 단계 수로 표시하고 S번호를 숨긴다',()=>{
+  const combined=combineCourses(course,loadServiceCourse(),mergePlan);
+  const page=preparePageData(combined);
+  const home=homeMarkup(page);
+  assert.match(home,/DAY 01–08/);
+  assert.doesNotMatch(home,/DAY \d{2}–S\d{2}/);
+  for(const module of page.modules.filter(item=>item.source==='beginner'&&item.serviceExtensions.length)){
+    assert.ok(home.includes(`href="#m=${module.id}&d=`),`${module.id}: 기능 카드`);
+    for(const feature of module.serviceExtensions){
+      assert.ok(home.includes(`🐝 ${feature.title} · ${feature.stageCount}단계`),`${module.id}/${feature.id}: 실무 기능명과 단계 수`);
+    }
+  }
 });

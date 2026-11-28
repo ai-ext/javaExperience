@@ -62,16 +62,19 @@ test('실무 개념 링크는 단계 근거와 연결 수·문서 분포 기준�
   const uses=new Map();
   for(const [id,links] of Object.entries(stages)){
     assert.ok(Array.isArray(links),`${id} 링크는 배열이어야 함`);
-    assert.ok(links.length<=3,`${id} 링크가 3개를 초과함`);
+    assert.ok(links.length<=2,`${id} 링크가 2개를 초과함`);
     const [featureId,variantId,stageId]=id.split(':');
     const feature=JSON.parse(readFileSync(new URL(`../service/features/${featureId}.json`,import.meta.url),'utf8'));
     const stage=feature.variants.find(item=>item.id===variantId)?.stages.find(item=>item.id===stageId);
     assert.ok(stage,`${id} 원문 단계가 없음`);
-    const source=[stage.title,stage.brief?.story,stage.brief?.scope,stage.brief?.purpose,...(stage.tasks||[]),...(stage.check||[])].filter(Boolean).join(' ');
     for(const link of links){
       assert.ok(link.reason?.trim(),`${id} ${link.href} 연결 이유 누락`);
-      const keyword=link.reason.match(/[“"]([^”"]+)[”"]/u)?.[1];
-      assert.ok(keyword&&source.includes(keyword),`${id} 연결 이유의 핵심어가 단계 원문에 없음: ${link.reason}`);
+      assert.ok(link.reason.length<=60,`${id} 연결 이유가 60자를 초과함: ${link.reason}`);
+      assert.ok(!/단계의 [“"].+[”"] 확인에 필요한 .+ 개념입니다\.?$/u.test(link.reason),`${id} 템플릿형 이유 금지: ${link.reason}`);
+      const sourcePath=resolve(link.href.replace(/\.html$/u,'.md'));
+      assert.ok(existsSync(sourcePath),`${id} 원본 학습 문서가 없음: ${sourcePath}`);
+      const document=readFileSync(sourcePath,'utf8').slice(0,12000);
+      assert.ok(document.length>300,`${id} 문서 본문이 비어 있음: ${link.href}`);
       uses.set(link.href,(uses.get(link.href)||0)+1);
     }
   }
@@ -79,4 +82,16 @@ test('실무 개념 링크는 단계 근거와 연결 수·문서 분포 기준�
   for(const [href,count] of uses){
     if(count>Math.floor(Object.keys(stages).length*.25)) assert.ok(exceptions[href]?.trim(),`${href}가 실무 단계의 25% 초과 사용: ${count}`);
   }
+});
+
+test('오늘 필요한 개념 링크 아래에 reason을 표시하고 reason이 없으면 생략한다',()=>{
+  const service=loadServiceCourse();
+  const module=service.modules.find(item=>item.days.some(day=>day.concepts.some(link=>link.reason)));
+  const day=module.days.find(item=>item.concepts.some(link=>link.reason));
+  const withReason=moduleMarkup(module,day,'task');
+  const linked=day.concepts.find(link=>link.reason);
+  assert.ok(withReason.includes(`<p class="concept-reason">${linked.reason}</p>`));
+  const withoutReason=moduleMarkup(module,{...day,concepts:[{label:'개념 제목',href:'docs/knowledge/P16-json-jackson-practical.html'}]},'task');
+  assert.match(withoutReason,/개념 제목/);
+  assert.doesNotMatch(withoutReason,/class="concept-reason"/);
 });

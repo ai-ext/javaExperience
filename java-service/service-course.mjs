@@ -77,7 +77,7 @@ function stageData(feature, variant, stage, recipeById, sourceIndex) {
     tasks:asArray(brief.work).length ? brief.work : [brief.task || stage.title],
     check:asArray(brief.done).length ? brief.done : asArray(brief.success),
     concept:asArray(stage.concepts).map(item => item.label || item.title).join(' · ') || '원문에 개념 이름이 등록되지 않았습니다.',
-    apiIds:asArray(stage.recipeIds), brief: {
+    apiIds:asArray(stage.recipeIds), manualDbSql:sql, brief: {
       ...common,
       purpose:common.purpose,
       story:common.story || brief.purpose || '',
